@@ -1,0 +1,34 @@
+Ginger Ninja Games Ltd Source-Available License v1.0
+
+1. Grant of Use
+You are permitted to download, view, and modify the source code, assets, and related materials contained in this project (the "Software") for personal, educational, and internal development purposes only.
+
+2. Contribution Assignment
+By submitting, uploading, or otherwise contributing any code, assets, documentation, or other materials (collectively, "Contributions") to the Software, you irrevocably and unconditionally assign all worldwide right, title, and interest, including all intellectual property rights, in and to such Contributions to Ginger Ninja Games Ltd.
+You also waive any and all moral rights you may have in your Contributions to the fullest extent permitted by law.
+
+3. Restrictions on Distribution
+You may not copy, distribute, sublicense, sell, offer for sale, publish, or otherwise make available the Software or any modified or unmodified version of the Software, whether commercially or non-commercially, without the prior written permission of Ginger Ninja Games Ltd.
+
+4. License Modification and Retrospective Application
+Ginger Ninja Games Ltd reserves the right to modify the terms of this License at any time. Any such modifications may, at the sole discretion of Ginger Ninja Games Ltd, be applied retroactively to all previous versions, copies, and Contributions of the Software, regardless of when they were obtained or made.
+
+5. Patent Grant and Waiver
+By contributing to the Software, you grant Ginger Ninja Games Ltd and its users a perpetual, irrevocable, worldwide, royalty-free license under any patents you own or control to use, reproduce, prepare derivative works of, display, perform, and distribute your Contributions.
+You further waive any right to assert patent infringement claims based on your Contributions against Ginger Ninja Games Ltd or its users.
+
+6. Indemnity
+You agree to indemnify, defend, and hold harmless Ginger Ninja Games Ltd, its officers, directors, employees, and agents from and against any and all claims, damages, liabilities, losses, costs, or expenses (including reasonable legal fees) arising out of or relating to your use of the Software or any Contributions you submit.
+
+7. Governing Law and Jurisdiction
+This License shall be governed by and construed in accordance with the laws of England and Wales.
+Any disputes arising out of or relating to this License shall be subject to the exclusive jurisdiction of the courts of England and Wales.
+
+8. No Obligation to Accept Contributions
+Ginger Ninja Games Ltd reserves the right to review, reject, modify, or remove any Contributions at its sole discretion and is under no obligation to include or incorporate any Contributions into the Software.
+
+9. No Warranty
+The Software is provided "as is" and without any warranty of any kind, whether express, implied, or statutory, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.
+
+10. Termination
+Your rights under this License will automatically terminate if you breach any of its terms. Upon termination, you must immediately cease all use of the Software and destroy all copies in your possession or control.
