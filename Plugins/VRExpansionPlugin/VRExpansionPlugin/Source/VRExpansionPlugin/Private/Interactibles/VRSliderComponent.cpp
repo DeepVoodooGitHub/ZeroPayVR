@@ -486,7 +486,7 @@ void UVRSliderComponent::CheckSliderProgress()
 	if (FMath::Abs(LastSliderProgressState - CurrentSliderProgress) >= (bSliderUsesSnapPoints ? FMath::Min(EventThrowThreshold, SnapIncrement / 2.0f) : EventThrowThreshold))
 	{
 		bHitEventThreshold = true;
-	}
+	} 
 }
 
 void UVRSliderComponent::OnGrip_Implementation(UGripMotionControllerComponent * GrippingController, const FBPActorGripInformation & GripInformation) 
