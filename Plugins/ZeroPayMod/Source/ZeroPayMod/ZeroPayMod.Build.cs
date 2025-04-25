@@ -11,7 +11,6 @@ public class ZeroPayMod : ModuleRules
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
-                
             }
             );
 				

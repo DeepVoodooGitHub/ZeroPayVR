@@ -11,7 +11,7 @@ public class ZeroPayVREditorTarget : TargetRules
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
 
         Type = TargetType.Editor;
-        ExtraModuleNames.AddRange(new string[] { "ZeroPayVR" });
+        ExtraModuleNames.AddRange(new string[] { "ZeroPayVR", "VRExpansionPlugin" });
 		//bUseUnityBuild = false;
 		//bUsePCHFiles = false;
     }
