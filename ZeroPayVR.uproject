@@ -48,12 +48,7 @@
 		},
 		{
 			"Name": "SteamVR",
-			"Enabled": false,
-			"SupportedTargetPlatforms": [
-				"Win32",
-				"Win64",
-				"Linux"
-			]
+			"Enabled": false
 		},
 		{
 			"Name": "OpenXRHandTracking",
@@ -91,12 +86,7 @@
 		},
 		{
 			"Name": "OculusXR",
-			"Enabled": false,
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/8313d8d7e7cf4e03a33e79eb757bccba",
-			"SupportedTargetPlatforms": [
-				"Win64",
-				"Android"
-			]
+			"Enabled": false
 		}
 	]
 }

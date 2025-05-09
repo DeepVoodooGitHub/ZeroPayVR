@@ -32,7 +32,7 @@ public:
 
 	// Debug helper functions
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target"))
-	static void AddDebugConsoleLine(AActor* target, FDebugConsoleLevel debugConsoleLevel = Log, const FString& value = "")
+	static void AddDebugConsoleLine(AActor* target, FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true, const FString& value = "")
 	{
 		if (!IsValid(target))
 			return;
@@ -47,15 +47,20 @@ public:
 			return ;
 
 		/* Append time */
-		FString TimeString = FString::SanitizeFloat(MyWorld->GetTimeSeconds()) + TEXT(" ") ;
+		FString TimeString = FString::Printf(TEXT("%.3f "), MyWorld->GetTimeSeconds());
+		
+		/* Include name */
+		FString ObjectName = "";
+		if (bIncludeObjectName)
+			ObjectName = TEXT("(") + target->GetName() + TEXT(") ");
 
 		/* Build output string */
 		FString OutputString ; 
 		switch (debugConsoleLevel)
 		{
-			case Log: OutputString = TEXT("[Log] ") + TimeString + value; break;
-			case Warn: OutputString = TEXT("[Warn] ") + TimeString + value; break;
-			case Error: OutputString = TEXT("[Error] ") + TimeString + value; break;
+			case Log: OutputString = TEXT("[Log] ") + TimeString + ObjectName + value; break;
+			case Warn: OutputString = TEXT("[Warn] ") + TimeString + ObjectName + value; break;
+			case Error: OutputString = TEXT("[Error] ") + TimeString + ObjectName + value; break;
 			default: OutputString = TimeString + value; break;
 		}
 

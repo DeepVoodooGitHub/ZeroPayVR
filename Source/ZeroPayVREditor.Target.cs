@@ -7,25 +7,12 @@ public class ZeroPayVREditorTarget : TargetRules
 {
 	public ZeroPayVREditorTarget(TargetInfo Target) : base(Target)
 	{
-        DefaultBuildSettings = BuildSettingsVersion.Latest; // V5
-		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
+        Type = TargetType.Editor;
+        DefaultBuildSettings = BuildSettingsVersion.V5;
+        IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_5;
 
         Type = TargetType.Editor;
         ExtraModuleNames.AddRange(new string[] { "ZeroPayVR", "VRExpansionPlugin" });
-		//bUseUnityBuild = false;
-		//bUsePCHFiles = false;
     }
 
-	//
-	// TargetRules interface.
-	//
-
-/*	public override void SetupBinaries(
-		TargetInfo Target,
-		ref List<UEBuildBinaryConfiguration> OutBuildBinaryConfigurations,
-		ref List<string> OutExtraModuleNames
-		)
-	{
-		OutExtraModuleNames.AddRange( new string[] { "ZeroPayVR" } );
-	}*/
 }

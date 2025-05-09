@@ -5,20 +5,13 @@ using System.Collections.Generic;
 
 public class ZeroPayVRTarget : TargetRules
 {
-	public ZeroPayVRTarget(TargetInfo Target) : base(Target)
-	{
+    public ZeroPayVRTarget(TargetInfo Target) : base(Target)
+    {
 
-        DefaultBuildSettings = BuildSettingsVersion.Latest;
-        IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-
-        // For debugging with push disabled
-        //bWithPushModel = false;
-
-        //bUseLoggingInShipping = true;
-        Type = TargetType.Game;
-        ExtraModuleNames.AddRange(new string[] { "ZeroPayVR" });
-        //bUsePCHFiles = false;
-        //bUseUnityBuild = false;
+        DefaultBuildSettings = BuildSettingsVersion.V5;
+        IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_5;
+        ExtraModuleNames.Add("ZeroPayVR");
+        //ExtraModuleNames.AddRange(new string[] { "ZeroPayVR" });
 
         /*
          * This is our Steam App ID.
@@ -26,39 +19,5 @@ public class ZeroPayVRTarget : TargetRules
          */
         ProjectDefinitions.Add("UE_PROJECT_STEAMSHIPPINGID=480");
 
-
-
-        /*
-         * This is used on SetProduct(), and should be the same as your Product Name
-         * under Dedicated Game Server Information in Steamworks
-         * # Define in the Server target
-         */
-        //ProjectDefinitions.Add("UE_PROJECT_STEAMPRODUCTNAME=\"MyGame\"");
-
-        /*
-         * This is used on SetModDir(), and should be the same as your Product Name
-         * under Dedicated Game Server Information in Steamworks
-         * # Define in the client target
-         */
-        //ProjectDefinitions.Add("UE_PROJECT_STEAMGAMEDIR=\"MyGame\"");
-
-        /*
-         * This is what shows up under the game filter in Steam server browsers.
-         * # Define in both server and client targets
-         */
-        //ProjectDefinitions.Add("UE_PROJECT_STEAMGAMEDESC=\"My Game\"");
     }
-
-    //
-    // TargetRules interface.
-    //
-
-    /*public override void SetupBinaries(
-		TargetInfo Target,
-		ref List<UEBuildBinaryConfiguration> OutBuildBinaryConfigurations,
-		ref List<string> OutExtraModuleNames
-		)
-	{
-		OutExtraModuleNames.AddRange( new string[] { "ZeroPayVR" } );
-	}*/
 }
