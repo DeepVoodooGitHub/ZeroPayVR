@@ -64,6 +64,12 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, meta = (DisplayName = "Slider Finished Lerping"))
 		void ReceiveSliderFinishedLerping(float FinalProgress);
 
+	UPROPERTY(BlueprintAssignable, Category = "VRSliderComponent")
+		FVRSliderOnProgressSignature OnSliderProgress ;		
+
+	UFUNCTION(BlueprintImplementableEvent, meta = (DisplayName = "Slider Progress"))
+		void ReceiveSliderProgressEvent(float CurrentProgress);
+
 	// If true then this slider will only update in its tick event instead of normally using the controllers update event
 	// Keep in mind that you then must adjust the tick group in order to make sure it happens after the gripping controller
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VRSliderComponent")
@@ -80,6 +86,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VRSliderComponent")
 		EVRInteractibleSliderDropBehavior SliderBehaviorWhenReleased;
+
+	// If true, any held movement results in the OnProgressEvent callback
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VRSliderComponent")
+		bool bExecuteProgressEvent ;
 
 	// Number of frames to average momentum across for the release momentum (avoids quick waggles)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VRSliderComponent|Momentum Settings", meta = (ClampMin = "0", ClampMax = "12", UIMin = "0", UIMax = "12"))

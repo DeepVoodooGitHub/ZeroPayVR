@@ -46,6 +46,7 @@ UVRSliderComponent::UVRSliderComponent(const FObjectInitializer& ObjectInitializ
 	SliderMomentumFriction = 3.0f;
 	MaxSliderMomentum = 1.0f;
 	FramesToAverage = 3;
+	bExecuteProgressEvent = false;
 
 	InitialInteractorLocation = FVector::ZeroVector;
 	InitialGripLoc = FVector::ZeroVector;
@@ -274,7 +275,7 @@ void UVRSliderComponent::TickComponent(float DeltaTime, enum ELevelTick TickType
 			this->SetComponentTickEnabled(false);
 			bReplicateMovement = bOriginalReplicatesMovement;
 		}
-		
+				
 		// Check for the hit point always
 		CheckSliderProgress();
 	}
@@ -431,6 +432,10 @@ void UVRSliderComponent::TickGrip_Implementation(UGripMotionControllerComponent 
 
 	// Check if we should auto drop
 	CheckAutoDrop(GrippingController, GripInformation);
+
+	// ZeroPay - Return slide progress (inverted)
+	ReceiveSliderProgressEvent(1.0f - CurrentSliderProgress);
+	OnSliderProgress.Broadcast(1.0f - CurrentSliderProgress);
 }
 
 bool UVRSliderComponent::CheckAutoDrop(UGripMotionControllerComponent * GrippingController, const FBPActorGripInformation & GripInformation)
