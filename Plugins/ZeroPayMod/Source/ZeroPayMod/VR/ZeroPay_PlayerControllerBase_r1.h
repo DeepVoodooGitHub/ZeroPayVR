@@ -12,9 +12,6 @@
 UCLASS()
 class ZEROPAYMOD_API AZeroPay_PlayerControllerBase_r1 : public AVRPlayerController
 {
-	GENERATED_BODY()
-	
-	
-	
+	GENERATED_BODY()	
 	
 };

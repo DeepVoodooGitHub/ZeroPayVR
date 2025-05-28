@@ -17,7 +17,7 @@ public class ZeroPayVRTarget : TargetRules
          * This is our Steam App ID.
          * # Define in both server and client targets
          */
-        ProjectDefinitions.Add("UE_PROJECT_STEAMSHIPPINGID=480");
+        ProjectDefinitions.Add("UE_PROJECT_STEAMSHIPPINGID= ");
 
     }
 }

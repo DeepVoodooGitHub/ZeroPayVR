@@ -118,7 +118,7 @@ void UZeroPay_DebugConsoleComponent::AddDebugConsoleLine_MULTICAST_Implementatio
 		/* Execute a BP function on that actor */
 		FOutputDeviceNull ar;
 		char funcCallBuf[2048];
-		_snprintf_s(funcCallBuf, sizeof(funcCallBuf), "AddLine \"%s\"", TCHAR_TO_ANSI(*value));
+		snprintf(funcCallBuf, sizeof(funcCallBuf), "AddLine \"%s\"", TCHAR_TO_ANSI(*value));
 		FoundDebugConsoleActors[nCounter]->CallFunctionByNameWithArguments(ANSI_TO_TCHAR(funcCallBuf), ar, NULL, true);
 	}
 }

@@ -3,6 +3,3 @@
 
 #include "VR/ZeroPay_PlayerControllerBase_r1.h"
 
-
-
-

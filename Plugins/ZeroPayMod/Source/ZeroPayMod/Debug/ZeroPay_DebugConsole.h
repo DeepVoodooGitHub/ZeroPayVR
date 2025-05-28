@@ -31,6 +31,15 @@ public:
 	{
 		if (!target) return;
 
+		// Dedicated server's just log to standard UE5 output
+		if (IsRunningDedicatedServer())
+		{
+			// TODO - Convert FDebugConsoleLevel to UE version
+			UE_LOG(LogTemp, Log, TEXT("Debug: %s"), *value);
+			return;
+		}
+			
+
 		UZeroPay_DebugConsoleComponent* DebugConsoleComponent = target->FindComponentByClass<UZeroPay_DebugConsoleComponent>();
 
 		if (!DebugConsoleComponent)

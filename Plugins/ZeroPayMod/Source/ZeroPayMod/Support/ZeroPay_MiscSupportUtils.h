@@ -36,8 +36,16 @@ public:
 	AZeroPay_MiscSupportUtils();
 	~AZeroPay_MiscSupportUtils();
 
-	// Debug helper functions
+	// Returns the correct path based on whether the "target" actor is controlled (on the network) locally or remotely
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
 	static void IsLocallyControlled(AActor* target, EZeroPay_NetControllerStatus& Result) ;
+
+	// Returns the current network version, used to keep mismatches servers and clients apart
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Support")
+	static int GetNetVersionNumber()
+	{
+		return 1;
+	}
+
 	
 };
