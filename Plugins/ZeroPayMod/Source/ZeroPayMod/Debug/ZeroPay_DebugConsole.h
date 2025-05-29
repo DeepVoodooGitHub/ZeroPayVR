@@ -29,16 +29,30 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target"))
 	static void AddDebugConsoleLine(AActor* target, FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true, const FString& value = "")
 	{
-		if (!target) return;
-
 		// Dedicated server's just log to standard UE5 output
 		if (IsRunningDedicatedServer())
 		{
-			// TODO - Convert FDebugConsoleLevel to UE version
-			UE_LOG(LogTemp, Log, TEXT("Debug: %s"), *value);
+			switch(debugConsoleLevel)
+			{
+				case None:
+				case Log:
+				case Warn:
+				{
+					/* We always print it as "warning" (orange) so that it's clear to see what's happening.. */
+					UE_LOG(LogTemp, Warning, TEXT("%s"), *value);
+					return;
+				}
+				case Error:
+				{
+					UE_LOG(LogTemp, Error, TEXT("%s"), *value);
+					return;
+				}
+				
+			}
 			return;
-		}
-			
+		}			
+
+		if (!target) return;
 
 		UZeroPay_DebugConsoleComponent* DebugConsoleComponent = target->FindComponentByClass<UZeroPay_DebugConsoleComponent>();
 

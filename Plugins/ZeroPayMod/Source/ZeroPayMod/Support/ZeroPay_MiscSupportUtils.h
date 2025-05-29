@@ -47,5 +47,33 @@ public:
 		return 1;
 	}
 
+	// Reads a command line argument 
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Support")
+	static FString GetCommandLineOption(FString OptionName)
+	{
+		FString Result = "";
+		FString FullKey = FString("-") + OptionName + TEXT("=");
+		FParse::Value(FCommandLine::Get(), *FullKey, Result);
+		return Result;
+	}
+
+
+	// Allow audio to continue if the game does not have focus
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
+	static void EnableBackgroundAudio()
+	{
+		FApp::SetUnfocusedVolumeMultiplier(1.0f);
+	}
+
+	// Returns true if on packaged dedicated server build (will return FALSE in editor even if a server) 
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Support")
+	static bool isDedicatedServer()
+	{
+#if UE_SERVER
+		return true;
+#else
+		return false;
+#endif
+	}
 	
 };
