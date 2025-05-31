@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Misc/Paths.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/OutputDeviceNull.h"
 #include "ZeroPay_MiscSupportUtils.generated.h"
@@ -35,6 +36,10 @@ protected:
 public:
 	AZeroPay_MiscSupportUtils();
 	~AZeroPay_MiscSupportUtils();
+
+	// Call from the BeginPlay event in your levels blueprint, this starts the underlying ZeroPay VR subsystems
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support", meta = (DefaultToSelf = "target"))
+	static void InitialiseZeroPayVR(AActor* target) ;
 
 	// Returns the correct path based on whether the "target" actor is controlled (on the network) locally or remotely
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
@@ -76,4 +81,10 @@ public:
 #endif
 	}
 	
+	// Gets the project root directory 
+	UFUNCTION(BlueprintPure, Category =  "ZeroPay Mod Support")
+	static FString GetProjectRootDir()
+	{
+		return FPaths::ProjectDir() ; 
+	}
 };

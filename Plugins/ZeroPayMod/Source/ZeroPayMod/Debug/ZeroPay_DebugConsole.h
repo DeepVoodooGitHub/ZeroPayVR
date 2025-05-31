@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ZeroPayMod.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
@@ -23,28 +24,52 @@ protected:
 
 public:	
 
-	// Adds a debug line to the in-world console (if it exists) this is replicated
+	// CLIENT: Adds a debug line to the in-world console (if it exists) this is replicated
 	// across the network and reports whether the node executed on the server or client
 	// Can be disabled for this entire object by using SetDebugConsoleEnabled()
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target"))
-	static void AddDebugConsoleLine(AActor* target, FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true, const FString& value = "")
+	// SERVER: This will always output to the console, with colour coding (Log = Green, Warn = Yellow, Error = Red)
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", AdvancedDisplay = "debugConsoleLevel, bIncludeObjectName"))
+	static void AddDebugConsoleLine(AActor* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
 	{
 		// Dedicated server's just log to standard UE5 output
 		if (IsRunningDedicatedServer())
 		{
+
+			/* Include name */
+			FString ObjectName = "[No Object]";
+			if (bIncludeObjectName)
+			{
+				if (target != nullptr)
+				{
+					ObjectName = target->GetFName().ToString();
+
+					/* Strip UAID */
+					int32 Index = ObjectName.Find(TEXT("_UAID_"), ESearchCase::IgnoreCase, ESearchDir::FromStart);
+					if (Index != INDEX_NONE)
+						ObjectName = ObjectName.Left(Index); // Keep everything before _UAID_
+				}
+			}
+
 			switch(debugConsoleLevel)
 			{
 				case None:
 				case Log:
+				{
+					/* Output in Green the message */
+					UE_LOG(LogZeroPay, Log, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName , *value);
+
+					return;
+				}
 				case Warn:
 				{
-					/* We always print it as "warning" (orange) so that it's clear to see what's happening.. */
-					UE_LOG(LogTemp, Warning, TEXT("%s"), *value);
+					/* Yellow warnings */
+					UE_LOG(LogZeroPay, Warning, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName, *value);
 					return;
 				}
 				case Error:
 				{
-					UE_LOG(LogTemp, Error, TEXT("%s"), *value);
+					/* Red errors */
+					UE_LOG(LogZeroPay, Error, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName, *value);
 					return;
 				}
 				
@@ -61,7 +86,7 @@ public:
 			DebugConsoleComponent = NewObject<UZeroPay_DebugConsoleComponent>(target);
 			DebugConsoleComponent->RegisterComponent(); // Make sure it gets ticking/network support
 
-			UE_LOG(LogTemp, Warning, TEXT("AddDebugConsoleLine() called on actor %s with ZeroPay_DebugConsole component. Created component but first output line may not RPC correctly or disconnection will occur!"), *target->GetName());
+			UE_LOG(LogZeroPay, Warning, TEXT("AddDebugConsoleLine() called on actor %s with ZeroPay_DebugConsole component. Created component but first output line may not RPC correctly or disconnection will occur!"), *target->GetName());
 		}
 
 		DebugConsoleComponent->AddDebugConsoleLine(debugConsoleLevel, bIncludeObjectName, value );
@@ -81,7 +106,7 @@ public:
 			DebugConsoleComponent = NewObject<UZeroPay_DebugConsoleComponent>(target);
 			DebugConsoleComponent->RegisterComponent(); // Make sure it gets ticking/network support
 
-			UE_LOG(LogTemp, Warning, TEXT("SetDebugConsoleDisabled() called on actor %s with ZeroPay_DebugConsole component. Created component but first output line may not RPC correctly or disconnection will occur!"), *target->GetName());
+			UE_LOG(LogZeroPay, Warning, TEXT("SetDebugConsoleDisabled() called on actor %s with ZeroPay_DebugConsole component. Created component but first output line may not RPC correctly or disconnection will occur!"), *target->GetName());
 		}
 
 		DebugConsoleComponent->SetDebugConsoleDisabled(bDisableDebugOutput);

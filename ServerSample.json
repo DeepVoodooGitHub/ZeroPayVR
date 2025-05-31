@@ -1,0 +1,8 @@
+{
+  "ServerName": "TestServer01",
+  "MapName": "LVL_Debug2_Persistant",
+  "MaxPlayers": 32,
+  "GameMode": "TeamDeathmatch",
+  "Pin": 0,
+  "Test" : "yes"
+}

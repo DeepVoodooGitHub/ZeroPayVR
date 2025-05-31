@@ -4,6 +4,8 @@
 
 #include "Modules/ModuleManager.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(LogZeroPay, Log, All);
+
 class FZeroPayModModule : public IModuleInterface
 {
 public:

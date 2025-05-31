@@ -3,6 +3,7 @@
 #include "ZeroPayMod.h"
 
 #define LOCTEXT_NAMESPACE "FZeroPayModModule"
+DEFINE_LOG_CATEGORY(LogZeroPay);
 
 void FZeroPayModModule::StartupModule()
 {
