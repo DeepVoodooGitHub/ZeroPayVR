@@ -11,6 +11,8 @@
 #include "EditorBuildUtils.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Widgets/Notifications/SNotificationList.h"
+#include "EngineUtils.h"
+#include "Misc/OutputDeviceNull.h"
 
 static const FName ZeroPayEditorButtonsPluginTabName("ZeroPayEditorButtonsPlugin");
 
@@ -61,6 +63,52 @@ void FZeroPayEditorButtonsPluginModule::ShutdownModule()
 
 void FZeroPayEditorButtonsPluginModule::ShowQuest3View_Clicked()
 {
+	UWorld* EditorWorld = GEditor->GetEditorWorldContext().World();
+	if (!EditorWorld) return;
+
+	// Load Blueprint class
+	UBlueprint* LoadedBP = LoadObject<UBlueprint>(nullptr, TEXT("/ZeroPayEditorPlugin/Blueprints/BP_ModIO_Test.BP_ModIO_Test"));
+	if (!LoadedBP || !LoadedBP->GeneratedClass) return;
+
+	UClass* ActorClass = LoadedBP->GeneratedClass;
+
+	// Spawn it
+	FName TargetName(TEXT("ModioEditorInstance"));
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Name = TargetName ;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParams.ObjectFlags = RF_Transient | RF_DuplicateTransient;  // Won’t save to level
+
+	bool bAlreadyExists = false;
+	AActor* SpawnedActor = nullptr;
+
+	/* Detect already in world */
+	for (AActor* Actor : TActorRange<AActor>(EditorWorld))
+	{
+		if (Actor && Actor->GetFName() == TargetName)
+		{
+			// Found it
+			bAlreadyExists = true ;
+			SpawnedActor = Actor;
+			break;
+		}
+	}
+
+	if (!bAlreadyExists)
+		SpawnedActor = EditorWorld->SpawnActor<AActor>(ActorClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+
+	if (!SpawnedActor) return;
+
+	SpawnedActor->SetActorHiddenInGame(true);         // Optional: hide from view
+	SpawnedActor->SetFlags(RF_Transient);             // Extra safety
+
+	// Call a function (must be BlueprintCallable)
+	FOutputDeviceNull ar;
+	char funcCallBuf[2048];
+	snprintf(funcCallBuf, sizeof(funcCallBuf), "UploadToModio");
+	SpawnedActor->CallFunctionByNameWithArguments(ANSI_TO_TCHAR(funcCallBuf), ar, NULL, true);
+
+#if 0
 	if (GEditor)
 	{
 		UWorld* World = nullptr;
@@ -110,6 +158,7 @@ void FZeroPayEditorButtonsPluginModule::ShowQuest3View_Clicked()
 
 		}
 	}
+#endif
 }
 
 void FZeroPayEditorButtonsPluginModule::ShowPCVRView_Clicked()
@@ -120,6 +169,11 @@ void FZeroPayEditorButtonsPluginModule::ShowPCVRView_Clicked()
 
 void FZeroPayEditorButtonsPluginModule::BakeMap_Clicked()
 {
+	UE_LOG(LogTemp, Log, TEXT("Test"));
+
+
+	return;
+#if 0
 	UE_LOG(LogTemp, Log, TEXT("Executing Bake.."));
 	ShowTemporaryNotification("ZeroPay - Starting full bake of world (due to UE5 bug).");
 
@@ -181,7 +235,7 @@ void FZeroPayEditorButtonsPluginModule::BakeMap_Clicked()
 
 	// Build Lightning again
 	FEditorBuildUtils::EditorBuild(GEditor->GetEditorWorldContext().World(), FBuildOptions::BuildLighting);
-
+#endif
 }
 
 

@@ -2,6 +2,11 @@
 
 #pragma once
 
+#include "DesktopPlatformModule.h"
+#include "IDesktopPlatform.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
+#include "EditorUtilitySubsystem.h"
+#include "EditorUtilityWidgetBlueprint.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Misc/Paths.h"
@@ -39,11 +44,11 @@ public:
 
 	// Call from the BeginPlay event in your levels blueprint, this starts the underlying ZeroPay VR subsystems
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support", meta = (DefaultToSelf = "target"))
-	static void InitialiseZeroPayVR(AActor* target) ;
+	static void InitialiseZeroPayVR(AActor* target);
 
 	// Returns the correct path based on whether the "target" actor is controlled (on the network) locally or remotely
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
-	static void IsLocallyControlled(AActor* target, EZeroPay_NetControllerStatus& Result) ;
+	static void IsLocallyControlled(AActor* target, EZeroPay_NetControllerStatus& Result);
 
 	// Returns the current network version, used to keep mismatches servers and clients apart
 	UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Support")
@@ -80,11 +85,101 @@ public:
 		return false;
 #endif
 	}
-	
+
 	// Gets the project root directory 
-	UFUNCTION(BlueprintPure, Category =  "ZeroPay Mod Support")
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Support")
 	static FString GetProjectRootDir()
 	{
-		return FPaths::ProjectDir() ; 
+		return FPaths::ProjectDir();
 	}
+
+	// Shows an editor utility widget
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
+	static void ShowEditorUtilityWidget(UEditorUtilityWidgetBlueprint* EditorWidget)
+	{
+		if (EditorWidget)
+		{
+			UEditorUtilitySubsystem* EditorUtilitySubsystem = GEditor->GetEditorSubsystem<UEditorUtilitySubsystem>();
+			EditorUtilitySubsystem->SpawnAndRegisterTab(EditorWidget);
+		}
+	}
+
+	// Editor configuration support
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
+	static void SetEditorConfigurationBool(FString field, bool bValue)
+	{
+		GConfig->SetBool(
+			TEXT("/Script/ZeroPayVR.EditorSettings"),
+			*field,
+			bValue,
+			GEditorPerProjectIni);
+
+		GConfig->Flush(false, GEditorPerProjectIni);  // Persist immediately
+	};
+
+
+	// Editor configuration support
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
+	static void SetEditorConfigurationString(FString field, FString Value)
+	{
+		GConfig->SetString(
+			TEXT("/Script/ZeroPayVR.EditorSettings"),
+			*field,
+			*Value,
+			GEditorPerProjectIni);
+
+		GConfig->Flush(false, GEditorPerProjectIni);  // Persist immediately
+	};
+
+	// Editor configuration support
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
+	static bool GetEditorConfigurationBool(FString field)
+	{
+		bool returnValue = false ;
+
+		GConfig->GetBool(
+			TEXT("/Script/ZeroPayVR.EditorSettings"),
+			*field,
+			returnValue,
+			GEditorPerProjectIni);
+
+		return returnValue;
+	};
+
+	// Editor configuration support
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
+	static FString GetEditorConfigurationString(FString field)
+	{
+		FString returnValue = "";
+
+		GConfig->GetString(
+			TEXT("/Script/ZeroPayVR.EditorSettings"),
+			*field,
+			returnValue,
+			GEditorPerProjectIni);
+
+		return returnValue;
+	};
+
+	// Editor configuration support
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
+	static void OpenFilePicker(FString windowTitle, FString fileTypes, TArray<FString>& OutFiles)
+	{
+		IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+		if (DesktopPlatform)
+		{
+			const void* ParentWindowHandle = nullptr; 
+			DesktopPlatform->OpenFileDialog(
+				ParentWindowHandle,
+				windowTitle,
+				TEXT(""),
+				TEXT(""),
+				fileTypes,
+				EFileDialogFlags::None,
+				OutFiles
+			);
+			// Handle selected file(s)
+		}
+	}
+
 };

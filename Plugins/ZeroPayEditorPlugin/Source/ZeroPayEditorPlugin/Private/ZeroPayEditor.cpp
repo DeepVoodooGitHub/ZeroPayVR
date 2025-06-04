@@ -54,7 +54,6 @@ FZeroPayEditorModule::FZeroPayEditorModule()
 	bSetupIsDeploying = false;
 	nUGCValue = 0;
 
-	ValidateUGC();
 }
 
 FZeroPayEditorModule::~FZeroPayEditorModule()

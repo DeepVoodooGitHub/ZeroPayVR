@@ -35,8 +35,8 @@ public:
 		if (IsRunningDedicatedServer())
 		{
 
-			/* Include name */
-			FString ObjectName = "[No Object]";
+			/* Include name (note the GameInstance uses a null target, as it's not an AActor so we default to that) */
+			FString ObjectName = "[GameInstance]";
 			if (bIncludeObjectName)
 			{
 				if (target != nullptr)

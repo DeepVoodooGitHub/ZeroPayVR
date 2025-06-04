@@ -19,7 +19,7 @@ public class ZeroPayMod : ModuleRules
 			new string[] {
 				// ... add other private include paths required here ...
 				"ZeroPayMod",
-            }
+				}
             );
 			
 		
@@ -45,6 +45,15 @@ public class ZeroPayMod : ModuleRules
                 "GameplayTags",
                 "OpenXRExpansionPlugin",
                 "VRExpansionPlugin",
+                "EditorFramework",
+                "UnrealEd",
+				"UMGEditor",
+                "ToolMenus",
+                "ToolWidgets",
+                "BlueprintGraph",
+                "Blutility",
+				"EditorSubsystem",
+				"UnrealEd"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

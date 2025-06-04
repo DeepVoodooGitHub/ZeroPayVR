@@ -30,7 +30,6 @@ public class ZeroPayEditorPlugin : ModuleRules
                 "Steamworks",
                 "NavigationSystem",
 				"UMG"
-
 				// ... add other public dependencies that you statically link with here ...
 			}
             );

@@ -43,6 +43,8 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
+                "Blutility",
+                "UMGEditor"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

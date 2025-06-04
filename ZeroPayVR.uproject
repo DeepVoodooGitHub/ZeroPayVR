@@ -109,6 +109,15 @@
 		{
 			"Name": "JsonBlueprintUtilities",
 			"Enabled": true
+		},
+		{
+			"Name": "ModioComponentUI",
+			"Enabled": true
+		},
+		{
+			"Name": "modio",
+			"Enabled": true,
+			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/1ab22ed2961a4cc19b9151bd072df998"
 		}
 	]
 }
