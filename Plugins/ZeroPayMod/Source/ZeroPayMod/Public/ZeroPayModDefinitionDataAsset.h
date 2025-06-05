@@ -12,46 +12,29 @@ struct FZeroPayModDefinition
 {
 	GENERATED_USTRUCT_BODY()
 
-	// The steam workshop UGC, this is automatically assigned - (DO NOT CHANGE)
+	// The UGC, this is automatically assigned by mod.io - (DO NOT CHANGE)
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-		FString SteamWorks_UGCID;
+		FString UGCID;
 
-	// The mod.io UGC, this is automatically assigned - (DO NOT CHANGE)
-	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-		FString ModIO_UGCID;
-
-	// Levels 
+	// The parent persistent level (REQUIRED) - MUST reference (as sub levels) the other levels
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 		TSoftObjectPtr<UWorld> persistentlevel;
 
+	// the PCVR sub-level (REQUIRED)
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 		TSoftObjectPtr<UWorld> pcvrlevel;
 
+	// the quest 3 level ((REQUIRED)
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 		TSoftObjectPtr<UWorld> quest3level;
 
+	// DO NOT USE - FUTURE
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 		TSoftObjectPtr<UWorld> quest4level;
 
+	// DO NOT USE - FUTURE
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 		TSoftObjectPtr<UWorld> psvrlevel;
-
-	// Your name for this level or mod ** will appear on server browser **
-	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-		FString modName ;
-
-	// Describe this mod
-	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-		FString modDescription ;
-
-	// Image used on workshop (512x512)
-	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-		UTexture2D* workshopImage ;
-
-	// Assets 
-	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-		TArray<FString> assetPaths;
-
 };
 
 UCLASS(BlueprintType)
@@ -59,14 +42,13 @@ class ZEROPAYMOD_API UZeroPayModDefinitionDataAsset : public UDataAsset
 {
 	GENERATED_BODY()
 public:
+	// Mod information
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 		FZeroPayModDefinition Definition ;
 
+	// Dependant UGC's
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-		TArray<FString> SteamWorkshopUGCDependancies ;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-		TArray<FString> ModIOUGCDependancies;
+		TArray<FString> UGCDependancies;
 
 	UZeroPayModDefinitionDataAsset() 
 	{

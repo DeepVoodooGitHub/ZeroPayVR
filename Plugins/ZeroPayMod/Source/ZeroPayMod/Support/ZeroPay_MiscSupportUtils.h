@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ZeroPayModDefinitionDataAsset.h"
 #include "DesktopPlatformModule.h"
 #include "IDesktopPlatform.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
@@ -178,7 +179,32 @@ public:
 				EFileDialogFlags::None,
 				OutFiles
 			);
-			// Handle selected file(s)
+		}
+	}
+
+	// Create a new definition file with some initial data
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
+	static void CreateAndSaveModDefinitionFile(FString UGCValue)
+	{
+		/* Valid.. create directory */
+		FString UGCPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()) + FString("ZeroPayMods/") + FString::Printf(TEXT("UGC%s"), *UGCValue);
+		FPlatformFileManager::Get().GetPlatformFile().CreateDirectory(*UGCPath);
+
+		FString sFullPath = UGCPath + FString("/ZeroPayDefinition");
+		FString sAssetFullPath = FString("/Game/ZeroPayMods/UGC") + *UGCValue + FString("/Definition");
+		FString sAssetName = FString("ZeroPayDefinition");
+
+		auto* package = CreatePackage(*sAssetFullPath);
+
+		UZeroPayModDefinitionDataAsset* level_asset = NewObject< UZeroPayModDefinitionDataAsset >(package, UZeroPayModDefinitionDataAsset::StaticClass(), *sAssetName, RF_Public | RF_Standalone);
+
+		level_asset->Definition.UGCID = UGCValue;
+
+		if (ensure(level_asset != nullptr))
+		{
+			const auto file_name = FString::Printf(TEXT("%s%s"), *sFullPath, *FPackageName::GetAssetPackageExtension());
+
+			UPackage::SavePackage(package, nullptr, EObjectFlags::RF_Public | EObjectFlags::RF_Standalone, *file_name);
 		}
 	}
 

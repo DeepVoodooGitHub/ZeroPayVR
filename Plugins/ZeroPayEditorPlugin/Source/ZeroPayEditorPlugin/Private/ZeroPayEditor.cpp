@@ -847,7 +847,7 @@ void FZeroPayEditorModule::CreateAndSaveDataDefinition(FString UGCPath, FString 
 	FString sAssetName = FString("Definition");
 
 	auto * package = CreatePackage(*sAssetFullPath);
-
+#if 0
 	UZeroPayModDefinitionDataAsset* level_asset = NewObject< UZeroPayModDefinitionDataAsset >(package, UZeroPayModDefinitionDataAsset::StaticClass(), *sAssetName, RF_Public | RF_Standalone);
 
 	level_asset->Definition.SteamWorks_UGCID = SteamWorks_UGCID_;
@@ -860,6 +860,7 @@ void FZeroPayEditorModule::CreateAndSaveDataDefinition(FString UGCPath, FString 
 
 		//FAssetRegistryModule::AssetCreated(level_asset);
 	}
+#endif
 }
 
 
@@ -926,7 +927,7 @@ FReply FZeroPayEditorModule::OnClick_Deploy()
 	// Validate the definitions (must be done in main game thread, so the debugger says - still works tbh)
 	FString sAssetFullPath = FString("/Game/CustomContent/") + UGCValue.ToString() + FString("/Definition.uasset");
 	FString sAssetName = FString("Definition");
-
+#if 0
 	// Open definition
 	auto * package = LoadPackage(nullptr, *sAssetFullPath, LOAD_None);
 	dataAsset = FindObject<UZeroPayModDefinitionDataAsset>(package, *sAssetName);
@@ -987,7 +988,7 @@ FReply FZeroPayEditorModule::OnClick_Deploy()
 		}
 	}
 #endif
-
+#endif
 	auto Future = Async(EAsyncExecution::ThreadPool, [&]
 	{
 		return Perform_Deploy();
@@ -1626,6 +1627,7 @@ bool FZeroPayEditorModule::UploadUGC()
 		return false;
 	}
 
+#if 0
 	// >> STTEAM UGC COMMANDS
 	UGCUpdateHandle_t hStartItemUpdate = SteamUGC()->StartItemUpdate(1281150, nUGCValue);
 	SteamUGC()->SetItemTitle(hStartItemUpdate, TCHAR_TO_ANSI(*dataAsset->Definition.modName) );
@@ -1703,6 +1705,7 @@ bool FZeroPayEditorModule::UploadUGC()
 //	ItemTagsStringArray.m_ppStrings = &buffers[0] ;
 //	SteamUGC()->SetItemTags(hStartItemUpdate, &ItemTagsStringArray);
 
+#if 0
 	// Add previewimage
 	if (dataAsset->Definition.workshopImage != nullptr)
 	{
@@ -1725,6 +1728,7 @@ bool FZeroPayEditorModule::UploadUGC()
 		}
 	}
 
+#endif
 	/* Wait.. */
 	for (int nCounter = 0; nCounter < 100; nCounter++)
 	{
@@ -1784,6 +1788,7 @@ bool FZeroPayEditorModule::UploadUGC()
 	}
 
 	bSetupIsDeploying = false;
+#endif
 
 	return true;
 }
