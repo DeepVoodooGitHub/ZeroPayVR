@@ -20,5 +20,5 @@ public:
 public:
 	TSharedPtr< FUICommandInfo > ShowQuest3View ;
 	TSharedPtr< FUICommandInfo > ShowPCVRView;
-	TSharedPtr< FUICommandInfo > BakeMap;
+	TSharedPtr< FUICommandInfo > OpenModioWindow;
 };

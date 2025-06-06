@@ -637,7 +637,7 @@ void FZeroPayEditorModule::ValidateUGC()
 
 		// Open definition
 		auto * package = LoadPackage(nullptr, *sAssetFullPath, LOAD_None);
-		dataAsset = FindObject<UZeroPayModDefinitionDataAsset>(package, *sAssetName);
+		dataAsset = FindObject<UZeroPayMod_DefinitionDataAsset>(package, *sAssetName);
 		if (dataAsset != nullptr)
 		{
 			bFoundDefinition = true;
@@ -930,7 +930,7 @@ FReply FZeroPayEditorModule::OnClick_Deploy()
 #if 0
 	// Open definition
 	auto * package = LoadPackage(nullptr, *sAssetFullPath, LOAD_None);
-	dataAsset = FindObject<UZeroPayModDefinitionDataAsset>(package, *sAssetName);
+	dataAsset = FindObject<UZeroPayMod_DefinitionDataAsset>(package, *sAssetName);
 
 	if (dataAsset == nullptr)
 	{

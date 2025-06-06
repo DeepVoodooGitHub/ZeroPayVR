@@ -26,9 +26,15 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
 			new string[]
 			{
 				"Core",
+                "CoreUObject", 
+				"Engine", 
+				"Slate", 
+				"SlateCore", 
+				"UMG",
+                "EditorWidgets"
 				// ... add other public dependencies that you statically link with here ...
 			}
-			);
+            );
 			
 		
 		PrivateDependencyModuleNames.AddRange(
@@ -44,10 +50,13 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
 				"Slate",
 				"SlateCore",
                 "Blutility",
-                "UMGEditor"
+                "UMGEditor",
+                "UMG",
+                "EditorWidgets",
+                "ZeroPayModCore"
 				// ... add private dependencies that you statically link with here ...	
 			}
-			);
+            );
 		
 		
 		DynamicallyLoadedModuleNames.AddRange(

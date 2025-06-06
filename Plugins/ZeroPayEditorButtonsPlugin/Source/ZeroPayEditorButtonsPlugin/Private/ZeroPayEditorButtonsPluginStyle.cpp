@@ -46,7 +46,7 @@ TSharedRef< FSlateStyleSet > FZeroPayEditorButtonsPluginStyle::Create()
 
 	Style->Set("ZeroPayEditorButtonsPlugin.ShowQuest3View", new IMAGE_BRUSH(TEXT("Quest3_EyeIcon"), Icon20x20));
 	Style->Set("ZeroPayEditorButtonsPlugin.ShowPCVRView", new IMAGE_BRUSH(TEXT("PCVR_EyeIcon"), Icon20x20));
-	Style->Set("ZeroPayEditorButtonsPlugin.BakeMap", new IMAGE_BRUSH(TEXT("BakeMap_Icon"), Icon20x20));
+	Style->Set("ZeroPayEditorButtonsPlugin.OpenModioWindow", new IMAGE_BRUSH(TEXT("OpenModioWindow_Icon"), Icon20x20));
 	return Style;
 }
 

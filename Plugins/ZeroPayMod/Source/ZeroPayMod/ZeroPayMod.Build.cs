@@ -38,6 +38,7 @@ public class ZeroPayMod : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"Core",
 				"CoreUObject",
 				"Engine",
 				"Slate",
@@ -53,7 +54,10 @@ public class ZeroPayMod : ModuleRules
                 "BlueprintGraph",
                 "Blutility",
 				"EditorSubsystem",
-				"UnrealEd"
+				"UnrealEd",
+                "AssetRegistry",
+				"ZeroPayEditorButtonsPlugin",
+				"ZeroPayModCore"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

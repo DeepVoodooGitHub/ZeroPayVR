@@ -16,6 +16,16 @@ struct FZeroPayModDefinition
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 		FString UGCID;
 
+	// The name of the mod, this is set ONCE during creation. Change it here will not be reflected in 
+	// mod.io; instead change it in the mod.io page (and probably here)
+	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
+		FString Name;
+
+	// The description of the mod, this is set ONCE during creation. Change it here will not be reflected in 
+	// mod.io; instead change it in the mod.io page (and probably here)
+	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
+		FString Description;
+
 	// The parent persistent level (REQUIRED) - MUST reference (as sub levels) the other levels
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 		TSoftObjectPtr<UWorld> persistentlevel;
@@ -50,7 +60,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 		TArray<FString> UGCDependancies;
 
+	// Normally true, unless you downloaded a "Source" Mod which contains usable assets but not the permissions to upload changes to it
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroPayMod Definition")
+		bool bOwner;
+
 	UZeroPayModDefinitionDataAsset() 
 	{
+		bOwner = true ;
 	}
 };

@@ -29,7 +29,9 @@ public class ZeroPayEditorPlugin : ModuleRules
                 "OnlineSubsystemUtils",
                 "Steamworks",
                 "NavigationSystem",
-				"UMG"
+				"UMG",
+				"ZeroPayMod",
+				"ZeroPayModCore"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );

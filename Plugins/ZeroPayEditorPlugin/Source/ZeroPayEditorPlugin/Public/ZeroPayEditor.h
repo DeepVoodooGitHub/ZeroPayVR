@@ -6,7 +6,7 @@
 #include "Modules/ModuleManager.h"
 #include "Misc/Optional.h"
 #include "ThirdParty/Steamworks/Steamv146/sdk/public/steam/steam_api.h"
-#include "ZeroPayMod/Public/ZeroPayModDefinitionDataAsset.h"
+#include "ZeroPayMod_DefinitionDataAsset.h"
 
 #define DEFAULT_FONT(...) FCoreStyle::GetDefaultFontStyle(__VA_ARGS__)
 
@@ -27,7 +27,7 @@ public:
 	void PluginButtonClicked();
 	
 private:
-	UZeroPayModDefinitionDataAsset* dataAsset ;
+	UZeroPayMod_DefinitionDataAsset* dataAsset ;
 
 	void AddToolbarExtension(FToolBarBuilder& Builder);
 	void AddMenuExtension(FMenuBuilder& Builder);

@@ -32,7 +32,7 @@ public:
 	static void AddDebugConsoleLine(AActor* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
 	{
 		// Dedicated server's just log to standard UE5 output
-		if (IsRunningDedicatedServer())
+		if (IsRunningDedicatedServer() || target == nullptr)
 		{
 
 			/* Include name (note the GameInstance uses a null target, as it's not an AActor so we default to that) */

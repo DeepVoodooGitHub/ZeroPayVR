@@ -38,5 +38,17 @@
 			"Name": "EOSIntegrationKit",
 			"Enabled": true
 		},
+		{
+			"Name": "ZeroPayEditorButtonsPlugin",
+			"Enabled": true
+		},
+		{
+			"Name": "ZeroPayModCore",
+			"Enabled": true
+		},
+		{
+			"Name": "ZeroPayEditorButtonsPlugin",
+			"Enabled": true
+		}
 	]
 }

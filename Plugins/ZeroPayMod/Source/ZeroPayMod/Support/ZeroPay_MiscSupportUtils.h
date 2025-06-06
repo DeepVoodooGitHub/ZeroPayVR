@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "ZeroPayModDefinitionDataAsset.h"
+#include "ZeroPayMod_DefinitionDataAsset.h"
 #include "DesktopPlatformModule.h"
 #include "IDesktopPlatform.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
@@ -94,17 +94,6 @@ public:
 		return FPaths::ProjectDir();
 	}
 
-	// Shows an editor utility widget
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
-	static void ShowEditorUtilityWidget(UEditorUtilityWidgetBlueprint* EditorWidget)
-	{
-		if (EditorWidget)
-		{
-			UEditorUtilitySubsystem* EditorUtilitySubsystem = GEditor->GetEditorSubsystem<UEditorUtilitySubsystem>();
-			EditorUtilitySubsystem->SpawnAndRegisterTab(EditorWidget);
-		}
-	}
-
 	// Editor configuration support
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
 	static void SetEditorConfigurationBool(FString field, bool bValue)
@@ -161,51 +150,5 @@ public:
 
 		return returnValue;
 	};
-
-	// Editor configuration support
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
-	static void OpenFilePicker(FString windowTitle, FString fileTypes, TArray<FString>& OutFiles)
-	{
-		IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
-		if (DesktopPlatform)
-		{
-			const void* ParentWindowHandle = nullptr; 
-			DesktopPlatform->OpenFileDialog(
-				ParentWindowHandle,
-				windowTitle,
-				TEXT(""),
-				TEXT(""),
-				fileTypes,
-				EFileDialogFlags::None,
-				OutFiles
-			);
-		}
-	}
-
-	// Create a new definition file with some initial data
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
-	static void CreateAndSaveModDefinitionFile(FString UGCValue)
-	{
-		/* Valid.. create directory */
-		FString UGCPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()) + FString("ZeroPayMods/") + FString::Printf(TEXT("UGC%s"), *UGCValue);
-		FPlatformFileManager::Get().GetPlatformFile().CreateDirectory(*UGCPath);
-
-		FString sFullPath = UGCPath + FString("/ZeroPayDefinition");
-		FString sAssetFullPath = FString("/Game/ZeroPayMods/UGC") + *UGCValue + FString("/Definition");
-		FString sAssetName = FString("ZeroPayDefinition");
-
-		auto* package = CreatePackage(*sAssetFullPath);
-
-		UZeroPayModDefinitionDataAsset* level_asset = NewObject< UZeroPayModDefinitionDataAsset >(package, UZeroPayModDefinitionDataAsset::StaticClass(), *sAssetName, RF_Public | RF_Standalone);
-
-		level_asset->Definition.UGCID = UGCValue;
-
-		if (ensure(level_asset != nullptr))
-		{
-			const auto file_name = FString::Printf(TEXT("%s%s"), *sFullPath, *FPackageName::GetAssetPackageExtension());
-
-			UPackage::SavePackage(package, nullptr, EObjectFlags::RF_Public | EObjectFlags::RF_Standalone, *file_name);
-		}
-	}
 
 };
