@@ -211,159 +211,106 @@ void FZeroPayEditorButtonsPluginModule::ShowTemporaryNotification(const FString&
 	UE_LOG(LogTemp, Log, TEXT("Notification displayed: %s"), *Message);
 }
 
-void FZeroPayEditorButtonsPluginModule::UpdateUIProgressField(const FString& Message)
+void FZeroPayEditorButtonsPluginModule::UpdateUIProgressField()
 {
-	/* During development, changes to the editor utility BP can cause the instance to disappear */
-	if (WidgetInstance == nullptr)
-		return ;
-	if (!IsValid(WidgetInstance))
-		return ;
+	// Post result back to main thread safely
+	Async(EAsyncExecution::TaskGraphMainThread, [this]()
+		{
+			/* During development, changes to the editor utility BP can cause the instance to disappear */
+			if (WidgetInstance == nullptr)
+				return;
+			if (!IsValid(WidgetInstance))
+				return;
 
-	UFunction* Func = WidgetInstance->FindFunction("UpdateUIProgressField");
-	if (!Func)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Function UpdateUIProgressField not found on %s"), *WidgetInstance->GetName());
-		return;
-	}
+			UFunction* Func = WidgetInstance->FindFunction("UpdateUIProgressField");
+			if (!Func)
+			{
+				UE_LOG(LogTemp, Error, TEXT("Function UpdateUIProgressField not found on %s"), *WidgetInstance->GetName());
+				return;
+			}
 
-	// Match the parameter layout: 1 FString
-	struct FMyParams
-	{
-		FString InputString;
-	};
+			// Match the parameter layout: 1 FString
+			struct FMyParams
+			{
+				FString InputString;
+			};
 
-	FMyParams Params;
-	Params.InputString = Message;
+			FMyParams Params;
+			Params.InputString = LastMessage;
 
-	WidgetInstance->ProcessEvent(Func, &Params);
+			WidgetInstance->ProcessEvent(Func, &Params);
+		});
 }
 
 /**************************************************** COOKING LOGIC ****************************************************/
 
-bool FZeroPayEditorButtonsPluginModule::CookThings(UZeroPayMod_DefinitionDataAsset* dataAsset)
+UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
 {
-	FString StdOut;
-	FString StdErr;
-	int32 ReturnCode = 0;
+	bAbortOperation = false;
+	Handle = NewObject<UZeroPayEditorOperationHandle>();
 
-	//
-	// Build paths
-	//
+	Async(EAsyncExecution::Thread, [this, dataAsset]()
+		{
+			/* >>> Pack PCVR <<< */
+			if (!CookAndPackWindows(dataAsset))
+			{
+				bAbortOperation = true;
+			}
 
-	// All build paths, names, etc
-	FString UnrealBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealBinary += "Engine/Binaries/Win64/UnrealEditor.exe";
-	FString UnrealPakBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealPakBinary += "Engine/Binaries/Win64/UnrealPak.exe";
-	FString ProjectFullFilePath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
-	FString PakFileName_Windows = "Windows.pak";
-	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakListFilePath += "custommap_paklist.txt";
+			/* Aborted? */
+			if (bAbortOperation)
+			{
+				// Simulate some logic, then notify later
+				AsyncTask(ENamedThreads::GameThread, [this]()
+					{
+						Handle->OnCompleted.Broadcast(bAbortOperation);
+					});
+				return;
+			}
+			/* >>> Pack Quest 3 <<< */
+			if (!CookAndPackAndroid(dataAsset))
+			{
+				bAbortOperation = true;
+			}
 
-	UE_LOG(LogTemp, Display, TEXT("UnrealBinary: %s"), *UnrealBinary);
-	UE_LOG(LogTemp, Display, TEXT("UnrealPakBinary: %s"), *UnrealPakBinary);
-	UE_LOG(LogTemp, Display, TEXT("ProjectFullFilePath: %s"), *ProjectFullFilePath);
-	UE_LOG(LogTemp, Display, TEXT("PakFileName_Windows: %s"), *PakFileName_Windows);
-	UE_LOG(LogTemp, Display, TEXT("CookedPakListFilePath: %s"), *CookedPakListFilePath);
-	//UE_LOG(LogTemp, Display, TEXT("GameInstallationPakPath: %s"), *GameInstallationPakPath);
+			/* Aborted? */
+			if (bAbortOperation)
+			{
+				// Simulate some logic, then notify later
+				AsyncTask(ENamedThreads::GameThread, [this]()
+					{
+						Handle->OnCompleted.Broadcast(bAbortOperation);
+					});
+				return;
+			}
+			/* >>> Pack Linux Server <<< */
+			if (!CookAndPackLinuxServer(dataAsset))
+			{
+				bAbortOperation = true;
+			}
 
-	// Debug
-	//UnrealBinary = "D:\\Program Files (x86)\\UE_4.24\\Engine\\Binaries\\Win64\\UnrealEditor.exe";
-	//UnrealPakBinary = "D:\\Program Files (x86)\\UE_4.24\\Engine\\Binaries\\Win64\\UnrealPak.exe";
-	//ProjectFullFilePath = "D:\\DVG\\SampleProject_UE24C\\SampleProject_UE24C.uproject";
-	//PakFileName_Windows = "UGC" + UGCValue.ToString() + "-Windows.pak";
-	//CookedPakLocation_Windows = "D:\\DVG\\SampleProject_UE24C\\Saved\\Cooked\\Workshop\\" + PakFileName_Windows;
-	//CookedPakListFilePath = "D:\\DVG\\SampleProject_UE24C\\Saved\\custommap_paklist.txt";
-	//GameInstallationPakPath = "D:\\DVG\\KModOutput\\Windows\\ZeroPay\\Content\\Paks\\";
+			/* All Good! */
+			LastMessage = "Cooking and packing stage completed successfully!" ;
+			UpdateUIProgressField();
+			FPlatformProcess::Sleep(2.0f);
 
-	/* Read the level grabbing tha name */
-	GlobalUGCValue = dataAsset->Definition.UGCID ;
-	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
-	FString pcvrName = dataAsset->Definition.pcvrlevel.GetAssetName();
+			// Simulate some logic, then notify later
+			AsyncTask(ENamedThreads::GameThread, [this]()
+			{
+				Handle->OnCompleted.Broadcast(bAbortOperation);
+			});
+		});
 
-	//
-	// >>>>>>>>>>>>>> COOKING >>>>>>>>>>>>>> 
-	//
-
-	UpdateUIProgressField("Cooking content game (desktop and server)...");
-
-
-	// JBH Windows+WindowsServer+LinuxServer+
-	FString Command = "cmd.exe";
-	FString CommandArgs = "cmd.exe /k \" \"" + UnrealBinary + "\" " + ProjectFullFilePath + " -run=cook -targetplatform=Android -versioned -map=/Game/CustomContent/" + GlobalUGCValue + "/Maps/" + *mapName + "";
-	FString CommandWorkingDirectory = "C:\\";
-
-	FString AdditionalArgs = " -NeverCookDir=/Game/CustomContent/" + GlobalUGCValue + "/Maps/Sublevels/PCVR/" + *pcvrName + "";
-	CommandArgs += AdditionalArgs;
-#if 0
-	if (dataAsset->bCookEverythingEvenIfThatsBads)
-	{
-		FString AdditionalArgs = " -CookDir=\"";
-		AdditionalArgs += *FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()) + FString("CustomContent/") + UGCValue.ToString();
-		AdditionalArgs += "/\"";
-
-		CommandArgs += AdditionalArgs;
-	}
-#endif
-	CommandArgs += "\"";
-
-	UE_LOG(LogTemp, Display, TEXT("CommandArgs -- %s"), *CommandArgs);
-
-	FPlatformProcess::ExecProcess(*Command, *CommandArgs, &ReturnCode, &StdOut, &StdErr, *CommandWorkingDirectory);
-
-	UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT(" KillerJim Mod - Cooking information"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("\n%s"), *StdOut)
-
-		/* Success?? */
-		int nSuccess;
-	nSuccess = StdOut.Find("Success - 0 error(s)", ESearchCase::IgnoreCase, ESearchDir::FromStart, INDEX_NONE);
-	if (nSuccess <= 0)
-	{
-		UE_LOG(LogTemp, Display, TEXT("ERROR RECORDED AS:\n%s"), *StdErr)
-			UpdateUIProgressField(">> ERROR >> ERROR > ERROR --- Cook failed. Please look in the 'output window' to see what went wrong") ;
-		return false;
-	}
-
-	UpdateUIProgressField("Cooked with no errors...");
-	FPlatformProcess::Sleep(1.0f);
-
-	//
-	// >>>>>>>>>>>>>> PACKING LIST >>>>>>>>>>>>>> 
-	//
-
-	//if (PackWindows(mapName))
-	return (PackAndroid(mapName));
-	//			if (PackWindowsServer(mapName))
-		//		return PackLinuxServer(mapName) ;
-
-		//
-		// >>>>>>>>>>>>>> COPYING >>>>>>>>>>>>>> 
-		//
-
-		//UpdateUIProgressField("Moving to location file system...");
-
-		//FString To = GameInstallationPakPath + PakFileName_Windows;
-		//FString From = CookedPakLocation_Windows;
-		//bool Result = PlatformFile.CopyFile(*To, *From, EPlatformFileRead::None, EPlatformFileWrite::None);	
-
-	return false;
+	return Handle;
 }
 
-bool FZeroPayEditorButtonsPluginModule::PackWindows(FString mapName)
+bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_DefinitionDataAsset* dataAsset)
 {
-
-	FString StdOut;
-	FString StdErr;
-	int32 ReturnCode = 0;
+	FString UGCID = dataAsset->Definition.UGCID;
+	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
+	FString neverCookMapName = dataAsset->Definition.quest3level.GetAssetName();
 
 	// All build paths, names, etc
-	FString UnrealBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealBinary += "Engine/Binaries/Win64/UnrealEditor.exe";
-	FString UnrealPakBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealPakBinary += "Engine/Binaries/Win64/UnrealPak.exe";
-	FString ProjectFullFilePath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
 	FString ProjectCookedPath_Windows = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	ProjectCookedPath_Windows += "Cooked/Windows/" + FString(FApp::GetProjectName()) + "/Content";
 	FString PakFileName_Windows = "Windows.pak";
@@ -372,13 +319,23 @@ bool FZeroPayEditorButtonsPluginModule::PackWindows(FString mapName)
 	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	CookedPakListFilePath += "custommap_paklist.txt";
 
-	FString Command = "cmd.exe";
-	FString CommandArgs = "cmd.exe /k \"" + UnrealBinary + "\" " + ProjectFullFilePath + " -run=cook -targetplatform=Windows+WindowsServer -SkipCookingEditorOnlyData -versioned -map=/Game/CustomContent/" + GlobalUGCValue + "/Maps/" + mapName + "";
-	FString CommandWorkingDirectory = "";
+	LastMessage = "[1/9] Cooking PCVR/Windows content.. ";
+	UpdateUIProgressField();
+	FPlatformProcess::Sleep(1.0f);
 
-	UpdateUIProgressField("Generate packing list..");
+	/* Cook Platform */
+	if (!ExecuteCookShellCmd("Windows", UGCID, mapName, neverCookMapName))
+	{
+		LastMessage = ">>> ERROR >> ERROR > ERROR - Windows Cook returned failure code.";
+		UpdateUIProgressField();
+		return false;
+	}
+
+	LastMessage = "[2/9] Generate PCVR/Windows packing list..";
+	UpdateUIProgressField();
 	FPlatformProcess::Sleep(0.5f);
 
+	/* Build the pak file */
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	TArray<FString> AssetFiles;
 	// Find all files with uasset extension in the cooked path 
@@ -389,7 +346,8 @@ bool FZeroPayEditorButtonsPluginModule::PackWindows(FString mapName)
 	// Nothing? WTF
 	if (AssetFiles.Num() <= 0)
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - Found nothing to add to pak list!");
+		LastMessage = ">>> ERROR >> ERROR > ERROR - Found nothing to add to Windows pak list!";
+		UpdateUIProgressField();
 		return false;
 	}
 
@@ -415,7 +373,14 @@ bool FZeroPayEditorButtonsPluginModule::PackWindows(FString mapName)
 			FString relativePakFilePath = AssetFiles[Index].Replace(*ProjectCookedPath_Windows, TEXT("../../.."));
 			FString realignedrelativePakFilePath = relativePakFilePath.Replace(TEXT("\\"), TEXT("/"));
 
-			generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
+			/* Ignore any "game" folders, these will be skipped as the main game containts them and the mod
+			   will have a "soft" reference to it which will still load in-game */
+			bool bIgnoreGameAsset = false ;
+			if ((realignedrelativePakFilePath.StartsWith("../../../VRE/")) || (realignedrelativePakFilePath.StartsWith("../../../ZeroPay/")))
+				bIgnoreGameAsset = true;
+
+			if (!bIgnoreGameAsset)
+				generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
 			nTotalFiles++;
 		}
 	}
@@ -430,81 +395,71 @@ bool FZeroPayEditorButtonsPluginModule::PackWindows(FString mapName)
 	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	if (!bSuccess)
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - Could not write to PAK list file.");
+		LastMessage = ">>> ERROR >> ERROR > ERROR - Could not write to Windows PAK list file.";
+		UpdateUIProgressField();
 		return false;
 	}
 
 	//
-	// >>>>>>>>>>>>>> PACKING DESKTOP (WINDOWS) >>>>>>>>>>>>>> 
+	// >>>>>>>>>>>>>> PACKING DESKTOP (PCVR) >>>>>>>>>>>>>> 
 	//
 
-	UpdateUIProgressField(FString::Printf(TEXT("Packing desktop content (%d assets)..."), nTotalFiles));
+	LastMessage = FString::Printf(TEXT("[3/9] Packing PCVR content (%d assets)..."), nTotalFiles);
+	UpdateUIProgressField();
 
-	Command = UnrealPakBinary;
-	CommandArgs = "\"" + CookedPakLocation_Windows + "\" -create=\"" + CookedPakListFilePath + "\" -platform = \"Windows\" -UTF8Output -multiprocess -patchpaddingalign=2048";
-	CommandWorkingDirectory = "C:\\";
-
-	FPlatformProcess::ExecProcess(*Command, *CommandArgs, &ReturnCode, &StdOut, &StdErr, *CommandWorkingDirectory);
-
-	UE_LOG(LogTemp, Display, TEXT("CommandArgs -- %s"), *CommandArgs);
-
-	UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT(" KillerJim Mod - Packing Information"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("\n%s"), *StdOut)
-
-		/* Success?? */
-		int nSuccess = StdOut.Find("Unreal pak executed", ESearchCase::IgnoreCase, ESearchDir::FromStart, INDEX_NONE);
-	if (nSuccess == 0)
+	if (!ExecutePakShellCmd("Windows", CookedPakLocation_Windows, CookedPakListFilePath))
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - PAKing failed. Please look in the 'output window' for more information.");
+		LastMessage = ">>> ERROR >> ERROR > ERROR - PAKing failed. The log's have been copied to the 'output window', please view for more information.";
 		return false;
 	}
 
 	return true;
-
 }
 
-
-bool FZeroPayEditorButtonsPluginModule::PackAndroid(FString mapName)
+bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_DefinitionDataAsset* dataAsset)
 {
-
-	FString StdOut;
-	FString StdErr;
-	int32 ReturnCode = 0;
+	FString UGCID = dataAsset->Definition.UGCID;
+	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
+	FString neverCookMapName = dataAsset->Definition.pcvrlevel.GetAssetName();
 
 	// All build paths, names, etc
-	FString UnrealBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealBinary += "Engine/Binaries/Win64/UnrealEditor.exe";
-	FString UnrealPakBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealPakBinary += "Engine/Binaries/Win64/UnrealPak.exe";
-	FString ProjectFullFilePath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
-	FString ProjectCookedPath_Windows = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectCookedPath_Windows += "Cooked/Android/" + FString(FApp::GetProjectName()) + "/Content";
-	FString PakFileName_Windows = "Android.pak";
-	FString CookedPakLocation_Windows = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakLocation_Windows += "Workshop/" + PakFileName_Windows;
+	FString ProjectCookedPath_Android = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+	ProjectCookedPath_Android += "Cooked/Android/" + FString(FApp::GetProjectName()) + "/Content";
+	FString PakFileName_Android = "Android.pak";
+	FString CookedPakLocation_Android = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+	CookedPakLocation_Android += "Workshop/" + PakFileName_Android;
 	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	CookedPakListFilePath += "custommap_paklist.txt";
 
-	FString Command = "cmd.exe";
-	FString CommandArgs = "cmd.exe /k \"" + UnrealBinary + "\" " + ProjectFullFilePath + " -run=cook -targetplatform=Android -SkipCookingEditorOnlyData -versioned -map=/Game/CustomContent/" + GlobalUGCValue + "/Maps/" + mapName + "";
-	FString CommandWorkingDirectory = "";
+	LastMessage = "[4/9] Cooking Quest3/Android PAK File...";
+	FPlatformProcess::Sleep(0.5f);
+	UpdateUIProgressField();
 
-	UpdateUIProgressField("Generate Android Quest 3 packing list..");
+	/* Cook Platform */
+	if (!ExecuteCookShellCmd("Android", UGCID, mapName, neverCookMapName))
+	{
+		LastMessage = ">>> ERROR >> ERROR > ERROR - Android Cook returned failure code.";
+		UpdateUIProgressField();
+		return false;
+	}
+
+	LastMessage = "[5/9] Generate Quest3/Android packing list..";
+	UpdateUIProgressField();
 	FPlatformProcess::Sleep(0.5f);
 
+	/* Build the pak file */
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	TArray<FString> AssetFiles;
 	// Find all files with uasset extension in the cooked path 
-	PlatformFile.FindFilesRecursively(AssetFiles, *ProjectCookedPath_Windows, NULL);
+	PlatformFile.FindFilesRecursively(AssetFiles, *ProjectCookedPath_Android, NULL);
 	// Open PAK list for writing
 	bool first = true;
 
 	// Nothing? WTF
 	if (AssetFiles.Num() <= 0)
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - Found nothing to add to pak list!");
+		LastMessage = ">>> ERROR >> ERROR > ERROR - Found nothing to add to Android pak list!";
+		UpdateUIProgressField();
 		return false;
 	}
 
@@ -527,10 +482,17 @@ bool FZeroPayEditorButtonsPluginModule::PackAndroid(FString mapName)
 		{
 			// Generate file such as \"FULLPATH\"SPACE\"RELATIVE PATH"
 			FString realignedFilePath = AssetFiles[Index].Replace(TEXT("\\"), TEXT("/"));
-			FString relativePakFilePath = AssetFiles[Index].Replace(*ProjectCookedPath_Windows, TEXT("../../.."));
+			FString relativePakFilePath = AssetFiles[Index].Replace(*ProjectCookedPath_Android, TEXT("../../.."));
 			FString realignedrelativePakFilePath = relativePakFilePath.Replace(TEXT("\\"), TEXT("/"));
 
-			generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
+			/* Ignore any "game" folders, these will be skipped as the main game containts them and the mod
+			   will have a "soft" reference to it which will still load in-game */
+			bool bIgnoreGameAsset = false;
+			if ((realignedrelativePakFilePath.StartsWith("../../../VRE/")) || (realignedrelativePakFilePath.StartsWith("../../../ZeroPay/")))
+				bIgnoreGameAsset = true;
+
+			if (!bIgnoreGameAsset)
+				generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
 			nTotalFiles++;
 		}
 	}
@@ -545,78 +507,68 @@ bool FZeroPayEditorButtonsPluginModule::PackAndroid(FString mapName)
 	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	if (!bSuccess)
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - Could not write to PAK list file.");
+		LastMessage = ">>> ERROR >> ERROR > ERROR - Could not write to Android PAK list file.";
+		UpdateUIProgressField();
 		return false;
 	}
 
-	//
-	// >>>>>>>>>>>>>> PACKING DESKTOP (WINDOWS) >>>>>>>>>>>>>> 
-	//
+	LastMessage = FString::Printf(TEXT("[6/9] Packing Quest3/Android content (%d assets)..."), nTotalFiles);
+	UpdateUIProgressField();
 
-	UpdateUIProgressField(FString::Printf(TEXT("Packing Android / Quest3 content (%d assets)..."), nTotalFiles));
-
-	Command = UnrealPakBinary;
-	CommandArgs = "\"" + CookedPakLocation_Windows + "\" -create=\"" + CookedPakListFilePath + "\" -platform = \"Android\" -compress -compressionformat=Zlib";
-	CommandWorkingDirectory = "C:\\";
-
-	FPlatformProcess::ExecProcess(*Command, *CommandArgs, &ReturnCode, &StdOut, &StdErr, *CommandWorkingDirectory);
-
-	UE_LOG(LogTemp, Display, TEXT("CommandArgs -- %s"), *CommandArgs);
-
-	UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT(" KillerJim Mod - Packing Information"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("\n%s"), *StdOut)
-
-		/* Success?? */
-		int nSuccess = StdOut.Find("Unreal pak executed", ESearchCase::IgnoreCase, ESearchDir::FromStart, INDEX_NONE);
-	if (nSuccess == 0)
+	if (!ExecutePakShellCmd("Android", CookedPakLocation_Android, CookedPakListFilePath))
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - PAKing failed. Please look in the 'output window' for more information.");
+		LastMessage = ">>> ERROR >> ERROR > ERROR - Android PAKing failed. The log's have been copied to the 'output window', please view for more information.";
+		UpdateUIProgressField();
 		return false;
 	}
 
 	return true;
-
 }
 
-bool FZeroPayEditorButtonsPluginModule::PackWindowsServer(FString mapName)
+bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_DefinitionDataAsset* dataAsset)
 {
-	FString StdOut;
-	FString StdErr;
-	int32 ReturnCode = 0;
+	FString UGCID = dataAsset->Definition.UGCID;
+	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
+	FString neverCookMapName = dataAsset->Definition.pcvrlevel.GetAssetName();
 
 	// All build paths, names, etc
-	FString UnrealBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealBinary += "Engine/Binaries/Win64/UnrealEditor.exe";
-	FString UnrealPakBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealPakBinary += "Engine/Binaries/Win64/UnrealPak.exe";
-	FString ProjectFullFilePath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
-	FString ProjectCookedPath_Windows = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectCookedPath_Windows += "Cooked/WindowsServer/" + FString(FApp::GetProjectName()) + "/Content";
-	FString PakFileName_Windows = "WindowsServer.pak";
-	FString CookedPakLocation_Windows = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakLocation_Windows += "Workshop/" + PakFileName_Windows;
+	FString ProjectCookedPath_LinuxServer = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+	ProjectCookedPath_LinuxServer += "Cooked/LinuxServer/" + FString(FApp::GetProjectName()) + "/Content";
+	FString PakFileName_LinuxServer = "LinuxServer.pak";
+	FString CookedPakLocation_LinuxServer = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+	CookedPakLocation_LinuxServer += "Workshop/" + PakFileName_LinuxServer;
 	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	CookedPakListFilePath += "custommap_paklist.txt";
 
-	FString Command;
-	FString CommandArgs;
-	FString CommandWorkingDirectory = "";
+	LastMessage = "[7/9] Cooking LinuxServer PAK File...";
+	UpdateUIProgressField();
+	FPlatformProcess::Sleep(1.05f);
 
-	UpdateUIProgressField("Generate packing list...");
+	/* Cook Platform */
+	if (!ExecuteCookShellCmd("LinuxServer", UGCID, mapName, neverCookMapName))
+	{
+		LastMessage = ">>> ERROR >> ERROR > ERROR - LinuxServer Cook returned failure code.";
+		UpdateUIProgressField();
+		return false;
+	}
 
+	LastMessage = "[8/9] Generate LinuxServer packing list..";
+	UpdateUIProgressField();
+	FPlatformProcess::Sleep(0.5f);
+
+	/* Build the pak file */
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	TArray<FString> AssetFiles;
 	// Find all files with uasset extension in the cooked path 
-	PlatformFile.FindFilesRecursively(AssetFiles, *ProjectCookedPath_Windows, NULL);
+	PlatformFile.FindFilesRecursively(AssetFiles, *ProjectCookedPath_LinuxServer, NULL);
 	// Open PAK list for writing
 	bool first = true;
 
 	// Nothing? WTF
 	if (AssetFiles.Num() <= 0)
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - Found nothing to add to pak list!");
+		LastMessage = ">>> ERROR >> ERROR > ERROR - Found nothing to add to LinuxServer pak list!";
+		UpdateUIProgressField();
 		return false;
 	}
 
@@ -633,172 +585,262 @@ bool FZeroPayEditorButtonsPluginModule::PackWindowsServer(FString mapName)
 		bool foundUBulk = AssetFiles[Index].Find(".ubulk") >= 0;
 		bool foundUMap = AssetFiles[Index].Find(".umap") >= 0;
 		bool foundUExp = AssetFiles[Index].Find(".uexp") >= 0;
+		bool foundUFont = AssetFiles[Index].Find(".ufont") >= 0;
 
-		if (foundUAsset || foundUBulk || foundUMap || foundUExp)
+		if (foundUAsset || foundUBulk || foundUMap || foundUExp || foundUFont)
 		{
 			// Generate file such as \"FULLPATH\"SPACE\"RELATIVE PATH"
 			FString realignedFilePath = AssetFiles[Index].Replace(TEXT("\\"), TEXT("/"));
-			FString relativePakFilePath = AssetFiles[Index].Replace(*ProjectCookedPath_Windows, TEXT("../../.."));
+			FString relativePakFilePath = AssetFiles[Index].Replace(*ProjectCookedPath_LinuxServer, TEXT("../../.."));
 			FString realignedrelativePakFilePath = relativePakFilePath.Replace(TEXT("\\"), TEXT("/"));
 
-			generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
+			/* Ignore any "game" folders, these will be skipped as the main game containts them and the mod
+			   will have a "soft" reference to it which will still load in-game */
+			bool bIgnoreGameAsset = false;
+			if ((realignedrelativePakFilePath.StartsWith("../../../VRE/")) || (realignedrelativePakFilePath.StartsWith("../../../ZeroPay/")))
+				bIgnoreGameAsset = true;
+
+			if (!bIgnoreGameAsset)
+				generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
 			nTotalFiles++;
 		}
 	}
+
+	/* Asset registry */
+	FString ProjectAssetRegistryPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+	ProjectAssetRegistryPath += "Cooked/LinuxServer/" + FString(FApp::GetProjectName()) + "/AssetRegistry.bin";
+	FString realignedFilePath = ProjectAssetRegistryPath.Replace(TEXT("\\"), TEXT("/"));
+	generatedPakListLine += "\"" + realignedFilePath + "\"   \"../../../AssetRegistry.bin\" \n";
 
 	/* Write all lines.. */
 	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	if (!bSuccess)
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - Could not write to PAK list file.");
+		LastMessage = ">>> ERROR >> ERROR > ERROR - Could not write to LinuxServer PAK list file.";
+		UpdateUIProgressField();
 		return false;
 	}
 
-	//
-	// >>>>>>>>>>>>>> PACKING DESKTOP (WINDOWS) >>>>>>>>>>>>>> 
-	//
+	LastMessage = FString::Printf(TEXT("[9/9] Packing LinuxServer content (%d assets)..."), nTotalFiles);
+	UpdateUIProgressField();
 
-	UpdateUIProgressField(FString::Printf(TEXT("Packing windows server content (%d assets)..."), nTotalFiles));
-
-	Command = UnrealPakBinary;
-	CommandArgs = "\"" + CookedPakLocation_Windows + "\" -create=\"" + CookedPakListFilePath + "\" -platform = \"Windows\" -UTF8Output -multiprocess -patchpaddingalign=2048";
-	CommandWorkingDirectory = "C:\\";
-
-	FPlatformProcess::ExecProcess(*Command, *CommandArgs, &ReturnCode, &StdOut, &StdErr, *CommandWorkingDirectory);
-
-	UE_LOG(LogTemp, Display, TEXT("CommandArgs -- %s"), *CommandArgs);
-
-	UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT(" KillerJim Mod - Packing Information"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("\n%s"), *StdOut)
-
-		/* Success?? */
-		int nSuccess = StdOut.Find("Unreal pak executed", ESearchCase::IgnoreCase, ESearchDir::FromStart, INDEX_NONE);
-	if (nSuccess == 0)
+	if (!ExecutePakShellCmd("LinuxServer", CookedPakLocation_LinuxServer, CookedPakListFilePath))
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - PAKing failed. Please look in the 'output window' for more information.");
+		LastMessage = ">>> ERROR >> ERROR > ERROR - LinuxServer PAKing failed. The log's have been copied to the 'output window', please view for more information.";
+		UpdateUIProgressField();
 		return false;
 	}
 
 	return true;
 }
 
-//-------
+/********************************************************************************************************/
+/*                                          SUPPORT FUNCTIONS                                           */
+/********************************************************************************************************/
 
-bool FZeroPayEditorButtonsPluginModule::PackLinuxServer(FString mapName)
+bool FZeroPayEditorButtonsPluginModule::ExecuteCookShellCmd(FString Platform, FString UGCID, FString MapName, FString NeverCookMapName)
 {
-	FString StdOut;
-	FString StdErr;
-	int32 ReturnCode = 0;
+	FString CmdExe = TEXT("cmd.exe");
 
-	// All build paths, names, etc
-	FString UnrealBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealBinary += "Engine/Binaries/Win64/UnrealEditor.exe";
-	FString UnrealPakBinary = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	UnrealPakBinary += "Engine/Binaries/Win64/UnrealPak.exe";
-	FString ProjectFullFilePath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
-	FString ProjectCookedPath_Linux = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectCookedPath_Linux += "Cooked/LinuxServer/" + FString(FApp::GetProjectName()) + "/Content";
-	FString PakFileName_Linux = "LinuxServer.pak";
-	FString CookedPakLocation_Linux = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakLocation_Linux += "Workshop/" + PakFileName_Linux;
-	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakListFilePath += "custommap_paklist.txt";
+	FString EditorExePath = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
+	EditorExePath += "Engine/Binaries/Win64/UnrealEditor.exe";
 
-	FString Command;
-	FString CommandArgs;
-	FString CommandWorkingDirectory = "";
+	FString ProjectPath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
 
-	UpdateUIProgressField("Generate packing list...");
+	FString MapPath = TEXT("/Game/ZeroPayMods/UGC" + UGCID + "/Levels/" + MapName);
+	FString NeverCookDir = TEXT("/Game/ZeroPayMods/UGC" + UGCID + "/Levels/" + NeverCookMapName);
 
-	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-	TArray<FString> AssetFiles;
-	// Find all files with uasset extension in the cooked path 
-	PlatformFile.FindFilesRecursively(AssetFiles, *ProjectCookedPath_Linux, NULL);
-	// Open PAK list for writing
-	bool first = true;
+	// The full quoted command passed to /k (entire command in one quoted string)
+	FString CommandToRun = FString::Printf(
+		TEXT("\"%s\" \"%s\" -run=cook -targetplatform=%s -SkipCookingEditorOnlyData -versioned -map=%s -NeverCookDir=%s"),
+		*EditorExePath,  // e.g. X:/UE5-Rel/Engine/Binaries/Win64/UnrealEditor.exe
+		*ProjectPath,    // e.g. I:/GameDev/ZeroPayVR/ZeroPayVR.uproject
+		*Platform,
+		*MapPath,
+		*NeverCookDir
+	);
 
-	// Nothing? WTF
-	if (AssetFiles.Num() <= 0)
+	// Arguments to cmd.exe: /k "full command in quotes"
+	FString CmdArgs = FString::Printf(TEXT("/k \"%s\""), *CommandToRun);
+
+	UE_LOG(LogTemp, Display, TEXT("Cook Shell CommandArgs -- %s"), *CmdArgs);
+
+	// Stdio pipe
+	void* ReadPipe = nullptr;
+	void* WritePipe = nullptr;
+	FPlatformProcess::CreatePipe(ReadPipe, WritePipe);
+
+	// Now launch the process
+	FProcHandle CmdHandle = FPlatformProcess::CreateProc(
+		*CmdExe,
+		*CmdArgs,
+		true,   // bLaunchDetached
+		false,  // bLaunchHidden
+		false,  // bLaunchReallyHidden
+		nullptr,
+		0,
+		nullptr,
+		WritePipe,
+		ReadPipe
+	);
+
+	if (CmdHandle.IsValid())
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - Found nothing to add to pak list!");
-		return false;
-	}
+		// Wait until the process exits
+		FString Output;
 
-	// Remove old pak list
-	PlatformFile.DeleteFile(*CookedPakListFilePath);
-
-	// Iterate all assets
-	FString generatedPakListLine;
-	int nTotalFiles = 0;
-	for (int32 Index = 0; Index != AssetFiles.Num(); ++Index)
-	{
-		/* Make sure it's a filetype we care about.. */
-		bool foundUAsset = AssetFiles[Index].Find(".uasset") >= 0;
-		bool foundUBulk = AssetFiles[Index].Find(".ubulk") >= 0;
-		bool foundUMap = AssetFiles[Index].Find(".umap") >= 0;
-		bool foundUExp = AssetFiles[Index].Find(".uexp") >= 0;
-
-		if (foundUAsset || foundUBulk || foundUMap || foundUExp)
-		{
-			// Generate file such as \"FULLPATH\"SPACE\"RELATIVE PATH"
-			FString realignedFilePath = AssetFiles[Index].Replace(TEXT("\\"), TEXT("/"));
-			FString relativePakFilePath = AssetFiles[Index].Replace(*ProjectCookedPath_Linux, TEXT("../../.."));
-			FString realignedrelativePakFilePath = relativePakFilePath.Replace(TEXT("\\"), TEXT("/"));
-
-			generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
-			nTotalFiles++;
-		}
-	}
-
-	/* Write all lines.. */
-	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
-	if (!bSuccess)
-	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - Could not write to PAK list file.");
-		return false;
-	}
-
-	//
-	// >>>>>>>>>>>>>> PACKING DESKTOP (LINUX) >>>>>>>>>>>>>> 
-	//
-
-	UpdateUIProgressField(FString::Printf(TEXT("Packing linux server content (%d assets)..."), nTotalFiles));
-
-	Command = UnrealPakBinary;
-	CommandArgs = "\"" + CookedPakLocation_Linux + "\" -create=\"" + CookedPakListFilePath + "\" -platform = \"Linux\" -UTF8Output -multiprocess -patchpaddingalign=2048";
-	CommandWorkingDirectory = "C:\\";
-
-	FPlatformProcess::ExecProcess(*Command, *CommandArgs, &ReturnCode, &StdOut, &StdErr, *CommandWorkingDirectory);
-
-	UE_LOG(LogTemp, Display, TEXT("CommandArgs -- %s"), *CommandArgs);
-
-	UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT(" KillerJim Mod - Packing (Linux Server) Information"))
 		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("\n%s"), *StdOut)
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("             >>>    ZeroPayVR Mod - Cooking information    <<<                  "))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
 
-		/* Success?? */
-		int nSuccess = StdOut.Find("Unreal pak executed", ESearchCase::IgnoreCase, ESearchDir::FromStart, INDEX_NONE);
-	if (nSuccess == 0)
+		while (FPlatformProcess::IsProcRunning(CmdHandle))
+		{
+			Output = FPlatformProcess::ReadPipe(ReadPipe);
+			UE_LOG(LogTemp, Display, TEXT("%s"), *Output)
+			FPlatformProcess::Sleep(0.1f); // allow buffer to fill
+		}
+		/* Final line */
+		FPlatformProcess::Sleep(1.0f); // allow buffer to fill
+		Output = FPlatformProcess::ReadPipe(ReadPipe);
+		UE_LOG(LogTemp, Display, TEXT("%s"), *Output)
+
+		FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
+
+		// Optionally, get the return code
+		int32 ExecReturnCode = 0;
+		FPlatformProcess::GetProcReturnCode(CmdHandle, &ExecReturnCode);
+		UE_LOG(LogTemp, Log, TEXT("Process exited with code %d"), ExecReturnCode);
+
+		// Clean up
+		FPlatformProcess::CloseProc(CmdHandle);
+
+		if (ExecReturnCode != 0)
+			return false;
+		else
+			return true ;
+	}
+	else
 	{
-		UpdateUIProgressField(">>> ERROR >> ERROR > ERROR - PAKing failed. Please look in the 'output window' for more information.");
+		UE_LOG(LogTemp, Error, TEXT("Failed to launch process."));
 		return false;
 	}
 
-	return true;
+	return false ;
 }
 
 
-void UZeroPayEditorButtonsFunctionLibrary::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
+
+bool FZeroPayEditorButtonsPluginModule::ExecutePakShellCmd(FString Platform, FString CookedPakLocation_Windows, FString CookedPakListFilePath)
+{
+	FString CmdExe = TEXT("cmd.exe");
+
+	FString EditorExePath = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
+	EditorExePath += "Engine/Binaries/Win64/UnrealPak.exe";
+
+	FString ProjectPath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
+
+//	CommandArgs = "\"" + CookedPakLocation_Windows + "\" -create=\"" + CookedPakListFilePath + "\" -platform = \"Windows\" -UTF8Output -multiprocess -patchpaddingalign=2048";
+
+	// The full quoted command passed to /k (entire command in one quoted string)
+	FString CommandToRun = FString::Printf(
+		TEXT("\"%s\" \"%s\" -create=\"%s\" -platform=%s -UTF8Output -multiprocess -patchpaddingalign=2048"),
+		*EditorExePath,
+		*CookedPakLocation_Windows,  
+		*CookedPakListFilePath,    
+		*Platform
+	);
+
+	// Arguments to cmd.exe: /k "full command in quotes"
+	FString CmdArgs = FString::Printf(TEXT("/k \"%s\""), *CommandToRun);
+
+	UE_LOG(LogTemp, Display, TEXT("Pak Shell CommandArgs -- %s"), *CmdArgs);
+
+	// Stdio pipe
+	void* ReadPipe = nullptr;
+	void* WritePipe = nullptr;
+	FPlatformProcess::CreatePipe(ReadPipe, WritePipe);
+
+	// Now launch the process
+	FProcHandle CmdHandle = FPlatformProcess::CreateProc(
+		*CmdExe,
+		*CmdArgs,
+		true,   // bLaunchDetached
+		false,  // bLaunchHidden
+		false,  // bLaunchReallyHidden
+		nullptr,
+		0,
+		nullptr,
+		WritePipe,
+		ReadPipe
+	);
+
+	if (CmdHandle.IsValid())
+	{
+		// Wait until the process exits
+		FString Output;
+
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("              >>>    ZeroPayVR Mod - PAKing information    <<<                  "))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
+
+		while (FPlatformProcess::IsProcRunning(CmdHandle))
+		{
+			Output = FPlatformProcess::ReadPipe(ReadPipe);
+			UE_LOG(LogTemp, Display, TEXT("%s"), *Output)
+			FPlatformProcess::Sleep(0.1f); // allow buffer to fill
+		}
+		/* Final line */
+		FPlatformProcess::Sleep(1.0f); // allow buffer to fill
+		Output = FPlatformProcess::ReadPipe(ReadPipe);
+		UE_LOG(LogTemp, Display, TEXT("%s"), *Output)
+
+		FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
+
+		// Optionally, get the return code
+		int32 ExecReturnCode = 0;
+		FPlatformProcess::GetProcReturnCode(CmdHandle, &ExecReturnCode);
+		UE_LOG(LogTemp, Log, TEXT("Process exited with code %d"), ExecReturnCode);
+
+		// Clean up
+		FPlatformProcess::CloseProc(CmdHandle);
+
+		if (ExecReturnCode != 0)
+			return false;
+		else
+			return true;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to launch process."));
+		return false;
+	}
+
+	return false;
+}
+
+
+
+UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
 {
 	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
 	{
-		Plugin->CookThings(dataAsset);
+		return Plugin->CookAndUploadPackages(dataAsset);
 	}
-}
 
+	return nullptr ;
+}
 
 #undef LOCTEXT_NAMESPACE
 	

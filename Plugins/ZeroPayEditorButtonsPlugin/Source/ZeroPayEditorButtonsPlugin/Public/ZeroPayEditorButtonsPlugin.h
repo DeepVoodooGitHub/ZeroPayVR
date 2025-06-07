@@ -16,6 +16,18 @@ struct FBPResultParams
 	FString Message;    // ← for out parameter
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnOperationComplete, bool, bSuccess);
+
+UCLASS(Blueprintable)
+class UZeroPayEditorOperationHandle : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(BlueprintAssignable)
+	FOnOperationComplete OnCompleted;
+};
+
 class FZeroPayEditorButtonsPluginModule : public IModuleInterface
 {
 public:
@@ -30,7 +42,7 @@ public:
 	void OpenModIOWindow_Clicked();
 
 	/* Cooking logic */
-	bool CookThings(UZeroPayMod_DefinitionDataAsset* dataAsset);
+	UZeroPayEditorOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
 	
 private:
 	/* Vars */
@@ -39,19 +51,24 @@ private:
 	TSharedPtr<class FUICommandList> PluginCommands;
 	UEditorUtilityWidget* WidgetInstance;
 	/* Cooking vars */
+	UZeroPayEditorOperationHandle* Handle;
 	FString GlobalUGCValue;
+	FString LastMessage ;
+	bool bAbortOperation ;
 
 	/* Windows, Menus, Dialogs, etc. */
 	TSharedRef<SDockTab> SpawnDockableTab(const FSpawnTabArgs& Args);
 	void RegisterMenus();
 	void ShowTemporaryNotification(const FString& Message, float Duration = 2.0f);
-	void UpdateUIProgressField(const FString& Message) ;
+	void UpdateUIProgressField() ;
 
 	/* Cooking logic */
-	bool PackWindows(FString mapName);
-	bool PackAndroid(FString mapName);
-	bool PackWindowsServer(FString mapName);
-	bool PackLinuxServer(FString mapName);
+	bool CookAndPackWindows(UZeroPayMod_DefinitionDataAsset* dataAsset);
+	bool CookAndPackAndroid(UZeroPayMod_DefinitionDataAsset* dataAsset);
+	bool CookAndPackLinuxServer(UZeroPayMod_DefinitionDataAsset* dataAsset);
+
+	bool ExecuteCookShellCmd(FString Platform, FString UGCID, FString MapName, FString NeverCookMapName);
+	bool ExecutePakShellCmd(FString Platform, FString CookedPakLocation_Windows, FString CookedPakListFilePath);
 };
 
 UCLASS()
@@ -62,5 +79,5 @@ class UZeroPayEditorButtonsFunctionLibrary : public UBlueprintFunctionLibrary
 public:
 
 	UFUNCTION(BlueprintCallable, Category = "MyPlugin")
-	static void CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
+	static UZeroPayEditorOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
 };
