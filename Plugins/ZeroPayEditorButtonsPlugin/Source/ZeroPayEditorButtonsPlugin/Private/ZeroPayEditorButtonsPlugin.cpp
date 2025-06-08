@@ -261,9 +261,9 @@ UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadP
 			if (bAbortOperation)
 			{
 				// Simulate some logic, then notify later
-				AsyncTask(ENamedThreads::GameThread, [this]()
+				AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
 					{
-						Handle->OnCompleted.Broadcast(bAbortOperation);
+						Handle->OnCompleted.Broadcast(bAbortOperation, dataAsset->Definition.UGCID);
 					});
 				return;
 			}
@@ -277,9 +277,9 @@ UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadP
 			if (bAbortOperation)
 			{
 				// Simulate some logic, then notify later
-				AsyncTask(ENamedThreads::GameThread, [this]()
+				AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
 					{
-						Handle->OnCompleted.Broadcast(bAbortOperation);
+						Handle->OnCompleted.Broadcast(bAbortOperation, dataAsset->Definition.UGCID);
 					});
 				return;
 			}
@@ -295,9 +295,9 @@ UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadP
 			FPlatformProcess::Sleep(2.0f);
 
 			// Simulate some logic, then notify later
-			AsyncTask(ENamedThreads::GameThread, [this]()
+			AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
 			{
-				Handle->OnCompleted.Broadcast(bAbortOperation);
+				Handle->OnCompleted.Broadcast(bAbortOperation, dataAsset->Definition.UGCID);
 			});
 		});
 
@@ -831,6 +831,110 @@ bool FZeroPayEditorButtonsPluginModule::ExecutePakShellCmd(FString Platform, FSt
 }
 
 
+UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::PollUploadStatus()
+{
+	bAbortOperation = false;
+	bPollCompleted = false;
+	Handle = NewObject<UZeroPayEditorOperationHandle>();
+
+	Async(EAsyncExecution::Thread, [this]()
+		{
+			bool bHasEnteredUploadState = false ;
+			while (!bPollCompleted)
+			{
+				UModioSubsystem* Subsystem = GEngine->GetEngineSubsystem<UModioSubsystem>();
+				if (Subsystem == nullptr)
+					return ;
+				TOptional<FModioModProgressInfo> result = Subsystem->QueryCurrentModUpdate();
+
+				if (result.IsSet())
+				{
+					/* Get value of progress*/
+					FModioModProgressInfo value = result.GetValue();
+					/* Wait until mod.io has said it's "uploading" */
+					if ((!bHasEnteredUploadState) && (value.GetCurrentState() == EModioModProgressState::Uploading))
+					{
+						/* Set flag to detect we are uploading */
+						bHasEnteredUploadState = true;
+						/* Read init values */
+						currentProgress = value.GetCurrentProgress(EModioModProgressState::Uploading);
+						totalProgress = value.GetTotalProgress(EModioModProgressState::Uploading);
+					}
+					/* Grab information */
+					if ((value.GetCurrentState() == EModioModProgressState::Uploading))
+					{
+						/* Difference */
+						int64 currentProgress_ = (int64) value.GetCurrentProgress(EModioModProgressState::Uploading) ;
+						int64 changeInBytes = currentProgress_ - (int64) currentProgress;
+
+						/* Read new value */
+						currentProgress = value.GetCurrentProgress(EModioModProgressState::Uploading);
+
+						/* Submit info to BP callback! */
+						AsyncTask(ENamedThreads::GameThread, [this, changeInBytes]()
+							{
+								Handle->OnUploadProgress.Broadcast(false, (int64)currentProgress, (int64)totalProgress, FormatDataRateResponse(changeInBytes));
+							});
+					}
+					else
+					{
+						/* Not uploading? make sure we were prior to killing ourself... */
+						if (bHasEnteredUploadState)
+							bPollCompleted = true;
+					}
+				}
+				else
+				{
+					/* Invalid, after upload? we're done.. */
+					if (bHasEnteredUploadState)
+						bPollCompleted = true;
+				}
+					
+				FPlatformProcess::Sleep(1.0f);
+			}
+
+			// Simulate some logic, then notify later
+			AsyncTask(ENamedThreads::GameThread, [this]()
+			{
+				Handle->OnUploadProgress.Broadcast(true, 0, 0, "Completed");
+			});
+		});
+
+	return Handle;
+}
+
+FString FZeroPayEditorButtonsPluginModule::FormatDataRateResponse(int64 BytesPerSecond)
+{
+	const TCHAR* Suffix = TEXT("B/s");
+	double Rate = static_cast<double>(BytesPerSecond);
+
+	if (Rate >= 1024.0 * 1024.0 * 1024.0)
+	{
+		Rate /= (1024.0 * 1024.0 * 1024.0);
+		Suffix = TEXT("GB/s");
+	}
+	else if (Rate >= 1024.0 * 1024.0)
+	{
+		Rate /= (1024.0 * 1024.0);
+		Suffix = TEXT("MB/s");
+	}
+	else if (Rate >= 1024.0)
+	{
+		Rate /= 1024.0;
+		Suffix = TEXT("KB/s");
+	}
+
+	return FString::Printf(TEXT("%.2f %s"), Rate, Suffix);
+}
+
+void FZeroPayEditorButtonsPluginModule::CancelUploadStatus()
+{
+	bAbortOperation = true ;
+	bPollCompleted = true ;
+}
+
+
+/*********************************************************************************************************/
 
 UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
 {
@@ -841,6 +945,27 @@ UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::CookAndUplo
 
 	return nullptr ;
 }
+
+UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::PollUploadStatus()
+{
+	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
+	{
+		return Plugin->PollUploadStatus();
+	}
+
+	return nullptr;
+}
+
+
+void UZeroPayEditorButtonsFunctionLibrary::CancelUploadStatus()
+{
+	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
+	{
+		Plugin->CancelUploadStatus();
+	}
+
+}
+
 
 #undef LOCTEXT_NAMESPACE
 	

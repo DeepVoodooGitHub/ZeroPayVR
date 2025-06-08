@@ -53,7 +53,8 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
                 "UMGEditor",
                 "UMG",
                 "EditorWidgets",
-                "ZeroPayModCore"
+                "ZeroPayModCore",
+                "Modio"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

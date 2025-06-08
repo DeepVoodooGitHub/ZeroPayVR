@@ -57,7 +57,8 @@ public class ZeroPayMod : ModuleRules
 				"UnrealEd",
                 "AssetRegistry",
 				"ZeroPayEditorButtonsPlugin",
-				"ZeroPayModCore"
+				"ZeroPayModCore",
+                "Modio"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

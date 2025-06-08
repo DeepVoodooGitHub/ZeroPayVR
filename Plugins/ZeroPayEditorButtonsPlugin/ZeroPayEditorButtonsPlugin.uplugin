@@ -25,6 +25,10 @@
 		{
 			"Name": "ZeroPayModCore",
 			"Enabled": true
+		},
+		{
+			"Name": "Modio",
+			"Enabled": true
 		}
 	]
 }

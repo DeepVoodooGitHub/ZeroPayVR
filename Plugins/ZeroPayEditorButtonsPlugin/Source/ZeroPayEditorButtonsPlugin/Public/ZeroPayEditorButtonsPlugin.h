@@ -4,6 +4,7 @@
 
 #include "ZeroPayMod_DefinitionDataAsset.h"
 #include "EditorUtilityWidgetBlueprint.h"
+#include "ModioSubsystem.h"
 #include "Modules/ModuleManager.h"
 #include "ZeroPayEditorButtonsPlugin.generated.h"
 
@@ -12,11 +13,12 @@ class FMenuBuilder;
 
 struct FBPResultParams
 {
-	bool ReturnValue;   // ← for return value
-	FString Message;    // ← for out parameter
+	bool ReturnValue;   
+	FString Message;    
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnOperationComplete, bool, bSuccess);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnOperationComplete, bool, bSuccess, FString, UGCID);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnUploadProgress, bool, bComplete, int64, currentBytes, int64, totalBytes, FString, dataRate);
 
 UCLASS(Blueprintable)
 class UZeroPayEditorOperationHandle : public UObject
@@ -26,6 +28,9 @@ class UZeroPayEditorOperationHandle : public UObject
 public:
 	UPROPERTY(BlueprintAssignable)
 	FOnOperationComplete OnCompleted;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnUploadProgress OnUploadProgress;
 };
 
 class FZeroPayEditorButtonsPluginModule : public IModuleInterface
@@ -43,7 +48,8 @@ public:
 
 	/* Cooking logic */
 	UZeroPayEditorOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
-	
+	UZeroPayEditorOperationHandle* PollUploadStatus() ;
+	void CancelUploadStatus();
 private:
 	/* Vars */
 	bool bIsOperationRunning;
@@ -55,12 +61,16 @@ private:
 	FString GlobalUGCValue;
 	FString LastMessage ;
 	bool bAbortOperation ;
+	bool bPollCompleted ;
+	FModioUnsigned64 currentProgress;
+	FModioUnsigned64 totalProgress;
 
 	/* Windows, Menus, Dialogs, etc. */
 	TSharedRef<SDockTab> SpawnDockableTab(const FSpawnTabArgs& Args);
 	void RegisterMenus();
 	void ShowTemporaryNotification(const FString& Message, float Duration = 2.0f);
 	void UpdateUIProgressField() ;
+	FString FormatDataRateResponse(int64 BytesPerSecond) ;
 
 	/* Cooking logic */
 	bool CookAndPackWindows(UZeroPayMod_DefinitionDataAsset* dataAsset);
@@ -78,6 +88,13 @@ class UZeroPayEditorButtonsFunctionLibrary : public UBlueprintFunctionLibrary
 
 public:
 
-	UFUNCTION(BlueprintCallable, Category = "MyPlugin")
+	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
 	static UZeroPayEditorOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
+
+	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
+	static UZeroPayEditorOperationHandle* PollUploadStatus();
+
+	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
+	static void CancelUploadStatus();
+
 };
