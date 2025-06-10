@@ -19,6 +19,13 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/AssetManager.h"
 #include "Widgets/Layout/SBox.h"
+#include "HAL/PlatformProcess.h"
+#include "Misc/Paths.h"
+#include "Misc/OutputDeviceNull.h"
+#include "Windows/WindowsPlatformProcess.h"
+#include "Windows/AllowWindowsPlatformTypes.h"
+#include <windows.h>
+#include "Windows/HideWindowsPlatformTypes.h"
 #include "Subsystems/AssetEditorSubsystem.h"
 
 static const FName ZeroPayEditorButtonsPluginTabName("ZeroPayEditorButtonsPlugin");
@@ -37,8 +44,8 @@ void FZeroPayEditorButtonsPluginModule::StartupModule()
 	PluginCommands = MakeShareable(new FUICommandList);
 
 	PluginCommands->MapAction(
-		FZeroPayEditorButtonsPluginCommands::Get().ShowQuest3View,
-		FExecuteAction::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::ShowQuest3View_Clicked),
+		FZeroPayEditorButtonsPluginCommands::Get().GenerateQuest3ReducedLevel,
+		FExecuteAction::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::GenerateQuest3ReducedLevel_Clicked),
 		FCanExecuteAction());
 
 	PluginCommands->MapAction(
@@ -55,10 +62,15 @@ void FZeroPayEditorButtonsPluginModule::StartupModule()
 
 	bIsOperationRunning = true;
 	ClosurePreventationMessage = "Cannot close window, operation pending";
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner("ZeroPayVRModTab",
-		FOnSpawnTab::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::SpawnDockableTab))
+	/* Create tabs */
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner("ZeroPay_ModManagement_Tab",
+		FOnSpawnTab::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::SpawnModManagementDockableTab))
 		.SetDisplayName(FText::FromString("ZeroPay VR Mod Management"))
-		.SetMenuType(ETabSpawnerMenuType::Hidden); // Or Show if you want it in the Window menu
+		.SetMenuType(ETabSpawnerMenuType::Hidden);
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner("ZeroPay_Quest3Reducer_Tab",
+		FOnSpawnTab::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::SpawnQuest3ReducerDockableTab))
+		.SetDisplayName(FText::FromString("ZeroPay VR Quest 3 Reducer"))
+		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
 void FZeroPayEditorButtonsPluginModule::ShutdownModule()
@@ -75,18 +87,18 @@ void FZeroPayEditorButtonsPluginModule::ShutdownModule()
 	FZeroPayEditorButtonsPluginCommands::Unregister();
 }
 
-TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnDockableTab(const FSpawnTabArgs& Args)
+TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnModManagementDockableTab(const FSpawnTabArgs& Args)
 {
 	FString WidgetPath = TEXT("/ZeroPayEditorPlugin/Blueprints/EUW_ZP_ModioWindow.EUW_ZP_ModioWindow");
 	UEditorUtilityWidgetBlueprint* WidgetBP = Cast<UEditorUtilityWidgetBlueprint>(
 		StaticLoadObject(UEditorUtilityWidgetBlueprint::StaticClass(), nullptr, *WidgetPath));
 
-	WidgetInstance = nullptr;
+	WidgetModManagementInstance = nullptr;
 
 	if (WidgetBP && WidgetBP->GeneratedClass)
 	{
-		WidgetInstance = NewObject<UEditorUtilityWidget>(GetTransientPackage(), WidgetBP->GeneratedClass);
-		WidgetInstance->AddToRoot(); // Prevent GC
+		WidgetModManagementInstance = NewObject<UEditorUtilityWidget>(GetTransientPackage(), WidgetBP->GeneratedClass);
+		WidgetModManagementInstance->AddToRoot(); // Prevent GC
 	}
 
 	TSharedRef<SDockTab> DockTab = SNew(SDockTab)
@@ -94,17 +106,17 @@ TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnDockableTab(const F
 		.OnCanCloseTab_Lambda([this]()
 			{
 				/* During development, changes to the editor utility BP can cause the instance to disappear */
-				if (WidgetInstance == nullptr)
+				if (WidgetModManagementInstance == nullptr)
 					return true ;
-				if (!IsValid(WidgetInstance))
+				if (!IsValid(WidgetModManagementInstance))
 					return true;
 
 				/* Find the function inside the widget to see if we can close the window (i.e. no operation is running) */
-				UFunction* Func = WidgetInstance->FindFunction("IsOperationRunning");
+				UFunction* Func = WidgetModManagementInstance->FindFunction("IsOperationRunning");
 				if (Func)
 				{
 					struct { bool ReturnValue;  FString Message; } Params;
-					WidgetInstance->ProcessEvent(Func, &Params);
+					WidgetModManagementInstance->ProcessEvent(Func, &Params);
 					bIsOperationRunning = Params.ReturnValue;
 					ClosurePreventationMessage = Params.Message;
 				}
@@ -129,18 +141,92 @@ TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnDockableTab(const F
 				return !bIsOperationRunning; 
 			});
 
-	if (WidgetInstance)
+	if (WidgetModManagementInstance)
 	{
-		TSharedRef<SWidget> SlateWidget = WidgetInstance->TakeWidget();
+		TSharedRef<SWidget> SlateWidget = WidgetModManagementInstance->TakeWidget();
 		DockTab->SetContent(SlateWidget);
 	}
 
 	return DockTab;
 }
 
-
-void FZeroPayEditorButtonsPluginModule::ShowQuest3View_Clicked()
+TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnQuest3ReducerDockableTab(const FSpawnTabArgs& Args)
 {
+	FString WidgetPath = TEXT("/ZeroPayEditorPlugin/Blueprints/EUW_ZP_ReducerWindow.EUW_ZP_ReducerWindow");
+	UEditorUtilityWidgetBlueprint* WidgetBP = Cast<UEditorUtilityWidgetBlueprint>(
+		StaticLoadObject(UEditorUtilityWidgetBlueprint::StaticClass(), nullptr, *WidgetPath));
+
+	WidgetQuest3ReducerInstance = nullptr;
+
+	if (WidgetBP && WidgetBP->GeneratedClass)
+	{
+		WidgetQuest3ReducerInstance = NewObject<UEditorUtilityWidget>(GetTransientPackage(), WidgetBP->GeneratedClass);
+		WidgetQuest3ReducerInstance->AddToRoot(); // Prevent GC
+	}
+
+	TSharedRef<SDockTab> DockTab = SNew(SDockTab)
+		.TabRole(ETabRole::NomadTab)
+		.OnCanCloseTab_Lambda([this]()
+			{
+				/* During development, changes to the editor utility BP can cause the instance to disappear */
+				if (WidgetQuest3ReducerInstance == nullptr)
+					return true;
+				if (!IsValid(WidgetQuest3ReducerInstance))
+					return true;
+
+				/* Find the function inside the widget to see if we can close the window (i.e. no operation is running) */
+				UFunction* Func = WidgetQuest3ReducerInstance->FindFunction("IsOperationRunning");
+				if (Func)
+				{
+					struct { bool ReturnValue;  FString Message; } Params;
+					WidgetQuest3ReducerInstance->ProcessEvent(Func, &Params);
+					bIsOperationRunning = Params.ReturnValue;
+					ClosurePreventationMessage = Params.Message;
+				}
+
+				/* If an operation is running, show a 5 second "hint" as to why we can't close (like uploading..) */
+				if (bIsOperationRunning)
+				{
+					FNotificationInfo Info(FText::FromString(ClosurePreventationMessage));
+					Info.FadeInDuration = 0.2f;
+					Info.FadeOutDuration = 0.5f;
+					Info.ExpireDuration = 5.0f;
+					Info.bUseThrobber = false;
+					Info.bUseSuccessFailIcons = true;
+					Info.bUseLargeFont = false;
+
+					TSharedPtr<SNotificationItem> Notification = FSlateNotificationManager::Get().AddNotification(Info);
+					if (Notification.IsValid())
+					{
+						Notification->SetCompletionState(SNotificationItem::CS_Fail);
+					}
+				}
+				return !bIsOperationRunning;
+			});
+
+	if (WidgetQuest3ReducerInstance)
+	{
+		TSharedRef<SWidget> SlateWidget = WidgetQuest3ReducerInstance->TakeWidget();
+		DockTab->SetContent(SlateWidget);
+	}
+
+	return DockTab;
+}
+
+void FZeroPayEditorButtonsPluginModule::GenerateQuest3ReducedLevel_Clicked()
+{
+	/* Try and show the window */
+	TSharedPtr<SDockTab> Tab = FGlobalTabmanager::Get()->TryInvokeTab(FName("ZeroPay_Quest3Reducer_Tab"));
+
+	/* Ensure it's size is maintained */
+	if (Tab.IsValid())
+	{
+		TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(Tab.ToSharedRef());
+		if (ParentWindow.IsValid())
+		{
+			ParentWindow->Resize(FVector2D(1200, 750));
+		}
+	}
 }
 
 void FZeroPayEditorButtonsPluginModule::ShowPCVRView_Clicked()
@@ -149,8 +235,10 @@ void FZeroPayEditorButtonsPluginModule::ShowPCVRView_Clicked()
 
 void FZeroPayEditorButtonsPluginModule::OpenModIOWindow_Clicked()
 {
-	TSharedPtr<SDockTab> Tab = FGlobalTabmanager::Get()->TryInvokeTab(FName("ZeroPayVRModTab"));
+	/* Try and show the window */
+	TSharedPtr<SDockTab> Tab = FGlobalTabmanager::Get()->TryInvokeTab(FName("ZeroPay_ModManagement_Tab"));
 
+	/* Ensure it's size is maintained */
 	if (Tab.IsValid())
 	{
 		TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(Tab.ToSharedRef());
@@ -171,7 +259,7 @@ void FZeroPayEditorButtonsPluginModule::RegisterMenus()
 		UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
 		{
 			FToolMenuSection& Section = Menu->FindOrAddSection("WindowLayout");
-			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().ShowQuest3View, PluginCommands);
+			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().GenerateQuest3ReducedLevel, PluginCommands);
 			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().ShowPCVRView, PluginCommands);
 			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().OpenModioWindow, PluginCommands);
 		}
@@ -182,8 +270,8 @@ void FZeroPayEditorButtonsPluginModule::RegisterMenus()
 		{
 			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("PluginTools");
 			{
-				FToolMenuEntry& ShowQuest3View_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().ShowQuest3View));
-				ShowQuest3View_Entry.SetCommandList(PluginCommands);
+				FToolMenuEntry& GenerateQuest3ReducedLevel_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().GenerateQuest3ReducedLevel));
+				GenerateQuest3ReducedLevel_Entry.SetCommandList(PluginCommands);
 				FToolMenuEntry& ShowPCVRView_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().ShowPCVRView));
 				ShowPCVRView_Entry.SetCommandList(PluginCommands);
 				FToolMenuEntry& BakeMap_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().OpenModioWindow));
@@ -217,15 +305,15 @@ void FZeroPayEditorButtonsPluginModule::UpdateUIProgressField()
 	Async(EAsyncExecution::TaskGraphMainThread, [this]()
 		{
 			/* During development, changes to the editor utility BP can cause the instance to disappear */
-			if (WidgetInstance == nullptr)
+			if (WidgetModManagementInstance == nullptr)
 				return;
-			if (!IsValid(WidgetInstance))
+			if (!IsValid(WidgetModManagementInstance))
 				return;
 
-			UFunction* Func = WidgetInstance->FindFunction("UpdateUIProgressField");
+			UFunction* Func = WidgetModManagementInstance->FindFunction("UpdateUIProgressField");
 			if (!Func)
 			{
-				UE_LOG(LogTemp, Error, TEXT("Function UpdateUIProgressField not found on %s"), *WidgetInstance->GetName());
+				UE_LOG(LogTemp, Error, TEXT("Function UpdateUIProgressField not found on %s"), *WidgetModManagementInstance->GetName());
 				return;
 			}
 
@@ -238,703 +326,16 @@ void FZeroPayEditorButtonsPluginModule::UpdateUIProgressField()
 			FMyParams Params;
 			Params.InputString = LastMessage;
 
-			WidgetInstance->ProcessEvent(Func, &Params);
+			WidgetModManagementInstance->ProcessEvent(Func, &Params);
 		});
 }
 
-/**************************************************** COOKING LOGIC ****************************************************/
 
-UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
-{
-	bAbortOperation = false;
-	Handle = NewObject<UZeroPayEditorOperationHandle>();
-
-	Async(EAsyncExecution::Thread, [this, dataAsset]()
-		{
-			/* >>> Pack PCVR <<< */
-			if (!CookAndPackWindows(dataAsset))
-			{
-				bAbortOperation = true;
-			}
-
-			/* Aborted? */
-			if (bAbortOperation)
-			{
-				// Simulate some logic, then notify later
-				AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
-					{
-						Handle->OnCompleted.Broadcast(bAbortOperation, dataAsset->Definition.UGCID);
-					});
-				return;
-			}
-			/* >>> Pack Quest 3 <<< */
-			if (!CookAndPackAndroid(dataAsset))
-			{
-				bAbortOperation = true;
-			}
-
-			/* Aborted? */
-			if (bAbortOperation)
-			{
-				// Simulate some logic, then notify later
-				AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
-					{
-						Handle->OnCompleted.Broadcast(bAbortOperation, dataAsset->Definition.UGCID);
-					});
-				return;
-			}
-			/* >>> Pack Linux Server <<< */
-			if (!CookAndPackLinuxServer(dataAsset))
-			{
-				bAbortOperation = true;
-			}
-
-			/* All Good! */
-			LastMessage = "Cooking and packing stage completed successfully!" ;
-			UpdateUIProgressField();
-			FPlatformProcess::Sleep(2.0f);
-
-			// Simulate some logic, then notify later
-			AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
-			{
-				Handle->OnCompleted.Broadcast(bAbortOperation, dataAsset->Definition.UGCID);
-			});
-		});
-
-	return Handle;
-}
-
-bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_DefinitionDataAsset* dataAsset)
-{
-	FString UGCID = dataAsset->Definition.UGCID;
-	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
-	FString neverCookMapName = dataAsset->Definition.quest3level.GetAssetName();
-
-	// All build paths, names, etc
-	FString ProjectCookedPath_Windows = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectCookedPath_Windows += "Cooked/Windows/" + FString(FApp::GetProjectName()) + "/Content";
-	FString PakFileName_Windows = "Windows.pak";
-	FString CookedPakLocation_Windows = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakLocation_Windows += "Workshop/" + PakFileName_Windows;
-	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakListFilePath += "custommap_paklist.txt";
-
-	LastMessage = "[1/9] Cooking PCVR/Windows content.. ";
-	UpdateUIProgressField();
-	FPlatformProcess::Sleep(1.0f);
-
-	/* Cook Platform */
-	if (!ExecuteCookShellCmd("Windows", UGCID, mapName, neverCookMapName))
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - Windows Cook returned failure code.";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	LastMessage = "[2/9] Generate PCVR/Windows packing list..";
-	UpdateUIProgressField();
-	FPlatformProcess::Sleep(0.5f);
-
-	/* Build the pak file */
-	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-	TArray<FString> AssetFiles;
-	// Find all files with uasset extension in the cooked path 
-	PlatformFile.FindFilesRecursively(AssetFiles, *ProjectCookedPath_Windows, NULL);
-	// Open PAK list for writing
-	bool first = true;
-
-	// Nothing? WTF
-	if (AssetFiles.Num() <= 0)
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - Found nothing to add to Windows pak list!";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	// Remove old pak list
-	PlatformFile.DeleteFile(*CookedPakListFilePath);
-
-	// Iterate all assets
-	FString generatedPakListLine;
-	int nTotalFiles = 0;
-	for (int32 Index = 0; Index != AssetFiles.Num(); ++Index)
-	{
-		/* Make sure it's a filetype we care about.. */
-		bool foundUAsset = AssetFiles[Index].Find(".uasset") >= 0;
-		bool foundUBulk = AssetFiles[Index].Find(".ubulk") >= 0;
-		bool foundUMap = AssetFiles[Index].Find(".umap") >= 0;
-		bool foundUExp = AssetFiles[Index].Find(".uexp") >= 0;
-		bool foundUFont = AssetFiles[Index].Find(".ufont") >= 0;
-
-		if (foundUAsset || foundUBulk || foundUMap || foundUExp || foundUFont)
-		{
-			// Generate file such as \"FULLPATH\"SPACE\"RELATIVE PATH"
-			FString realignedFilePath = AssetFiles[Index].Replace(TEXT("\\"), TEXT("/"));
-			FString relativePakFilePath = AssetFiles[Index].Replace(*ProjectCookedPath_Windows, TEXT("../../.."));
-			FString realignedrelativePakFilePath = relativePakFilePath.Replace(TEXT("\\"), TEXT("/"));
-
-			/* Ignore any "game" folders, these will be skipped as the main game containts them and the mod
-			   will have a "soft" reference to it which will still load in-game */
-			bool bIgnoreGameAsset = false ;
-			if ((realignedrelativePakFilePath.StartsWith("../../../VRE/")) || (realignedrelativePakFilePath.StartsWith("../../../ZeroPay/")))
-				bIgnoreGameAsset = true;
-
-			if (!bIgnoreGameAsset)
-				generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
-			nTotalFiles++;
-		}
-	}
-
-	/* Asset registry */
-	FString ProjectAssetRegistryPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectAssetRegistryPath += "Cooked/Windows/" + FString(FApp::GetProjectName()) + "/AssetRegistry.bin";
-	FString realignedFilePath = ProjectAssetRegistryPath.Replace(TEXT("\\"), TEXT("/"));
-	generatedPakListLine += "\"" + realignedFilePath + "\"   \"../../../AssetRegistry.bin\" \n";
-
-	/* Write all lines.. */
-	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
-	if (!bSuccess)
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - Could not write to Windows PAK list file.";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	//
-	// >>>>>>>>>>>>>> PACKING DESKTOP (PCVR) >>>>>>>>>>>>>> 
-	//
-
-	LastMessage = FString::Printf(TEXT("[3/9] Packing PCVR content (%d assets)..."), nTotalFiles);
-	UpdateUIProgressField();
-
-	if (!ExecutePakShellCmd("Windows", CookedPakLocation_Windows, CookedPakListFilePath))
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - PAKing failed. The log's have been copied to the 'output window', please view for more information.";
-		return false;
-	}
-
-	return true;
-}
-
-bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_DefinitionDataAsset* dataAsset)
-{
-	FString UGCID = dataAsset->Definition.UGCID;
-	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
-	FString neverCookMapName = dataAsset->Definition.pcvrlevel.GetAssetName();
-
-	// All build paths, names, etc
-	FString ProjectCookedPath_Android = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectCookedPath_Android += "Cooked/Android/" + FString(FApp::GetProjectName()) + "/Content";
-	FString PakFileName_Android = "Android.pak";
-	FString CookedPakLocation_Android = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakLocation_Android += "Workshop/" + PakFileName_Android;
-	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakListFilePath += "custommap_paklist.txt";
-
-	LastMessage = "[4/9] Cooking Quest3/Android PAK File...";
-	FPlatformProcess::Sleep(0.5f);
-	UpdateUIProgressField();
-
-	/* Cook Platform */
-	if (!ExecuteCookShellCmd("Android", UGCID, mapName, neverCookMapName))
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - Android Cook returned failure code.";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	LastMessage = "[5/9] Generate Quest3/Android packing list..";
-	UpdateUIProgressField();
-	FPlatformProcess::Sleep(0.5f);
-
-	/* Build the pak file */
-	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-	TArray<FString> AssetFiles;
-	// Find all files with uasset extension in the cooked path 
-	PlatformFile.FindFilesRecursively(AssetFiles, *ProjectCookedPath_Android, NULL);
-	// Open PAK list for writing
-	bool first = true;
-
-	// Nothing? WTF
-	if (AssetFiles.Num() <= 0)
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - Found nothing to add to Android pak list!";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	// Remove old pak list
-	PlatformFile.DeleteFile(*CookedPakListFilePath);
-
-	// Iterate all assets
-	FString generatedPakListLine;
-	int nTotalFiles = 0;
-	for (int32 Index = 0; Index != AssetFiles.Num(); ++Index)
-	{
-		/* Make sure it's a filetype we care about.. */
-		bool foundUAsset = AssetFiles[Index].Find(".uasset") >= 0;
-		bool foundUBulk = AssetFiles[Index].Find(".ubulk") >= 0;
-		bool foundUMap = AssetFiles[Index].Find(".umap") >= 0;
-		bool foundUExp = AssetFiles[Index].Find(".uexp") >= 0;
-		bool foundUFont = AssetFiles[Index].Find(".ufont") >= 0;
-
-		if (foundUAsset || foundUBulk || foundUMap || foundUExp || foundUFont)
-		{
-			// Generate file such as \"FULLPATH\"SPACE\"RELATIVE PATH"
-			FString realignedFilePath = AssetFiles[Index].Replace(TEXT("\\"), TEXT("/"));
-			FString relativePakFilePath = AssetFiles[Index].Replace(*ProjectCookedPath_Android, TEXT("../../.."));
-			FString realignedrelativePakFilePath = relativePakFilePath.Replace(TEXT("\\"), TEXT("/"));
-
-			/* Ignore any "game" folders, these will be skipped as the main game containts them and the mod
-			   will have a "soft" reference to it which will still load in-game */
-			bool bIgnoreGameAsset = false;
-			if ((realignedrelativePakFilePath.StartsWith("../../../VRE/")) || (realignedrelativePakFilePath.StartsWith("../../../ZeroPay/")))
-				bIgnoreGameAsset = true;
-
-			if (!bIgnoreGameAsset)
-				generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
-			nTotalFiles++;
-		}
-	}
-
-	/* Asset registry */
-	FString ProjectAssetRegistryPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectAssetRegistryPath += "Cooked/Android/" + FString(FApp::GetProjectName()) + "/AssetRegistry.bin";
-	FString realignedFilePath = ProjectAssetRegistryPath.Replace(TEXT("\\"), TEXT("/"));
-	generatedPakListLine += "\"" + realignedFilePath + "\"   \"../../../AssetRegistry.bin\" \n";
-
-	/* Write all lines.. */
-	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
-	if (!bSuccess)
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - Could not write to Android PAK list file.";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	LastMessage = FString::Printf(TEXT("[6/9] Packing Quest3/Android content (%d assets)..."), nTotalFiles);
-	UpdateUIProgressField();
-
-	if (!ExecutePakShellCmd("Android", CookedPakLocation_Android, CookedPakListFilePath))
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - Android PAKing failed. The log's have been copied to the 'output window', please view for more information.";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	return true;
-}
-
-bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_DefinitionDataAsset* dataAsset)
-{
-	FString UGCID = dataAsset->Definition.UGCID;
-	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
-	FString neverCookMapName = dataAsset->Definition.pcvrlevel.GetAssetName();
-
-	// All build paths, names, etc
-	FString ProjectCookedPath_LinuxServer = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectCookedPath_LinuxServer += "Cooked/LinuxServer/" + FString(FApp::GetProjectName()) + "/Content";
-	FString PakFileName_LinuxServer = "LinuxServer.pak";
-	FString CookedPakLocation_LinuxServer = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakLocation_LinuxServer += "Workshop/" + PakFileName_LinuxServer;
-	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakListFilePath += "custommap_paklist.txt";
-
-	LastMessage = "[7/9] Cooking LinuxServer PAK File...";
-	UpdateUIProgressField();
-	FPlatformProcess::Sleep(1.05f);
-
-	/* Cook Platform */
-	if (!ExecuteCookShellCmd("LinuxServer", UGCID, mapName, neverCookMapName))
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - LinuxServer Cook returned failure code.";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	LastMessage = "[8/9] Generate LinuxServer packing list..";
-	UpdateUIProgressField();
-	FPlatformProcess::Sleep(0.5f);
-
-	/* Build the pak file */
-	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-	TArray<FString> AssetFiles;
-	// Find all files with uasset extension in the cooked path 
-	PlatformFile.FindFilesRecursively(AssetFiles, *ProjectCookedPath_LinuxServer, NULL);
-	// Open PAK list for writing
-	bool first = true;
-
-	// Nothing? WTF
-	if (AssetFiles.Num() <= 0)
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - Found nothing to add to LinuxServer pak list!";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	// Remove old pak list
-	PlatformFile.DeleteFile(*CookedPakListFilePath);
-
-	// Iterate all assets
-	FString generatedPakListLine;
-	int nTotalFiles = 0;
-	for (int32 Index = 0; Index != AssetFiles.Num(); ++Index)
-	{
-		/* Make sure it's a filetype we care about.. */
-		bool foundUAsset = AssetFiles[Index].Find(".uasset") >= 0;
-		bool foundUBulk = AssetFiles[Index].Find(".ubulk") >= 0;
-		bool foundUMap = AssetFiles[Index].Find(".umap") >= 0;
-		bool foundUExp = AssetFiles[Index].Find(".uexp") >= 0;
-		bool foundUFont = AssetFiles[Index].Find(".ufont") >= 0;
-
-		if (foundUAsset || foundUBulk || foundUMap || foundUExp || foundUFont)
-		{
-			// Generate file such as \"FULLPATH\"SPACE\"RELATIVE PATH"
-			FString realignedFilePath = AssetFiles[Index].Replace(TEXT("\\"), TEXT("/"));
-			FString relativePakFilePath = AssetFiles[Index].Replace(*ProjectCookedPath_LinuxServer, TEXT("../../.."));
-			FString realignedrelativePakFilePath = relativePakFilePath.Replace(TEXT("\\"), TEXT("/"));
-
-			/* Ignore any "game" folders, these will be skipped as the main game containts them and the mod
-			   will have a "soft" reference to it which will still load in-game */
-			bool bIgnoreGameAsset = false;
-			if ((realignedrelativePakFilePath.StartsWith("../../../VRE/")) || (realignedrelativePakFilePath.StartsWith("../../../ZeroPay/")))
-				bIgnoreGameAsset = true;
-
-			if (!bIgnoreGameAsset)
-				generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
-			nTotalFiles++;
-		}
-	}
-
-	/* Asset registry */
-	FString ProjectAssetRegistryPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectAssetRegistryPath += "Cooked/LinuxServer/" + FString(FApp::GetProjectName()) + "/AssetRegistry.bin";
-	FString realignedFilePath = ProjectAssetRegistryPath.Replace(TEXT("\\"), TEXT("/"));
-	generatedPakListLine += "\"" + realignedFilePath + "\"   \"../../../AssetRegistry.bin\" \n";
-
-	/* Write all lines.. */
-	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
-	if (!bSuccess)
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - Could not write to LinuxServer PAK list file.";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	LastMessage = FString::Printf(TEXT("[9/9] Packing LinuxServer content (%d assets)..."), nTotalFiles);
-	UpdateUIProgressField();
-
-	if (!ExecutePakShellCmd("LinuxServer", CookedPakLocation_LinuxServer, CookedPakListFilePath))
-	{
-		LastMessage = ">>> ERROR >> ERROR > ERROR - LinuxServer PAKing failed. The log's have been copied to the 'output window', please view for more information.";
-		UpdateUIProgressField();
-		return false;
-	}
-
-	return true;
-}
-
-/********************************************************************************************************/
-/*                                          SUPPORT FUNCTIONS                                           */
-/********************************************************************************************************/
-
-bool FZeroPayEditorButtonsPluginModule::ExecuteCookShellCmd(FString Platform, FString UGCID, FString MapName, FString NeverCookMapName)
-{
-	FString CmdExe = TEXT("cmd.exe");
-
-	FString EditorExePath = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	EditorExePath += "Engine/Binaries/Win64/UnrealEditor.exe";
-
-	FString ProjectPath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
-
-	FString MapPath = TEXT("/Game/ZeroPayMods/UGC" + UGCID + "/Levels/" + MapName);
-	FString NeverCookDir = TEXT("/Game/ZeroPayMods/UGC" + UGCID + "/Levels/" + NeverCookMapName);
-
-	// The full quoted command passed to /k (entire command in one quoted string)
-	FString CommandToRun = FString::Printf(
-		TEXT("\"%s\" \"%s\" -run=cook -targetplatform=%s -SkipCookingEditorOnlyData -versioned -map=%s -NeverCookDir=%s"),
-		*EditorExePath,  // e.g. X:/UE5-Rel/Engine/Binaries/Win64/UnrealEditor.exe
-		*ProjectPath,    // e.g. I:/GameDev/ZeroPayVR/ZeroPayVR.uproject
-		*Platform,
-		*MapPath,
-		*NeverCookDir
-	);
-
-	// Arguments to cmd.exe: /k "full command in quotes"
-	FString CmdArgs = FString::Printf(TEXT("/k \"%s\""), *CommandToRun);
-
-	UE_LOG(LogTemp, Display, TEXT("Cook Shell CommandArgs -- %s"), *CmdArgs);
-
-	// Stdio pipe
-	void* ReadPipe = nullptr;
-	void* WritePipe = nullptr;
-	FPlatformProcess::CreatePipe(ReadPipe, WritePipe);
-
-	// Now launch the process
-	FProcHandle CmdHandle = FPlatformProcess::CreateProc(
-		*CmdExe,
-		*CmdArgs,
-		true,   // bLaunchDetached
-		false,  // bLaunchHidden
-		false,  // bLaunchReallyHidden
-		nullptr,
-		0,
-		nullptr,
-		WritePipe,
-		ReadPipe
-	);
-
-	if (CmdHandle.IsValid())
-	{
-		// Wait until the process exits
-		FString Output;
-
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("             >>>    ZeroPayVR Mod - Cooking information    <<<                  "))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-
-		while (FPlatformProcess::IsProcRunning(CmdHandle))
-		{
-			Output = FPlatformProcess::ReadPipe(ReadPipe);
-			UE_LOG(LogTemp, Display, TEXT("%s"), *Output)
-			FPlatformProcess::Sleep(0.1f); // allow buffer to fill
-		}
-		/* Final line */
-		FPlatformProcess::Sleep(1.0f); // allow buffer to fill
-		Output = FPlatformProcess::ReadPipe(ReadPipe);
-		UE_LOG(LogTemp, Display, TEXT("%s"), *Output)
-
-		FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
-
-		// Optionally, get the return code
-		int32 ExecReturnCode = 0;
-		FPlatformProcess::GetProcReturnCode(CmdHandle, &ExecReturnCode);
-		UE_LOG(LogTemp, Log, TEXT("Process exited with code %d"), ExecReturnCode);
-
-		// Clean up
-		FPlatformProcess::CloseProc(CmdHandle);
-
-		if (ExecReturnCode != 0)
-			return false;
-		else
-			return true ;
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to launch process."));
-		return false;
-	}
-
-	return false ;
-}
-
-
-
-bool FZeroPayEditorButtonsPluginModule::ExecutePakShellCmd(FString Platform, FString CookedPakLocation_Windows, FString CookedPakListFilePath)
-{
-	FString CmdExe = TEXT("cmd.exe");
-
-	FString EditorExePath = *FPaths::ConvertRelativePathToFull(FPaths::RootDir());
-	EditorExePath += "Engine/Binaries/Win64/UnrealPak.exe";
-
-	FString ProjectPath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
-
-//	CommandArgs = "\"" + CookedPakLocation_Windows + "\" -create=\"" + CookedPakListFilePath + "\" -platform = \"Windows\" -UTF8Output -multiprocess -patchpaddingalign=2048";
-
-	// The full quoted command passed to /k (entire command in one quoted string)
-	FString CommandToRun = FString::Printf(
-		TEXT("\"%s\" \"%s\" -create=\"%s\" -platform=%s -UTF8Output -multiprocess -patchpaddingalign=2048"),
-		*EditorExePath,
-		*CookedPakLocation_Windows,  
-		*CookedPakListFilePath,    
-		*Platform
-	);
-
-	// Arguments to cmd.exe: /k "full command in quotes"
-	FString CmdArgs = FString::Printf(TEXT("/k \"%s\""), *CommandToRun);
-
-	UE_LOG(LogTemp, Display, TEXT("Pak Shell CommandArgs -- %s"), *CmdArgs);
-
-	// Stdio pipe
-	void* ReadPipe = nullptr;
-	void* WritePipe = nullptr;
-	FPlatformProcess::CreatePipe(ReadPipe, WritePipe);
-
-	// Now launch the process
-	FProcHandle CmdHandle = FPlatformProcess::CreateProc(
-		*CmdExe,
-		*CmdArgs,
-		true,   // bLaunchDetached
-		false,  // bLaunchHidden
-		false,  // bLaunchReallyHidden
-		nullptr,
-		0,
-		nullptr,
-		WritePipe,
-		ReadPipe
-	);
-
-	if (CmdHandle.IsValid())
-	{
-		// Wait until the process exits
-		FString Output;
-
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("              >>>    ZeroPayVR Mod - PAKing information    <<<                  "))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-		UE_LOG(LogTemp, Display, TEXT("--------------------------------------------------------------------------------"))
-
-		while (FPlatformProcess::IsProcRunning(CmdHandle))
-		{
-			Output = FPlatformProcess::ReadPipe(ReadPipe);
-			UE_LOG(LogTemp, Display, TEXT("%s"), *Output)
-			FPlatformProcess::Sleep(0.1f); // allow buffer to fill
-		}
-		/* Final line */
-		FPlatformProcess::Sleep(1.0f); // allow buffer to fill
-		Output = FPlatformProcess::ReadPipe(ReadPipe);
-		UE_LOG(LogTemp, Display, TEXT("%s"), *Output)
-
-		FPlatformProcess::ClosePipe(ReadPipe, WritePipe);
-
-		// Optionally, get the return code
-		int32 ExecReturnCode = 0;
-		FPlatformProcess::GetProcReturnCode(CmdHandle, &ExecReturnCode);
-		UE_LOG(LogTemp, Log, TEXT("Process exited with code %d"), ExecReturnCode);
-
-		// Clean up
-		FPlatformProcess::CloseProc(CmdHandle);
-
-		if (ExecReturnCode != 0)
-			return false;
-		else
-			return true;
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to launch process."));
-		return false;
-	}
-
-	return false;
-}
-
-
-UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::PollUploadStatus()
-{
-	bAbortOperation = false;
-	bPollCompleted = false;
-	Handle = NewObject<UZeroPayEditorOperationHandle>();
-
-	Async(EAsyncExecution::Thread, [this]()
-		{
-			bool bHasEnteredUploadState = false ;
-			while (!bPollCompleted)
-			{
-				UModioSubsystem* Subsystem = GEngine->GetEngineSubsystem<UModioSubsystem>();
-				if (Subsystem == nullptr)
-					return ;
-				TOptional<FModioModProgressInfo> result = Subsystem->QueryCurrentModUpdate();
-
-				if (result.IsSet())
-				{
-					/* Get value of progress*/
-					FModioModProgressInfo value = result.GetValue();
-					/* Wait until mod.io has said it's "uploading" */
-					if ((!bHasEnteredUploadState) && (value.GetCurrentState() == EModioModProgressState::Uploading))
-					{
-						/* Set flag to detect we are uploading */
-						bHasEnteredUploadState = true;
-						/* Read init values */
-						currentProgress = value.GetCurrentProgress(EModioModProgressState::Uploading);
-						totalProgress = value.GetTotalProgress(EModioModProgressState::Uploading);
-					}
-					/* Grab information */
-					if ((value.GetCurrentState() == EModioModProgressState::Uploading))
-					{
-						/* Difference */
-						int64 currentProgress_ = (int64) value.GetCurrentProgress(EModioModProgressState::Uploading) ;
-						int64 changeInBytes = currentProgress_ - (int64) currentProgress;
-
-						/* Read new value */
-						currentProgress = value.GetCurrentProgress(EModioModProgressState::Uploading);
-
-						/* Submit info to BP callback! */
-						AsyncTask(ENamedThreads::GameThread, [this, changeInBytes]()
-							{
-								Handle->OnUploadProgress.Broadcast(false, (int64)currentProgress, (int64)totalProgress, FormatDataRateResponse(changeInBytes));
-							});
-					}
-					else
-					{
-						/* Not uploading? make sure we were prior to killing ourself... */
-						if (bHasEnteredUploadState)
-							bPollCompleted = true;
-					}
-				}
-				else
-				{
-					/* Invalid, after upload? we're done.. */
-					if (bHasEnteredUploadState)
-						bPollCompleted = true;
-				}
-					
-				FPlatformProcess::Sleep(1.0f);
-			}
-
-			// Simulate some logic, then notify later
-			AsyncTask(ENamedThreads::GameThread, [this]()
-			{
-				Handle->OnUploadProgress.Broadcast(true, 0, 0, "Completed");
-			});
-		});
-
-	return Handle;
-}
-
-FString FZeroPayEditorButtonsPluginModule::FormatDataRateResponse(int64 BytesPerSecond)
-{
-	const TCHAR* Suffix = TEXT("B/s");
-	double Rate = static_cast<double>(BytesPerSecond);
-
-	if (Rate >= 1024.0 * 1024.0 * 1024.0)
-	{
-		Rate /= (1024.0 * 1024.0 * 1024.0);
-		Suffix = TEXT("GB/s");
-	}
-	else if (Rate >= 1024.0 * 1024.0)
-	{
-		Rate /= (1024.0 * 1024.0);
-		Suffix = TEXT("MB/s");
-	}
-	else if (Rate >= 1024.0)
-	{
-		Rate /= 1024.0;
-		Suffix = TEXT("KB/s");
-	}
-
-	return FString::Printf(TEXT("%.2f %s"), Rate, Suffix);
-}
-
-void FZeroPayEditorButtonsPluginModule::CancelUploadStatus()
-{
-	bAbortOperation = true ;
-	bPollCompleted = true ;
-}
-
-
-/*********************************************************************************************************/
+/***************************************************************************************************************
+*
+* Function Library Code 
+*
+*/
 
 UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
 {
@@ -943,7 +344,7 @@ UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::CookAndUplo
 		return Plugin->CookAndUploadPackages(dataAsset);
 	}
 
-	return nullptr ;
+	return nullptr;
 }
 
 UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::PollUploadStatus()
@@ -956,7 +357,6 @@ UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::PollUploadS
 	return nullptr;
 }
 
-
 void UZeroPayEditorButtonsFunctionLibrary::CancelUploadStatus()
 {
 	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
@@ -965,7 +365,6 @@ void UZeroPayEditorButtonsFunctionLibrary::CancelUploadStatus()
 	}
 
 }
-
 
 #undef LOCTEXT_NAMESPACE
 	

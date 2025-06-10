@@ -18,7 +18,7 @@ public:
 	virtual void RegisterCommands() override;
 
 public:
-	TSharedPtr< FUICommandInfo > ShowQuest3View ;
+	TSharedPtr< FUICommandInfo > GenerateQuest3ReducedLevel;
 	TSharedPtr< FUICommandInfo > ShowPCVRView;
 	TSharedPtr< FUICommandInfo > OpenModioWindow;
 };

@@ -6,7 +6,7 @@
 
 void FZeroPayEditorButtonsPluginCommands::RegisterCommands()
 {
-	UI_COMMAND(ShowQuest3View, "ShowQuest3View", "Show Quest3 data layer only", EUserInterfaceActionType::Button, FInputChord());
+	UI_COMMAND(GenerateQuest3ReducedLevel, "GenerateQuest3ReducedLevel", "Build the Quest3 level by reducing down the PCVR level", EUserInterfaceActionType::Button, FInputChord());
 	UI_COMMAND(ShowPCVRView, "ShowPCVRView", "Show PCVR data layer only", EUserInterfaceActionType::Button, FInputChord());	
 	UI_COMMAND(OpenModioWindow, "Open Mod.Io Window", "Create mods, upload changes, etc.", EUserInterfaceActionType::Button, FInputChord());
 }
