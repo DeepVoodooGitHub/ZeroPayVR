@@ -25,7 +25,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnOperationComplete, bool, bSucces
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnUploadProgress, bool, bComplete, int64, currentBytes, int64, totalBytes, FString, dataRate);
 
 UCLASS(Blueprintable)
-class UZeroPayEditorOperationHandle : public UObject
+class UZeroPayEditorCookPakOperationHandle : public UObject
 {
 	GENERATED_BODY()
 
@@ -37,6 +37,15 @@ public:
 	FOnUploadProgress OnUploadProgress;
 };
 
+UCLASS(Blueprintable)
+class UZeroPayEditorReduceOperationHandle : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(BlueprintAssignable)
+	FOnOperationComplete OnCompleted;
+};
 
 /**********************************************************************************************************************
 *
@@ -45,22 +54,39 @@ public:
 *
 */
 
-USTRUCT(BlueprintType)
-struct FZeroPayEditor_ReducerSettingsStruct
+UCLASS(BlueprintType)
+class UZeroPayEditor_ReducerSettingsAsset : public UDataAsset
 {
 	GENERATED_BODY()
-
-	/* The parent PCVR level to use for reduction */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	TSoftObjectPtr<UWorld> PCVRLevel;
-
-	/* The quest 3 target level for the output of the reduction */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	TSoftObjectPtr<UWorld> Quest3Level;
-
+public:
 	/* How much to reduce the triangle count down to (0.3 = 30%) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
 	float PercentageTriangles = 0.3f;
+
+	/* The total triangles found in the original PCVR level */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
+	int32 Stats_OriginalTriangleCount = 0;
+
+	/* The total triangles found in the reduced Quest3 level */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
+	int32 Stats_ReducedTriangleCount = 0;
+
+	/* The total materials found in the original PCVR level */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
+	int32 Stats_OriginalMaterialCount = 0;
+
+	/* The total triangles found in the reduced Quest3 level */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
+	int32 Stats_ReducedMaterialCount = 0;
+
+	/* The total unique meshes in original PCVR level */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
+	int32 Stats_OriginalMeshCount = 0;
+
+	/* The total unique meshes found in the reduced Quest3 level */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
+	int32 Stats_ReducedMeshCount = 0;
+
 };
 
 /**********************************************************************************************************************
@@ -83,9 +109,12 @@ public:
 	void OpenModIOWindow_Clicked();
 
 	/* >>> Cooking logic - Called from Function Library */
-	UZeroPayEditorOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
-	UZeroPayEditorOperationHandle* PollUploadStatus() ;
+	UZeroPayEditorCookPakOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
+	UZeroPayEditorCookPakOperationHandle* PollUploadStatus() ;
 	void CancelUploadStatus();
+
+	/* >>> Reducer Logic - Called from Function Library */
+	UZeroPayEditorReduceOperationHandle* ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings);
 private:
 	/* >>> Vars */
 	bool bIsOperationRunning;
@@ -94,7 +123,8 @@ private:
 	UEditorUtilityWidget* WidgetModManagementInstance;
 	UEditorUtilityWidget* WidgetQuest3ReducerInstance;
 	/* >>> Cooking vars */
-	UZeroPayEditorOperationHandle* Handle;
+	UZeroPayEditorCookPakOperationHandle* CookPakHandle;
+	UZeroPayEditorReduceOperationHandle* ReduceHandle;
 	FString GlobalUGCValue;
 	FString LastMessage ;
 	bool bAbortOperation ;
@@ -107,7 +137,6 @@ private:
 	TSharedRef<SDockTab> SpawnQuest3ReducerDockableTab(const FSpawnTabArgs& Args);
 	void RegisterMenus();
 	void ShowTemporaryNotification(const FString& Message, float Duration = 2.0f);
-	void UpdateUIProgressField() ;
 	FString FormatDataRateResponse(int64 BytesPerSecond) ;
 
 	/* >>> Cooking logic */
@@ -119,8 +148,9 @@ private:
 	bool ReadNextLineFromPipe(HANDLE PipeHandle, FString& OutLine, FString& Remainder);
 	bool ExecutePakShellCmd(FString Platform, FString CookedPakLocation_Windows, FString CookedPakListFilePath);
 
-	/* >>> Reducer Logic */
-	bool ReduceLevel() ;
+	/* Cooking support */
+	void UpdateModManagementUIProgressField(); 
+	void UpdateQuest3ReducerUIProgressField();
 };
 
 /**********************************************************************************************************************
@@ -137,13 +167,20 @@ class UZeroPayEditorButtonsFunctionLibrary : public UBlueprintFunctionLibrary
 
 public:
 
-	/* Cooking */
+	/* Start the cooking and packaging of all supported targets */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
-	static UZeroPayEditorOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
+	static UZeroPayEditorCookPakOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
 
+	/* Returns the status of any upload.. */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
-	static UZeroPayEditorOperationHandle* PollUploadStatus();
+	static UZeroPayEditorCookPakOperationHandle* PollUploadStatus();
 
+	/* Cancels the upload */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
 	static void CancelUploadStatus();
+
+	/* Reduces a PCVR level using the supplied settings, to a Quest3 level */
+	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
+	static UZeroPayEditorReduceOperationHandle* ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings);
+
 };

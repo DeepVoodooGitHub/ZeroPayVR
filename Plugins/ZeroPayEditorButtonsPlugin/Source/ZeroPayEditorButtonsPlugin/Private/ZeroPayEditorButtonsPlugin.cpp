@@ -224,7 +224,7 @@ void FZeroPayEditorButtonsPluginModule::GenerateQuest3ReducedLevel_Clicked()
 		TSharedPtr<SWindow> ParentWindow = FSlateApplication::Get().FindWidgetWindow(Tab.ToSharedRef());
 		if (ParentWindow.IsValid())
 		{
-			ParentWindow->Resize(FVector2D(1200, 750));
+			ParentWindow->Resize(FVector2D(1200, 950));
 		}
 	}
 }
@@ -299,45 +299,13 @@ void FZeroPayEditorButtonsPluginModule::ShowTemporaryNotification(const FString&
 	UE_LOG(LogTemp, Log, TEXT("Notification displayed: %s"), *Message);
 }
 
-void FZeroPayEditorButtonsPluginModule::UpdateUIProgressField()
-{
-	// Post result back to main thread safely
-	Async(EAsyncExecution::TaskGraphMainThread, [this]()
-		{
-			/* During development, changes to the editor utility BP can cause the instance to disappear */
-			if (WidgetModManagementInstance == nullptr)
-				return;
-			if (!IsValid(WidgetModManagementInstance))
-				return;
-
-			UFunction* Func = WidgetModManagementInstance->FindFunction("UpdateUIProgressField");
-			if (!Func)
-			{
-				UE_LOG(LogTemp, Error, TEXT("Function UpdateUIProgressField not found on %s"), *WidgetModManagementInstance->GetName());
-				return;
-			}
-
-			// Match the parameter layout: 1 FString
-			struct FMyParams
-			{
-				FString InputString;
-			};
-
-			FMyParams Params;
-			Params.InputString = LastMessage;
-
-			WidgetModManagementInstance->ProcessEvent(Func, &Params);
-		});
-}
-
-
 /***************************************************************************************************************
 *
 * Function Library Code 
 *
 */
 
-UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
+UZeroPayEditorCookPakOperationHandle* UZeroPayEditorButtonsFunctionLibrary::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
 {
 	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
 	{
@@ -347,7 +315,7 @@ UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::CookAndUplo
 	return nullptr;
 }
 
-UZeroPayEditorOperationHandle* UZeroPayEditorButtonsFunctionLibrary::PollUploadStatus()
+UZeroPayEditorCookPakOperationHandle* UZeroPayEditorButtonsFunctionLibrary::PollUploadStatus()
 {
 	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
 	{
@@ -364,6 +332,16 @@ void UZeroPayEditorButtonsFunctionLibrary::CancelUploadStatus()
 		Plugin->CancelUploadStatus();
 	}
 
+}
+
+UZeroPayEditorReduceOperationHandle* UZeroPayEditorButtonsFunctionLibrary::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings)
+{
+	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
+	{
+		return Plugin->ReduceLevel(dataAsset, reducerSettings);
+	}
+
+	return nullptr ;
 }
 
 #undef LOCTEXT_NAMESPACE

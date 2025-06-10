@@ -30,10 +30,10 @@
 
 /**************************************************** COOKING LOGIC ****************************************************/
 
-UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
+UZeroPayEditorCookPakOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset)
 {
 	bAbortOperation = false;
-	Handle = NewObject<UZeroPayEditorOperationHandle>();
+	CookPakHandle = NewObject<UZeroPayEditorCookPakOperationHandle>();
 
 	Async(EAsyncExecution::Thread, [this, dataAsset]()
 		{
@@ -47,7 +47,7 @@ UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadP
 				// Simulate some logic, then notify later
 				AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
 					{
-						Handle->OnCompleted.Broadcast(false, dataAsset->Definition.UGCID);
+						CookPakHandle->OnCompleted.Broadcast(false, dataAsset->Definition.UGCID);
 					});
 				return;
 			}
@@ -61,7 +61,7 @@ UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadP
 				// Simulate some logic, then notify later
 				AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
 					{
-						Handle->OnCompleted.Broadcast(false, dataAsset->Definition.UGCID);
+						CookPakHandle->OnCompleted.Broadcast(false, dataAsset->Definition.UGCID);
 					});
 				return;
 			}
@@ -73,17 +73,17 @@ UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::CookAndUploadP
 			if (!bAbortOperation)
 				LastMessage = "Cooking and packing stage completed successfully!";
 
-			UpdateUIProgressField();
+			UpdateModManagementUIProgressField();
 			FPlatformProcess::Sleep(1.0f);
 
 			// Simulate some logic, then notify later
 			AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
 				{
-					Handle->OnCompleted.Broadcast(!bAbortOperation, dataAsset->Definition.UGCID);
+					CookPakHandle->OnCompleted.Broadcast(!bAbortOperation, dataAsset->Definition.UGCID);
 				});
 		});
 
-	return Handle;
+	return CookPakHandle;
 }
 
 bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_DefinitionDataAsset* dataAsset)
@@ -102,19 +102,19 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_Definitio
 	CookedPakListFilePath += "custommap_paklist.txt";
 
 	LastMessage = "[1/9] Cooking PCVR/Windows content.. ";
-	UpdateUIProgressField();
+	UpdateModManagementUIProgressField();
 	FPlatformProcess::Sleep(1.0f);
 
 	/* Cook Platform */
 	if (!ExecuteCookShellCmd("Windows", UGCID, mapName, neverCookMapName))
 	{
 		LastMessage = ">>> ERROR : Cooking of windows failed, see 'Output Log'.";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
 	LastMessage = "[2/9] Generate PCVR/Windows packing list..";
-	UpdateUIProgressField();
+	UpdateModManagementUIProgressField();
 	FPlatformProcess::Sleep(0.5f);
 
 	/* Build the pak file */
@@ -129,7 +129,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_Definitio
 	if (AssetFiles.Num() <= 0)
 	{
 		LastMessage = ">>> ERROR : Windows Pak list was empty, see 'Output Log'.";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
@@ -178,7 +178,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_Definitio
 	if (!bSuccess)
 	{
 		LastMessage = ">>> ERROR : Could not write Windows Pak list.";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
@@ -187,12 +187,12 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_Definitio
 	//
 
 	LastMessage = FString::Printf(TEXT("[3/9] Packing PCVR content (%d assets)..."), nTotalFiles);
-	UpdateUIProgressField();
+	UpdateModManagementUIProgressField();
 
 	if (!ExecutePakShellCmd("Windows", CookedPakLocation_Windows, CookedPakListFilePath))
 	{
 		LastMessage = ">>> ERROR : Windows Pak failed, see 'output log'";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
@@ -216,18 +216,18 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 
 	LastMessage = "[4/9] Cooking Quest3/Android PAK File...";
 	FPlatformProcess::Sleep(0.5f);
-	UpdateUIProgressField();
+	UpdateModManagementUIProgressField();
 
 	/* Cook Platform */
 	if (!ExecuteCookShellCmd("Android", UGCID, mapName, neverCookMapName))
 	{
 		LastMessage = ">>> ERROR : Cooking of Android failed, see 'Output Log'.";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
 	LastMessage = "[5/9] Generate Quest3/Android packing list..";
-	UpdateUIProgressField();
+	UpdateModManagementUIProgressField();
 	FPlatformProcess::Sleep(0.5f);
 
 	/* Build the pak file */
@@ -242,7 +242,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 	if (AssetFiles.Num() <= 0)
 	{
 		LastMessage = ">>> ERROR : Android Pak list was empty, see 'Output Log'.";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
@@ -291,17 +291,17 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 	if (!bSuccess)
 	{
 		LastMessage = ">>> ERROR >> ERROR > ERROR - Could not write to Android PAK list file.";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
 	LastMessage = FString::Printf(TEXT("[6/9] Packing Quest3/Android content (%d assets)..."), nTotalFiles);
-	UpdateUIProgressField();
+	UpdateModManagementUIProgressField();
 
 	if (!ExecutePakShellCmd("Android", CookedPakLocation_Android, CookedPakListFilePath))
 	{
 		LastMessage = ">>> ERROR : Android Pak failed, see 'output log'";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
@@ -324,19 +324,19 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 	CookedPakListFilePath += "custommap_paklist.txt";
 
 	LastMessage = "[7/9] Cooking LinuxServer PAK File...";
-	UpdateUIProgressField();
+	UpdateModManagementUIProgressField();
 	FPlatformProcess::Sleep(1.05f);
 
 	/* Cook Platform */
 	if (!ExecuteCookShellCmd("LinuxServer", UGCID, mapName, neverCookMapName))
 	{
 		LastMessage = ">>> ERROR : Cooking of LinuxServer failed, see 'Output Log'.";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
 	LastMessage = "[8/9] Generate LinuxServer packing list..";
-	UpdateUIProgressField();
+	UpdateModManagementUIProgressField();
 	FPlatformProcess::Sleep(0.5f);
 
 	/* Build the pak file */
@@ -351,7 +351,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 	if (AssetFiles.Num() <= 0)
 	{
 		LastMessage = ">>> ERROR : LinuxServer Pak list was empty, see 'Output Log'.";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
@@ -400,17 +400,17 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 	if (!bSuccess)
 	{
 		LastMessage = ">>> ERROR : LinuxServer Pak failed, see 'output log'";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
 	LastMessage = FString::Printf(TEXT("[9/9] Packing LinuxServer content (%d assets)..."), nTotalFiles);
-	UpdateUIProgressField();
+	UpdateModManagementUIProgressField();
 
 	if (!ExecutePakShellCmd("LinuxServer", CookedPakLocation_LinuxServer, CookedPakListFilePath))
 	{
 		LastMessage = ">>> ERROR >> ERROR > ERROR - LinuxServer PAKing failed. The log's have been copied to the 'output window', please view for more information.";
-		UpdateUIProgressField();
+		UpdateModManagementUIProgressField();
 		return false;
 	}
 
@@ -728,11 +728,11 @@ bool FZeroPayEditorButtonsPluginModule::ExecutePakShellCmd(FString Platform, FSt
 }
 
 
-UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::PollUploadStatus()
+UZeroPayEditorCookPakOperationHandle* FZeroPayEditorButtonsPluginModule::PollUploadStatus()
 {
 	bAbortOperation = false;
 	bPollCompleted = false;
-	Handle = NewObject<UZeroPayEditorOperationHandle>();
+	CookPakHandle = NewObject<UZeroPayEditorCookPakOperationHandle>();
 
 	Async(EAsyncExecution::Thread, [this]()
 		{
@@ -770,7 +770,7 @@ UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::PollUploadStat
 						/* Submit info to BP callback! */
 						AsyncTask(ENamedThreads::GameThread, [this, changeInBytes]()
 							{
-								Handle->OnUploadProgress.Broadcast(false, (int64)currentProgress, (int64)totalProgress, FormatDataRateResponse(changeInBytes));
+								CookPakHandle->OnUploadProgress.Broadcast(false, (int64)currentProgress, (int64)totalProgress, FormatDataRateResponse(changeInBytes));
 							});
 					}
 					else
@@ -793,11 +793,11 @@ UZeroPayEditorOperationHandle* FZeroPayEditorButtonsPluginModule::PollUploadStat
 			// Simulate some logic, then notify later
 			AsyncTask(ENamedThreads::GameThread, [this]()
 			{
-				Handle->OnUploadProgress.Broadcast(true, 0, 0, "Completed");
+					CookPakHandle->OnUploadProgress.Broadcast(true, 0, 0, "Completed");
 			});
 		});
 
-	return Handle;
+	return CookPakHandle;
 }
 
 FString FZeroPayEditorButtonsPluginModule::FormatDataRateResponse(int64 BytesPerSecond)
@@ -830,3 +830,33 @@ void FZeroPayEditorButtonsPluginModule::CancelUploadStatus()
 	bPollCompleted = true ;
 }
 
+void FZeroPayEditorButtonsPluginModule::UpdateModManagementUIProgressField()
+{
+	// Post result back to main thread safely
+	Async(EAsyncExecution::TaskGraphMainThread, [this]()
+		{
+			/* During development, changes to the editor utility BP can cause the instance to disappear */
+			if (WidgetModManagementInstance == nullptr)
+				return;
+			if (!IsValid(WidgetModManagementInstance))
+				return;
+
+			UFunction* Func = WidgetModManagementInstance->FindFunction("UpdateUIProgressField");
+			if (!Func)
+			{
+				UE_LOG(LogTemp, Error, TEXT("Function UpdateUIProgressField not found on %s"), *WidgetModManagementInstance->GetName());
+				return;
+			}
+
+			// Match the parameter layout: 1 FString
+			struct FMyParams
+			{
+				FString InputString;
+			};
+
+			FMyParams Params;
+			Params.InputString = LastMessage;
+
+			WidgetModManagementInstance->ProcessEvent(Func, &Params);
+		});
+}
