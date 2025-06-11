@@ -9,6 +9,8 @@
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include <windows.h>
 #include "Windows/HideWindowsPlatformTypes.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "ZeroPayEditorButtonsPlugin.generated.h"
 
 class FToolBarBuilder;
@@ -54,14 +56,33 @@ public:
 *
 */
 
-UCLASS(BlueprintType)
-class UZeroPayEditor_ReducerSettingsAsset : public UDataAsset
+USTRUCT(BlueprintType)
+struct FZeroPayEditor_MeshReductionSettings
 {
 	GENERATED_BODY()
-public:
-	/* How much to reduce the triangle count down to (0.3 = 30%) */
+
+	/* Show we merge mesh actors that contain the same base mesh and material */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	float PercentageTriangles = 0.3f;
+	bool Stage1_MergeUniform_Enable = true;
+
+	/* Max distance (from bounding box center) of a given mesh to consider part of a merged mesh */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
+	float Stage1_MaxDistance = 2000.0f ;
+
+	/* Show we merge mesh actors that contain the different base meshes and materials */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
+	bool Stage2_MergeNonUniform_Enable = true;
+
+	/* Max distance (from bounding box center) of a given mesh to consider part of a merged mesh */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
+	float Stage2_MaxDistance = 2000.0f;
+
+};
+
+USTRUCT(BlueprintType)
+struct FZeroPayEditor_ReductionStatistics
+{
+	GENERATED_BODY()
 
 	/* The total triangles found in the original PCVR level */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
@@ -78,15 +99,60 @@ public:
 	/* The total triangles found in the reduced Quest3 level */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
 	int32 Stats_ReducedMaterialCount = 0;
+};
 
-	/* The total unique meshes in original PCVR level */
+UCLASS(BlueprintType)
+class UZeroPayEditor_ReducerSettingsAsset : public UDataAsset
+{
+	GENERATED_BODY()
+public:
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
+	FZeroPayEditor_MeshReductionSettings MeshReductionSettings ;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
-	int32 Stats_OriginalMeshCount = 0;
+	FZeroPayEditor_ReductionStatistics Statistics ;
 
-	/* The total unique meshes found in the reduced Quest3 level */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
-	int32 Stats_ReducedMeshCount = 0;
+};
 
+USTRUCT(BlueprintType)
+struct FReducerRuntimeSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
+	bool bStage1_ShowMergeGroups = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
+	bool bStage1_ShowOutputLogDebug = true;
+
+};
+
+/**********************************************************************************************************************
+*
+* FMeshMaterialKey - Provides a mesh and unique material map
+*
+*/
+
+struct FMeshMaterialKey
+{
+	UStaticMesh* Mesh = nullptr;
+	TArray<UMaterialInterface*> Materials;
+
+	bool operator==(const FMeshMaterialKey& Other) const
+	{
+		return Mesh == Other.Mesh && Materials == Other.Materials;
+	}
+
+	friend uint32 GetTypeHash(const FMeshMaterialKey& Key)
+	{
+		uint32 Hash = GetTypeHash(Key.Mesh);
+		for (UMaterialInterface* Mat : Key.Materials)
+		{
+			Hash = HashCombine(Hash, GetTypeHash(Mat));
+		}
+		return Hash;
+	}
 };
 
 /**********************************************************************************************************************
@@ -114,7 +180,7 @@ public:
 	void CancelUploadStatus();
 
 	/* >>> Reducer Logic - Called from Function Library */
-	UZeroPayEditorReduceOperationHandle* ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings);
+	UZeroPayEditorReduceOperationHandle* ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
 private:
 	/* >>> Vars */
 	bool bIsOperationRunning;
@@ -150,6 +216,20 @@ private:
 
 	/* Cooking support */
 	void UpdateModManagementUIProgressField(); 
+
+	/* >>> Reducer Logic */
+	bool Stage1MergeUniformMeshes(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings) ;
+
+	/* Reducer mesh, world, etc. support */
+	TMap<AActor*, TArray<UStaticMeshComponent*>> GetStaticMeshesInSubLevel(const FString& SubLevelName);
+	TMap<UStaticMesh*, TArray<UStaticMeshComponent*>> GroupMeshComponentsByMesh(const TMap<AActor*, TArray<UStaticMeshComponent*>>& ActorMeshMap) ;
+	TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>> GroupByMeshThenProximity_MaterialAware(const TMap<UStaticMesh*, TArray<UStaticMeshComponent*>>& MeshGroups, float MaxDistance);
+	bool MergeMeshIslands(const TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent = 0.5f, const FString& TargetFolderPath = "");
+
+	/* Reducer debug */
+	void DrawClusterDebugBoxes(const TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>>& ClusteredGroups, UWorld* World, float Lifetime);
+
+	/* Reducer support */
 	void UpdateQuest3ReducerUIProgressField();
 };
 
@@ -181,6 +261,6 @@ public:
 
 	/* Reduces a PCVR level using the supplied settings, to a Quest3 level */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
-	static UZeroPayEditorReduceOperationHandle* ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings);
+	static UZeroPayEditorReduceOperationHandle* ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
 
 };

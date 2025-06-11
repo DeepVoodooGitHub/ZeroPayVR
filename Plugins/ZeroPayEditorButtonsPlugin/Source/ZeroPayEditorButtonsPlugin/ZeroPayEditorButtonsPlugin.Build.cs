@@ -54,7 +54,15 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
                 "UMG",
                 "EditorWidgets",
                 "ZeroPayModCore",
-                "Modio"
+                "Modio",
+                "MeshUtilities",
+                "MeshMergeUtilities",
+                "MeshUtilitiesCommon",
+                "MeshReductionInterface",
+                "AssetRegistry",
+                "MeshDescription",
+				"StaticMeshDescription"
+
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

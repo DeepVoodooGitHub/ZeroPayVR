@@ -334,11 +334,11 @@ void UZeroPayEditorButtonsFunctionLibrary::CancelUploadStatus()
 
 }
 
-UZeroPayEditorReduceOperationHandle* UZeroPayEditorButtonsFunctionLibrary::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings)
+UZeroPayEditorReduceOperationHandle* UZeroPayEditorButtonsFunctionLibrary::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
 	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
 	{
-		return Plugin->ReduceLevel(dataAsset, reducerSettings);
+		return Plugin->ReduceLevel(dataAsset, reducerSettings, runtimeSettings);
 	}
 
 	return nullptr ;

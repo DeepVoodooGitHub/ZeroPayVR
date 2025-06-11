@@ -727,7 +727,6 @@ bool FZeroPayEditorButtonsPluginModule::ExecutePakShellCmd(FString Platform, FSt
 	return false;
 }
 
-
 UZeroPayEditorCookPakOperationHandle* FZeroPayEditorButtonsPluginModule::PollUploadStatus()
 {
 	bAbortOperation = false;
@@ -799,6 +798,8 @@ UZeroPayEditorCookPakOperationHandle* FZeroPayEditorButtonsPluginModule::PollUpl
 
 	return CookPakHandle;
 }
+
+
 
 FString FZeroPayEditorButtonsPluginModule::FormatDataRateResponse(int64 BytesPerSecond)
 {
