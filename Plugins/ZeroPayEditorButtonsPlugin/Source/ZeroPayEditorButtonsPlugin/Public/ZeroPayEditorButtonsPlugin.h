@@ -197,6 +197,7 @@ private:
 	bool bPollCompleted ;
 	FModioUnsigned64 currentProgress;
 	FModioUnsigned64 totalProgress;
+	/* >>> Reducer Vars */
 
 	/* >>> Windows, Menus, Dialogs, etc. */
 	TSharedRef<SDockTab> SpawnModManagementDockableTab(const FSpawnTabArgs& Args);
@@ -224,10 +225,12 @@ private:
 	TMap<AActor*, TArray<UStaticMeshComponent*>> GetStaticMeshesInSubLevel(const FString& SubLevelName);
 	TMap<UStaticMesh*, TArray<UStaticMeshComponent*>> GroupMeshComponentsByMesh(const TMap<AActor*, TArray<UStaticMeshComponent*>>& ActorMeshMap) ;
 	TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>> GroupByMeshThenProximity_MaterialAware(const TMap<UStaticMesh*, TArray<UStaticMeshComponent*>>& MeshGroups, float MaxDistance);
-	bool MergeMeshIslands(const TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent = 0.5f, const FString& TargetFolderPath = "");
+	TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>> GroupByMeshesViaProximity(const TMap<UStaticMesh*, TArray<UStaticMeshComponent*>>& MeshGroups, float MaxDistance);
+	bool MergeMeshIslands(const TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent = 0.5f, const FString& TargetFolderPath = "");
+	bool MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName);
 
 	/* Reducer debug */
-	void DrawClusterDebugBoxes(const TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>>& ClusteredGroups, UWorld* World, float Lifetime);
+	void DrawClusterDebugBoxes(const TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>>& ClusteredGroups, UWorld* World, float Lifetime);
 
 	/* Reducer support */
 	void UpdateQuest3ReducerUIProgressField();

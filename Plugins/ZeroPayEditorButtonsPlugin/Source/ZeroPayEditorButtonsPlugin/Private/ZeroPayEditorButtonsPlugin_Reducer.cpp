@@ -22,6 +22,10 @@
 #include "StaticMeshDescription.h"
 #include "StaticMeshCompiler.h"
 #include "ContentBrowserModule.h" 
+#include "Engine/StaticMeshActor.h"
+#include "ObjectTools.h"
+#include "UObject/UObjectGlobals.h"
+#include "IContentBrowserSingleton.h"
 
 UZeroPayEditorReduceOperationHandle* FZeroPayEditorButtonsPluginModule::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
@@ -99,8 +103,8 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 	}
 
 	/* Info */
-	LastMessage = "Stage 1 - Recording all statis meshes in PCVR level";
-	UpdateQuest3ReducerUIProgressField();
+	FScopedSlowTask SlowTask(1.0f, FText::FromString(TEXT("Gathering actors...")));
+	SlowTask.MakeDialog();
 
 	/* >>> Get all static mesh actors from PCVR level */
 	TMap<AActor*, TArray<UStaticMeshComponent*>> MeshContainingActors = GetStaticMeshesInSubLevel(dataAsset->Definition.pcvrlevel.GetAssetName());
@@ -129,12 +133,16 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 	}
 
 	/* Info */
-	LastMessage = FString::Printf(TEXT("Stage 1 - Grouping by distance (%d units) and material similarity"), reducerSettings->MeshReductionSettings.Stage1_MaxDistance);
+	LastMessage = FString::Printf(TEXT("Stage 1 - Grouping by distance (%d units)"), reducerSettings->MeshReductionSettings.Stage1_MaxDistance);
 	UpdateQuest3ReducerUIProgressField();
 
 	/* >>> Group them by proximity to each other... */
-	auto ClusteredGroups = GroupByMeshThenProximity_MaterialAware(MeshGroups, reducerSettings->MeshReductionSettings.Stage1_MaxDistance);
+	//auto ClusteredGroups = GroupByMeshThenProximity_MaterialAware(MeshGroups, reducerSettings->MeshReductionSettings.Stage1_MaxDistance);
+	auto ClusteredGroups = GroupByMeshesViaProximity(MeshGroups, reducerSettings->MeshReductionSettings.Stage1_MaxDistance);
 
+	SlowTask.EnterProgressFrame(0.1f);
+
+#if 0
 	/* Output information from user */
 	if (runtimeSettings.bStage1_ShowOutputLogDebug)
 	{
@@ -152,6 +160,7 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 			}
 		}
 	}
+#endif
 	
 	/* Debug? */
 	if (runtimeSettings.bStage1_ShowMergeGroups)
@@ -162,7 +171,7 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 	UpdateQuest3ReducerUIProgressField();
 
 	/* >>> Merge */
-	FString ReducedAssetMeshPath = FString::Printf(TEXT("/Game/ZeroPayMods/UGC%s/Levels/"), *dataAsset->Definition.UGCID); //ReducedAssets/Meshes
+	FString ReducedAssetMeshPath = FString::Printf(TEXT("/Game/ZeroPayMods/UGC%s/Levels/ReducedAssets/Meshes"), *dataAsset->Definition.UGCID); 
 
 	bSuccess = MergeMeshIslands(ClusteredGroups, 0.5f, *ReducedAssetMeshPath);
 
@@ -323,271 +332,235 @@ TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>> FZeroPayEditorButt
 
 /***************************************************************************************************************
 *
+* GroupByMeshesViaProximity - Returns a mapping of all mesh components against the StaticMesh asset
+*
+*/
+
+TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginModule::GroupByMeshesViaProximity(const TMap<UStaticMesh*, TArray<UStaticMeshComponent*>>& MeshGroups, float MaxDistance)
+{
+	TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>> OutClusters;
+
+	for (const auto& MeshGroup : MeshGroups)
+	{
+		UStaticMesh* Mesh = MeshGroup.Key;
+		const TArray<UStaticMeshComponent*>& Components = MeshGroup.Value;
+
+		TArray<TArray<UStaticMeshComponent*>> Clusters;
+
+		for (UStaticMeshComponent* MeshComp : Components)
+		{
+			if (!MeshComp) continue;
+
+			const FVector Center = MeshComp->Bounds.Origin;
+			bool bAdded = false;
+
+			// Check against each existing cluster
+			for (TArray<UStaticMeshComponent*>& Cluster : Clusters)
+			{
+				if (Cluster.Num() == 0) continue;
+
+				const FVector RefCenter = Cluster[0]->Bounds.Origin;
+				if (FVector::Dist(Center, RefCenter) <= MaxDistance)
+				{
+					Cluster.Add(MeshComp);
+					bAdded = true;
+					break;
+				}
+			}
+
+			// If not added to an existing cluster, start a new one
+			if (!bAdded)
+			{
+				TArray<UStaticMeshComponent*> NewCluster;
+				NewCluster.Add(MeshComp);
+				Clusters.Add(NewCluster);
+			}
+		}
+
+		OutClusters.Add(Mesh, Clusters);
+	}
+
+	return OutClusters;
+}
+
+
+/***************************************************************************************************************
+*
 * MergeMeshIslands - Takes currently grouped (mesh = same, material = same) and merges them with reduction 
 *
 */
 
-bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath)
+bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath)
 {
-	UWorld* World = GEditor->GetEditorWorldContext().World();
-	if (!World) return false ;
-
-	// Load mesh merge + reduction interfaces
-	IMeshReduction* MeshReduction = FModuleManager::LoadModuleChecked<IMeshReductionManagerModule>("MeshReductionInterface").GetStaticMeshReductionInterface();
-
-	if (!MeshReduction)
+	/* Get total operations to keep user happy.. */
+	int32 nMergeCount = 0;
+	for (const auto& ClusterPair : ClusteredIslands)
 	{
-		UE_LOG(LogTemp, Error, TEXT("MeshReductionInterface not available."));
-		return false ;
-	}
-
-	if (!TargetFolderPath.StartsWith(TEXT("/Game")))
-	{
-		UE_LOG(LogTemp, Error, TEXT("Target folder path must start with /Game."));
-		return false;
-	}
-
-	FAssetToolsModule& AssetTools = FAssetToolsModule::GetModule();
-	int32 MergeIndex = 0;
-
-	for (const auto& IslandGroup : ClusteredIslands)
-	{
-		const TArray<TArray<UStaticMeshComponent*>>& Clusters = IslandGroup.Value;
-
-		for (const TArray<UStaticMeshComponent*>& Cluster : Clusters)
+		const TArray<TArray<UStaticMeshComponent*>>& IslandGroups = ClusterPair.Value;
+		for (const TArray<UStaticMeshComponent*>& IslandGroup : IslandGroups)
 		{
-			if (Cluster.Num() == 0) continue;
-
-			TArray<UPrimitiveComponent*> ComponentsToMerge;
-			for (UStaticMeshComponent* Comp : Cluster)
-			{
-				if (Comp)
-					ComponentsToMerge.Add(Comp);
-			}
-
-			FMeshMergingSettings MergeSettings;
-			MergeSettings.bMergeMaterials = true;
-			MergeSettings.MaterialSettings.TextureSize = FIntPoint(2048, 2048);
-			MergeSettings.bBakeVertexDataToMesh = true;
-			MergeSettings.bGenerateLightMapUV = true;
-			MergeSettings.bPivotPointAtZero = false;
-
-			FString AssetName = FString::Printf(TEXT("Merged_Island_%03d"), MergeIndex++);
-			FString PackagePath = TargetFolderPath + TEXT("/") + AssetName;
-			FString CleanPackagePath = PackageTools::SanitizePackageName(PackagePath);
-
-			UPackage* Package = CreatePackage(*CleanPackagePath);
-			if (!Package)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Failed to create package: %s"), *CleanPackagePath);
-				continue;
-			}
-
-			FVector MergedLocation;
-			TArray<UObject*> OutAssets;
-			const float ScreenSize = 1.0f;
-
-			IMeshMergeUtilities& MergeUtilities = FModuleManager::Get().LoadModuleChecked<IMeshMergeModule>("MeshMergeUtilities").GetUtilities();
-
-			MergeUtilities.MergeComponentsToStaticMesh(
-				ComponentsToMerge,
-				World,
-				MergeSettings,
-				nullptr, // InBaseMaterial
-				Package,
-				AssetName,
-				OutAssets,
-				MergedLocation,
-				ScreenSize,
-				false // bSilent
-			);
-
-			if (OutAssets.Num() == 0) continue;
-
-			for (UObject* Asset : OutAssets)
-			{
-#if 0
-				if (UStaticMesh* StaticMesh = Cast<UStaticMesh>(Asset))
-				{
-					// Apply triangle reduction if needed
-					if (ReductionPercent < 0.99f)
-					{
-						FMeshDescription* OriginalDesc = StaticMesh->GetMeshDescription(0);
-						if (OriginalDesc)
-						{
-							// Prepare overlapping corners
-							FOverlappingCorners OverlappingCorners;
-							FStaticMeshOperations::FindOverlappingCorners(
-								OverlappingCorners,
-								*OriginalDesc,
-								0.0001f
-							);
-
-							// Copy mesh for output
-							FMeshDescription ReducedDesc;
-							ReducedDesc = *OriginalDesc;
-
-							// Settings
-							FMeshReductionSettings Settings;
-							Settings.PercentTriangles = ReductionPercent;
-							Settings.TerminationCriterion = EStaticMeshReductionTerimationCriterion::Triangles;
-
-							float MaxDeviation = 0.0f;
-
-							// Perform reduction
-							MeshReduction->ReduceMeshDescription(
-								ReducedDesc,
-								MaxDeviation,
-								*OriginalDesc,
-								OverlappingCorners,
-								Settings
-							);
-
-							StaticMesh->CreateMeshDescription(0, ReducedDesc);
-							UStaticMesh::FCommitMeshDescriptionParams CommitParams;
-							StaticMesh->CommitMeshDescription(0, CommitParams);
-						}
-					}
-				}
-#endif
-
-				// Finalize asset: only after all changes are done
-				Asset->SetFlags(RF_Public | RF_Standalone);
-				Asset->MarkPackageDirty();
-				Asset->PostEditChange();
-				FAssetRegistryModule::AssetCreated(Asset);
-
-				if (!Asset->IsIn(Package))
-				{
-					UE_LOG(LogTemp, Error, TEXT("Asset %s is not in expected package: %s (found in %s)"),
-						*Asset->GetName(),
-						*Package->GetName(),
-						*Asset->GetOutermost()->GetName());
-				}
-			}
-
-			FString PackageFilename = FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
-
-			bool bSaved = UPackage::SavePackage(
-				Package,
-				nullptr,
-				EObjectFlags::RF_Public | EObjectFlags::RF_Standalone,
-				*PackageFilename,
-				GError,
-				nullptr,
-				false, // bSaveToMemory
-				true   // bForceByteSwapping
-			);
-
-			UPackage* LoadedPkg = LoadPackage(nullptr, *Package->GetName(), LOAD_None);
-			if (LoadedPkg)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Loaded package for indexing: %s"), *LoadedPkg->GetName());
-
-				// Now force registry to scan loaded package contents
-				FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-				AssetRegistryModule.Get().AssetCreated(LoadedPkg); // Not strictly required if the contained assets are flagged
-
-				FString AssetPath = FPackageName::LongPackageNameToFilename(
-					Package->GetName(),
-					FPackageName::GetAssetPackageExtension()
-				);
-
-				TArray<FString> FilesToScan;
-				FilesToScan.Add(AssetPath);
-
-				// Or scan again
-				AssetRegistryModule.Get().ScanModifiedAssetFiles(FilesToScan);
-
-				TArray<UObject*> Assets;
-				GetObjectsWithOuter(LoadedPkg, Assets, /*bIncludeNested*/ true);
-
-				for (UObject* Obj : Assets)
-				{
-					if (Obj && Obj->HasAnyFlags(RF_Public | RF_Standalone))
-					{
-						FAssetRegistryModule::AssetCreated(Obj);
-					}
-				}
-
-				for (UObject* Asset : Assets)
-				{
-					const bool bInRegistry = AssetRegistryModule.Get().GetAssetByObjectPath(FName(*Asset->GetPathName())).IsValid();
-					const bool bIsVisible = Asset->IsAsset();
-
-					UE_LOG(LogTemp, Warning, TEXT("Asset: %s | Class: %s | IsAsset: %d | InRegistry: %d"),
-						*Asset->GetPathName(),
-						*Asset->GetClass()->GetName(),
-						bIsVisible,
-						bInRegistry);
-				}
-			}
-			else
-			{
-				UE_LOG(LogTemp, Error, TEXT("Failed to load saved package: %s"), *Package->GetName());
-			}
-
+			nMergeCount++;
 		}
 	}
 
-#if 0
-	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-	
-	FARFilter Filter;
-	Filter.PackagePaths.Add("/Game/ZeroPayMods");
+	/* Info */
+	FScopedSlowTask SlowTask(nMergeCount, FText::FromString(TEXT("Merging and replacing...")));
+	SlowTask.MakeDialog();
 
-	TArray<FAssetData> AssetDataList;
-	AssetRegistryModule.Get().GetAssets(Filter, AssetDataList);
-
-	for (const FAssetData& Data : AssetDataList)
+	/* Iterate all supplied mesh islands and merge them, placing them in the target folder under unique names*/
+	int32 nMergeIndex = 0;
+	for (const auto& ClusterPair : ClusteredIslands)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Asset found: %s [%s]"), *Data.AssetName.ToString(), *Data.AssetClass.ToString());
-	}
+		const TArray<TArray<UStaticMeshComponent*>>& IslandGroups = ClusterPair.Value;
 
-#endif 
-
-	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-
-	// Step 1: Filter for all assets under /Game
-	FARFilter Filter;
-	Filter.PackagePaths.Add(FName("/Game"));
-	Filter.bRecursivePaths = true;
-
-	TArray<FAssetData> AssetDataList;
-	AssetRegistryModule.Get().GetAssets(Filter, AssetDataList);
-
-	UE_LOG(LogTemp, Warning, TEXT("Found %d assets under /Game"), AssetDataList.Num());
-
-	// Step 2: Load and optionally sync them in the Content Browser
-	TArray<UObject*> LoadedAssets;
-
-	for (const FAssetData& AssetData : AssetDataList)
-	{
-		UObject* Asset = AssetData.GetAsset();
-		if (Asset)
+		for (const TArray<UStaticMeshComponent*>& IslandGroup : IslandGroups)
 		{
-			LoadedAssets.Add(Asset);
-			UE_LOG(LogTemp, Display, TEXT("Loaded: %s (%s)"), *Asset->GetName(), *Asset->GetClass()->GetName());
+			FString PackageName = FString::Printf(TEXT("%s/Merged_Island_%05d"), *TargetFolderPath, nMergeIndex);
+			MergeMesh(IslandGroup, PackageName);
+			nMergeIndex++;
+
+			SlowTask.EnterProgressFrame(1);
 		}
 	}
-
-	//FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
-
-	//TArray<FString> Folders;
-	//Folders.Add("/Game/ZeroPayMods/UGC4991524/Levels/ReducedAssets/Meshes/"); // e.g., "/Game/ZeroPayMods/UGC4991524"
-
-	//ContentBrowserModule.SyncBrowserToFolders(Folders);
-
 	return true;
 }
 
+
+bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName)
+{
+	const IMeshMergeUtilities& MeshUtilities = FModuleManager::Get().LoadModuleChecked<IMeshMergeModule>("MeshMergeUtilities").GetUtilities();
+	TArray<AActor*> Actors;
+	TArray<ULevel*> UniqueLevels;
+	bool bReplaceSourceActors = false;
+
+	FScopedSlowTask SlowTask(1.0f, FText::FromString(TEXT("Merging actors...")));
+	SlowTask.MakeDialog();
+
+	// Extracting static mesh components from the selected mesh components in the dialog
+	TArray<UPrimitiveComponent*> ComponentsToMerge;
+
+	for (UStaticMeshComponent* SelectedComponent : SelectedComponents)
+	{
+		// Determine whether or not this component should be incorporated according the user settings
+		if (SelectedComponent->IsValidLowLevel())
+		{
+			ComponentsToMerge.Add(Cast<UPrimitiveComponent>(SelectedComponent));
+		}
+	}
+
+	FVector MergedActorLocation;
+	TArray<UObject*> AssetsToSync;
+
+	if (ComponentsToMerge.Num())
+	{
+		UWorld* World = ComponentsToMerge[0]->GetWorld();
+		checkf(World != nullptr, TEXT("Invalid World retrieved from Mesh components"));
+		const float ScreenAreaSize = TNumericLimits<float>::Max();
+
+		// Setup merge settings
+		FMeshMergingSettings SettingsObject;
+		SettingsObject.bMergeMaterials = true;
+		SettingsObject.bGenerateLightMapUV = true;
+		SettingsObject.bComputedLightMapResolution = true;
+		SettingsObject.LODSelectionType = EMeshLODSelectionType::AllLODs;
+		SettingsObject.bUseLandscapeCulling = false;
+		SettingsObject.bBakeVertexDataToMesh = true;
+		SettingsObject.bAllowDistanceField = false;
+
+		// If the merge destination package already exists, it is possible that the mesh is already used in a scene somewhere, or its materials or even just its textures.
+		// Static primitives uniform buffers could become invalid after the operation completes and lead to memory corruption. To avoid it, we force a global reregister.
+		if (FindObject<UObject>(nullptr, *PackageName))
+		{
+			FGlobalComponentReregisterContext GlobalReregister;
+			MeshUtilities.MergeComponentsToStaticMesh(ComponentsToMerge, World, SettingsObject, nullptr, nullptr, PackageName, AssetsToSync, MergedActorLocation, ScreenAreaSize, true);
+		}
+		else
+		{
+			MeshUtilities.MergeComponentsToStaticMesh(ComponentsToMerge, World, SettingsObject, nullptr, nullptr, PackageName, AssetsToSync, MergedActorLocation, ScreenAreaSize, true);
+		}
+	}
+
+	if (AssetsToSync.Num())
+	{
+		FAssetRegistryModule& AssetRegistry = FModuleManager::Get().LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+
+		for (UObject* AssetToSync : AssetsToSync)
+		{
+			// MergeComponentsToStaticMesh() will have outered all assets (material instance, textures) to the static mesh package.
+			// Move each of them to their own package, so that they show up in the Content Browser
+			if (AssetToSync && !AssetToSync->IsA<UStaticMesh>())
+			{
+				FString AssetName = AssetToSync->GetName();
+				FString AssetPackagePath = FPackageName::GetLongPackagePath(AssetToSync->GetPathName());
+				FString AssetPackageName = AssetPackagePath / AssetName;
+
+				UPackage* AssetPackage = CreatePackage(*AssetPackageName);
+				check(AssetPackage);
+				AssetPackage->FullyLoad();
+				AssetPackage->Modify();
+
+				// Replace existing asset by the new one.
+				if (UObject* OldAsset = FindObject<UObject>(AssetPackage, *AssetName))
+				{
+					FName ObjectName = OldAsset->GetFName();
+					UObject* Outer = OldAsset->GetOuter();
+					OldAsset->Rename(nullptr, GetTransientPackage(), REN_DoNotDirty | REN_DontCreateRedirectors);
+
+					// Consolidate or "Replace" the old object with the new object for any living references.
+					bool bShowDeleteConfirmation = false;
+					TArray<UObject*> OldDataAssetArray = { OldAsset };
+					ObjectTools::ConsolidateObjects(AssetToSync, { OldDataAssetArray }, bShowDeleteConfirmation);
+				}
+
+				AssetToSync->Rename(*AssetName, AssetPackage, REN_DontCreateRedirectors);
+				AssetToSync->SetFlags(RF_Public | RF_Standalone);
+			}
+
+			AssetRegistry.AssetCreated(AssetToSync);
+			GEditor->BroadcastObjectReimported(AssetToSync);
+		}
+
+		//Also notify the content browser that the new assets exists
+		FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+		ContentBrowserModule.Get().SyncBrowserToAssets(AssetsToSync, true);
+
+		// Place new mesh in the world
+		if (bReplaceSourceActors)
+		{
+			UStaticMesh* MergedMesh = nullptr;
+			if (AssetsToSync.FindItemByClass(&MergedMesh))
+			{
+				const FScopedTransaction Transaction(FText::FromString(TEXT("Placing merged actors...")));
+				UniqueLevels[0]->Modify();
+
+				UWorld* World = UniqueLevels[0]->OwningWorld;
+				FActorSpawnParameters Params;
+				Params.OverrideLevel = UniqueLevels[0];
+				FRotator MergedActorRotation(ForceInit);
+
+				AStaticMeshActor* MergedActor = World->SpawnActor<AStaticMeshActor>(MergedActorLocation, MergedActorRotation, Params);
+				MergedActor->GetStaticMeshComponent()->SetStaticMesh(MergedMesh);
+				MergedActor->SetActorLabel(MergedMesh->GetName());
+				World->UpdateCullDistanceVolumes(MergedActor, MergedActor->GetStaticMeshComponent());
+				GEditor->SelectNone(true, true);
+				GEditor->SelectActor(MergedActor, true, true);
+				// Remove source actors
+				for (AActor* Actor : Actors)
+				{
+					Actor->Destroy();
+				}
+			}
+		}
+	}
+
+	return true;
+}
 
 /********************************************************************************************************/
 /*                                           DEBUG FUNCTIONS                                            */
 /********************************************************************************************************/
 
-
-void FZeroPayEditorButtonsPluginModule::DrawClusterDebugBoxes(const TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>>& ClusteredGroups, UWorld* World, float Lifetime) 
+void FZeroPayEditorButtonsPluginModule::DrawClusterDebugBoxes(const TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>>& ClusteredGroups, UWorld* World, float Lifetime)
 {
 	if (!World) return;
 
@@ -595,7 +568,7 @@ void FZeroPayEditorButtonsPluginModule::DrawClusterDebugBoxes(const TMap<FMeshMa
 
 	for (const auto& Group : ClusteredGroups)
 	{
-		const FMeshMaterialKey& Key = Group.Key;
+		UStaticMesh* Mesh = Group.Key;
 		const TArray<TArray<UStaticMeshComponent*>>& Clusters = Group.Value;
 
 		for (const TArray<UStaticMeshComponent*>& Cluster : Clusters)
@@ -606,7 +579,10 @@ void FZeroPayEditorButtonsPluginModule::DrawClusterDebugBoxes(const TMap<FMeshMa
 			FBox ClusterBox(EForceInit::ForceInit);
 			for (UStaticMeshComponent* Comp : Cluster)
 			{
-				ClusterBox += Comp->Bounds.GetBox();
+				if (Comp)
+				{
+					ClusterBox += Comp->Bounds.GetBox();
+				}
 			}
 
 			// Draw cluster box (blue)
@@ -625,10 +601,9 @@ void FZeroPayEditorButtonsPluginModule::DrawClusterDebugBoxes(const TMap<FMeshMa
 			DrawDebugString(
 				World,
 				ClusterBox.GetCenter() + FVector(0, 0, 30),
-				FString::Printf(TEXT("Cluster %d\nMesh: %s\nMats: %d"),
+				FString::Printf(TEXT("Cluster %d\nMesh: %s"),
 					ClusterIndexGlobal++,
-					*Key.Mesh->GetName(),
-					Key.Materials.Num()),
+					*Mesh->GetName()),
 				nullptr,
 				FColor::White,
 				Lifetime,
@@ -657,6 +632,8 @@ void FZeroPayEditorButtonsPluginModule::DrawClusterDebugBoxes(const TMap<FMeshMa
 		}
 	}
 }
+
+
 /********************************************************************************************************/
 /*                                          SUPPORT FUNCTIONS                                           */
 /********************************************************************************************************/
