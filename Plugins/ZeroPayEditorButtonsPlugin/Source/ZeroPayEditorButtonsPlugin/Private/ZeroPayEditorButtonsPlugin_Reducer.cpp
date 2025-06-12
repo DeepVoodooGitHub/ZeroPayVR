@@ -21,6 +21,7 @@
 #include "StaticMeshOperations.h"
 #include "StaticMeshDescription.h"
 #include "StaticMeshCompiler.h"
+#include "ContentBrowserModule.h" 
 
 UZeroPayEditorReduceOperationHandle* FZeroPayEditorButtonsPluginModule::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
@@ -28,8 +29,8 @@ UZeroPayEditorReduceOperationHandle* FZeroPayEditorButtonsPluginModule::ReduceLe
 	bAbortOperation = false;
 	ReduceHandle = NewObject<UZeroPayEditorReduceOperationHandle>();
 
-	Async(EAsyncExecution::Thread, [this, dataAsset, reducerSettings, runtimeSettings]()
-		{
+	//Async(EAsyncExecution::Thread, [this, dataAsset, reducerSettings, runtimeSettings]()
+//		{
 			/* >>> Stage 1 - Uniform Mesh Merging <<< */
 			if (!Stage1MergeUniformMeshes(dataAsset, reducerSettings, runtimeSettings))
 				bAbortOperation = true;
@@ -42,7 +43,6 @@ UZeroPayEditorReduceOperationHandle* FZeroPayEditorButtonsPluginModule::ReduceLe
 					{
 						ReduceHandle->OnCompleted.Broadcast(false, dataAsset->Definition.UGCID);
 					});
-				return;
 			}
 #if 0
 			/* >>> Pack Quest 3 <<< */
@@ -63,7 +63,6 @@ UZeroPayEditorReduceOperationHandle* FZeroPayEditorButtonsPluginModule::ReduceLe
 			if (!CookAndPackLinuxServer(dataAsset))
 				bAbortOperation = true;
 
-#endif
 			/* All Good! */
 			if (!bAbortOperation)
 				LastMessage = "Reduction operation completed successfully!";
@@ -77,6 +76,7 @@ UZeroPayEditorReduceOperationHandle* FZeroPayEditorButtonsPluginModule::ReduceLe
 					ReduceHandle->OnCompleted.Broadcast(!bAbortOperation, dataAsset->Definition.UGCID);
 				});
 		});
+#endif
 
 	return ReduceHandle;
 }
@@ -162,19 +162,9 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 	UpdateQuest3ReducerUIProgressField();
 
 	/* >>> Merge */
-	FString ReducedAssetMeshPath = FString::Printf(TEXT("/Game/ZeroPayMods/UGC%s/Levels/ReducedAssets/Meshes"), *dataAsset->Definition.UGCID);
+	FString ReducedAssetMeshPath = FString::Printf(TEXT("/Game/ZeroPayMods/UGC%s/Levels/"), *dataAsset->Definition.UGCID); //ReducedAssets/Meshes
 
-	FEvent* DoneEvent = FPlatformProcess::GetSynchEventFromPool(true); // auto-reset
-
-	AsyncTask(ENamedThreads::GameThread, [this, DoneEvent, &bSuccess, ClusteredGroups, ReducedAssetMeshPath]()
-		{	
-			bSuccess = MergeMeshIslands(ClusteredGroups, 0.5f, *ReducedAssetMeshPath);
-			DoneEvent->Trigger();
-		});
-
-	DoneEvent->Wait(); // blocks here until Trigger() is called
-
-	FPlatformProcess::ReturnSynchEventToPool(DoneEvent);
+	bSuccess = MergeMeshIslands(ClusteredGroups, 0.5f, *ReducedAssetMeshPath);
 
 	LastMessage = FString::Printf(TEXT("Stage 1 - Merging (%d Clusters)"), ClusteredGroups.Num());
 	UpdateQuest3ReducerUIProgressField();
@@ -416,6 +406,7 @@ bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TMap<FMeshMateria
 
 			for (UObject* Asset : OutAssets)
 			{
+#if 0
 				if (UStaticMesh* StaticMesh = Cast<UStaticMesh>(Asset))
 				{
 					// Apply triangle reduction if needed
@@ -434,7 +425,7 @@ bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TMap<FMeshMateria
 
 							// Copy mesh for output
 							FMeshDescription ReducedDesc;
-							ReducedDesc = *OriginalDesc ;
+							ReducedDesc = *OriginalDesc;
 
 							// Settings
 							FMeshReductionSettings Settings;
@@ -452,34 +443,140 @@ bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TMap<FMeshMateria
 								Settings
 							);
 
-							StaticMesh->CreateMeshDescription(0, ReducedDesc) ;
+							StaticMesh->CreateMeshDescription(0, ReducedDesc);
 							UStaticMesh::FCommitMeshDescriptionParams CommitParams;
 							StaticMesh->CommitMeshDescription(0, CommitParams);
 						}
 					}
+				}
+#endif
 
-					// Finalize asset: only after all changes are done
-					StaticMesh->PostEditChange();
-					StaticMesh->MarkPackageDirty();
-					FAssetRegistryModule::AssetCreated(StaticMesh);
+				// Finalize asset: only after all changes are done
+				Asset->SetFlags(RF_Public | RF_Standalone);
+				Asset->MarkPackageDirty();
+				Asset->PostEditChange();
+				FAssetRegistryModule::AssetCreated(Asset);
 
-					FString PackageFilename = FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
-
-					bool bSaved = UPackage::SavePackage(
-						Package,
-						StaticMesh,
-						EObjectFlags::RF_Public | EObjectFlags::RF_Standalone,
-						*PackageFilename,
-						GError,
-						nullptr,
-						false, // bSaveToMemory
-						true   // bForceByteSwapping
-					);
-
+				if (!Asset->IsIn(Package))
+				{
+					UE_LOG(LogTemp, Error, TEXT("Asset %s is not in expected package: %s (found in %s)"),
+						*Asset->GetName(),
+						*Package->GetName(),
+						*Asset->GetOutermost()->GetName());
 				}
 			}
+
+			FString PackageFilename = FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
+
+			bool bSaved = UPackage::SavePackage(
+				Package,
+				nullptr,
+				EObjectFlags::RF_Public | EObjectFlags::RF_Standalone,
+				*PackageFilename,
+				GError,
+				nullptr,
+				false, // bSaveToMemory
+				true   // bForceByteSwapping
+			);
+
+			UPackage* LoadedPkg = LoadPackage(nullptr, *Package->GetName(), LOAD_None);
+			if (LoadedPkg)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Loaded package for indexing: %s"), *LoadedPkg->GetName());
+
+				// Now force registry to scan loaded package contents
+				FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+				AssetRegistryModule.Get().AssetCreated(LoadedPkg); // Not strictly required if the contained assets are flagged
+
+				FString AssetPath = FPackageName::LongPackageNameToFilename(
+					Package->GetName(),
+					FPackageName::GetAssetPackageExtension()
+				);
+
+				TArray<FString> FilesToScan;
+				FilesToScan.Add(AssetPath);
+
+				// Or scan again
+				AssetRegistryModule.Get().ScanModifiedAssetFiles(FilesToScan);
+
+				TArray<UObject*> Assets;
+				GetObjectsWithOuter(LoadedPkg, Assets, /*bIncludeNested*/ true);
+
+				for (UObject* Obj : Assets)
+				{
+					if (Obj && Obj->HasAnyFlags(RF_Public | RF_Standalone))
+					{
+						FAssetRegistryModule::AssetCreated(Obj);
+					}
+				}
+
+				for (UObject* Asset : Assets)
+				{
+					const bool bInRegistry = AssetRegistryModule.Get().GetAssetByObjectPath(FName(*Asset->GetPathName())).IsValid();
+					const bool bIsVisible = Asset->IsAsset();
+
+					UE_LOG(LogTemp, Warning, TEXT("Asset: %s | Class: %s | IsAsset: %d | InRegistry: %d"),
+						*Asset->GetPathName(),
+						*Asset->GetClass()->GetName(),
+						bIsVisible,
+						bInRegistry);
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("Failed to load saved package: %s"), *Package->GetName());
+			}
+
 		}
 	}
+
+#if 0
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	
+	FARFilter Filter;
+	Filter.PackagePaths.Add("/Game/ZeroPayMods");
+
+	TArray<FAssetData> AssetDataList;
+	AssetRegistryModule.Get().GetAssets(Filter, AssetDataList);
+
+	for (const FAssetData& Data : AssetDataList)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Asset found: %s [%s]"), *Data.AssetName.ToString(), *Data.AssetClass.ToString());
+	}
+
+#endif 
+
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+
+	// Step 1: Filter for all assets under /Game
+	FARFilter Filter;
+	Filter.PackagePaths.Add(FName("/Game"));
+	Filter.bRecursivePaths = true;
+
+	TArray<FAssetData> AssetDataList;
+	AssetRegistryModule.Get().GetAssets(Filter, AssetDataList);
+
+	UE_LOG(LogTemp, Warning, TEXT("Found %d assets under /Game"), AssetDataList.Num());
+
+	// Step 2: Load and optionally sync them in the Content Browser
+	TArray<UObject*> LoadedAssets;
+
+	for (const FAssetData& AssetData : AssetDataList)
+	{
+		UObject* Asset = AssetData.GetAsset();
+		if (Asset)
+		{
+			LoadedAssets.Add(Asset);
+			UE_LOG(LogTemp, Display, TEXT("Loaded: %s (%s)"), *Asset->GetName(), *Asset->GetClass()->GetName());
+		}
+	}
+
+	//FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+
+	//TArray<FString> Folders;
+	//Folders.Add("/Game/ZeroPayMods/UGC4991524/Levels/ReducedAssets/Meshes/"); // e.g., "/Game/ZeroPayMods/UGC4991524"
+
+	//ContentBrowserModule.SyncBrowserToFolders(Folders);
 
 	return true;
 }

@@ -61,8 +61,9 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
                 "MeshReductionInterface",
                 "AssetRegistry",
                 "MeshDescription",
-				"StaticMeshDescription"
-
+				"StaticMeshDescription",
+                "ContentBrowser",
+				"EditorSubsystem",
 				// ... add private dependencies that you statically link with here ...	
 			}
             );
