@@ -64,6 +64,7 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
 				"StaticMeshDescription",
                 "ContentBrowser",
 				"EditorSubsystem",
+                "EditorScriptingUtilities"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

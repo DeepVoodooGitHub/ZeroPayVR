@@ -39,16 +39,6 @@ public:
 	FOnUploadProgress OnUploadProgress;
 };
 
-UCLASS(Blueprintable)
-class UZeroPayEditorReduceOperationHandle : public UObject
-{
-	GENERATED_BODY()
-
-public:
-	UPROPERTY(BlueprintAssignable)
-	FOnOperationComplete OnCompleted;
-};
-
 /**********************************************************************************************************************
 *
 * Class: UZeroPayEditorOperationHandle
@@ -61,22 +51,9 @@ struct FZeroPayEditor_MeshReductionSettings
 {
 	GENERATED_BODY()
 
-	/* Show we merge mesh actors that contain the same base mesh and material */
+	/* The size of each bounding box cluster in units  */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	bool Stage1_MergeUniform_Enable = true;
-
-	/* Max distance (from bounding box center) of a given mesh to consider part of a merged mesh */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	float Stage1_MaxDistance = 2000.0f ;
-
-	/* Show we merge mesh actors that contain the different base meshes and materials */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	bool Stage2_MergeNonUniform_Enable = true;
-
-	/* Max distance (from bounding box center) of a given mesh to consider part of a merged mesh */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	float Stage2_MaxDistance = 2000.0f;
-
+	float BoundingClusterSize = 200.0f ;
 };
 
 USTRUCT(BlueprintType)
@@ -120,12 +97,23 @@ struct FReducerRuntimeSettings
 {
 	GENERATED_BODY()
 
+	/* Show stage 1 visual debugging */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	bool bStage1_ShowMergeGroups = true;
+	bool bStage1_ShowVisualDebug = true;
+
+	/* How long to show any debug boxes, labels, etc. for stage 1 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
+	float fStage1_VisualDebugDuration = 30.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
 	bool bStage1_ShowOutputLogDebug = true;
 
+};
+
+struct FFoundAssetInformation
+{
+	int32 FoundAssets = 0 ; 
+	int32 FoundInstances = 0 ;
 };
 
 /**********************************************************************************************************************
@@ -180,7 +168,7 @@ public:
 	void CancelUploadStatus();
 
 	/* >>> Reducer Logic - Called from Function Library */
-	UZeroPayEditorReduceOperationHandle* ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
+	bool ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
 private:
 	/* >>> Vars */
 	bool bIsOperationRunning;
@@ -190,7 +178,6 @@ private:
 	UEditorUtilityWidget* WidgetQuest3ReducerInstance;
 	/* >>> Cooking vars */
 	UZeroPayEditorCookPakOperationHandle* CookPakHandle;
-	UZeroPayEditorReduceOperationHandle* ReduceHandle;
 	FString GlobalUGCValue;
 	FString LastMessage ;
 	bool bAbortOperation ;
@@ -222,17 +209,19 @@ private:
 	bool Stage1MergeUniformMeshes(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings) ;
 
 	/* Reducer mesh, world, etc. support */
-	TMap<AActor*, TArray<UStaticMeshComponent*>> GetStaticMeshesInSubLevel(const FString& SubLevelName);
-	TMap<UStaticMesh*, TArray<UStaticMeshComponent*>> GroupMeshComponentsByMesh(const TMap<AActor*, TArray<UStaticMeshComponent*>>& ActorMeshMap) ;
-	TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>> GroupByMeshThenProximity_MaterialAware(const TMap<UStaticMesh*, TArray<UStaticMeshComponent*>>& MeshGroups, float MaxDistance);
-	TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>> GroupByMeshesViaProximity(const TMap<UStaticMesh*, TArray<UStaticMeshComponent*>>& MeshGroups, float MaxDistance);
-	bool MergeMeshIslands(const TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent = 0.5f, const FString& TargetFolderPath = "");
-	bool MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName);
+	FBox GetMaximumVisibleBoundingBox(ULevel* Level) ;
+	TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> PartitionActorsIntoBoundingBoxes(const FBox& GlobalBounds, const FVector& ChunkSize, ULevel* Level);
+
+	/* Merge system */
+	bool MergeMeshIslands(const TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath, TSoftObjectPtr<UWorld> Quest3World);
+	bool MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World);
 
 	/* Reducer debug */
 	void DrawClusterDebugBoxes(const TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>>& ClusteredGroups, UWorld* World, float Lifetime);
 
 	/* Reducer support */
+	FFoundAssetInformation ScanLevelActorsAndDirectory(ULevel* LevelToScan, const FString& TargetAssetPath) ;
+	bool DeleteActorsAndAssets(ULevel* TargetLevel, const FString& AssetFolderPathToDelete) ;
 	void UpdateQuest3ReducerUIProgressField();
 };
 
@@ -264,6 +253,6 @@ public:
 
 	/* Reduces a PCVR level using the supplied settings, to a Quest3 level */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
-	static UZeroPayEditorReduceOperationHandle* ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
+	static bool ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
 
 };

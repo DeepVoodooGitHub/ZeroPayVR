@@ -26,63 +26,21 @@
 #include "ObjectTools.h"
 #include "UObject/UObjectGlobals.h"
 #include "IContentBrowserSingleton.h"
+#include "Engine/Level.h"
+#include "GameFramework/Actor.h"
+#include "Components/PrimitiveComponent.h"
+#include "FileHelpers.h" 
 
-UZeroPayEditorReduceOperationHandle* FZeroPayEditorButtonsPluginModule::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
+bool FZeroPayEditorButtonsPluginModule::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
 	/* Find the settings file and validate it's correct */
 	bAbortOperation = false;
-	ReduceHandle = NewObject<UZeroPayEditorReduceOperationHandle>();
 
-	//Async(EAsyncExecution::Thread, [this, dataAsset, reducerSettings, runtimeSettings]()
-//		{
-			/* >>> Stage 1 - Uniform Mesh Merging <<< */
-			if (!Stage1MergeUniformMeshes(dataAsset, reducerSettings, runtimeSettings))
-				bAbortOperation = true;
+	/* >>> Stage 1 - Uniform Mesh Merging <<< */
+	if (!Stage1MergeUniformMeshes(dataAsset, reducerSettings, runtimeSettings))
+		bAbortOperation = true;
 
-			/* Aborted? */
-			if (bAbortOperation)
-			{
-				// Simulate some logic, then notify later
-				AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
-					{
-						ReduceHandle->OnCompleted.Broadcast(false, dataAsset->Definition.UGCID);
-					});
-			}
-#if 0
-			/* >>> Pack Quest 3 <<< */
-			if (!CookAndPackAndroid(dataAsset))
-				bAbortOperation = true;
-
-			/* Aborted? */
-			if (bAbortOperation)
-			{
-				// Simulate some logic, then notify later
-				AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
-					{
-						Handle->OnCompleted.Broadcast(false, dataAsset->Definition.UGCID);
-					});
-				return;
-			}
-			/* >>> Pack Linux Server <<< */
-			if (!CookAndPackLinuxServer(dataAsset))
-				bAbortOperation = true;
-
-			/* All Good! */
-			if (!bAbortOperation)
-				LastMessage = "Reduction operation completed successfully!";
-
-			UpdateQuest3ReducerUIProgressField();
-			FPlatformProcess::Sleep(1.0f);
-
-			// Simulate some logic, then notify later
-			AsyncTask(ENamedThreads::GameThread, [this, dataAsset]()
-				{
-					ReduceHandle->OnCompleted.Broadcast(!bAbortOperation, dataAsset->Definition.UGCID);
-				});
-		});
-#endif
-
-	return ReduceHandle;
+	return !bAbortOperation;
 }
 
 /********************************************************************************************************/
@@ -93,6 +51,7 @@ UZeroPayEditorReduceOperationHandle* FZeroPayEditorButtonsPluginModule::ReduceLe
 bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
 	bool bSuccess = false;
+	FString ReducedAssetMeshPath = FString::Printf(TEXT("/Game/ZeroPayMods/UGC%s/Levels/ReducedAssets/Meshes"), *dataAsset->Definition.UGCID);
 
 	/* Handle bad dataAsset */
 	if (dataAsset->Definition.pcvrlevel == nullptr)
@@ -102,84 +61,77 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 		return false ;
 	}
 
-	/* Info */
-	FScopedSlowTask SlowTask(1.0f, FText::FromString(TEXT("Gathering actors...")));
-	SlowTask.MakeDialog();
-
-	/* >>> Get all static mesh actors from PCVR level */
-	TMap<AActor*, TArray<UStaticMeshComponent*>> MeshContainingActors = GetStaticMeshesInSubLevel(dataAsset->Definition.pcvrlevel.GetAssetName());
-
-	/* Handle no meshes found :/ */
-	if (MeshContainingActors.Num() == 0)
+	/* Validate existing installation */
+	FFoundAssetInformation Result = ScanLevelActorsAndDirectory(dataAsset->Definition.quest3level->PersistentLevel, *ReducedAssetMeshPath);
+	if ( (Result.FoundAssets > 0) || (Result.FoundInstances > 0) )
 	{
-		LastMessage = FString::Printf(TEXT("Error S1 - No mesh components found in any actors in '%s'"), *dataAsset->Definition.pcvrlevel.GetAssetName());
-		UpdateQuest3ReducerUIProgressField();
-		return false;
-	}
+		const FString DialogMessage = FString::Printf(TEXT("Warning!\n\nThere are %d found assets in the Context Browser (merged meshes, materials, etc.) that will be destroyed and recreated.\nThere are %d instanced actors in the Quest 3 level that will be destroyed and recreated.\n\nAre you sure? You cannot undo these changes later."), Result.FoundAssets, Result.FoundInstances );
+		EAppReturnType::Type DialogResult = FMessageDialog::Open( EAppMsgType::YesNo, FText::FromString(DialogMessage));
 
-	/* Info */
-	LastMessage = "Stage 1 - Grouping them by mesh asset";
-	UpdateQuest3ReducerUIProgressField();
-
-	/* >>> Get all mesh grouping (i.e. which mesh assets copies in which in-level mesh components) */
-	auto MeshGroups = GroupMeshComponentsByMesh(MeshContainingActors);
-
-	/* Handle no meshes found :/ */
-	if (MeshGroups.Num() == 0)
-	{
-		LastMessage = FString::Printf(TEXT("Error S1 - Found no mesh groups, but found %d mesh actors"), MeshContainingActors.Num());
-		UpdateQuest3ReducerUIProgressField();
-		return false;
-	}
-
-	/* Info */
-	LastMessage = FString::Printf(TEXT("Stage 1 - Grouping by distance (%d units)"), reducerSettings->MeshReductionSettings.Stage1_MaxDistance);
-	UpdateQuest3ReducerUIProgressField();
-
-	/* >>> Group them by proximity to each other... */
-	//auto ClusteredGroups = GroupByMeshThenProximity_MaterialAware(MeshGroups, reducerSettings->MeshReductionSettings.Stage1_MaxDistance);
-	auto ClusteredGroups = GroupByMeshesViaProximity(MeshGroups, reducerSettings->MeshReductionSettings.Stage1_MaxDistance);
-
-	SlowTask.EnterProgressFrame(0.1f);
-
-#if 0
-	/* Output information from user */
-	if (runtimeSettings.bStage1_ShowOutputLogDebug)
-	{
-		for (const auto& Pair : ClusteredGroups)
+		switch (DialogResult)
 		{
-			const FMeshMaterialKey& Key = Pair.Key;
-			const auto& ClusterArray = Pair.Value;
-
-			UE_LOG(LogTemp, Log, TEXT("Mesh %s with %d material slots has %d clusters"), *Key.Mesh->GetName(), Key.Materials.Num(), ClusterArray.Num());
-
-			for (int32 i = 0; i < ClusterArray.Num(); ++i)
+			case EAppReturnType::Yes:
+				break;
+			case EAppReturnType::No:
 			{
-				const auto& Cluster = ClusterArray[i];
-				UE_LOG(LogTemp, Log, TEXT("  Cluster %d: %d components"), i, Cluster.Num());
+				LastMessage = "User aborted.";
+				UpdateQuest3ReducerUIProgressField();
+				return false;
+				break;
 			}
 		}
 	}
-#endif
-	
-	/* Debug? */
-	if (runtimeSettings.bStage1_ShowMergeGroups)
-		DrawClusterDebugBoxes(ClusteredGroups, GEditor->GetEditorWorldContext().World(), 20.0f);
+
+	/* Remove old */
+	FScopedSlowTask SlowTask(1.0f, FText::FromString(TEXT("Gathering actors...")));
+	SlowTask.MakeDialog();
+
+	/* >>> Delete old things */
+	bool bDeletionSuccess = DeleteActorsAndAssets(dataAsset->Definition.quest3level->PersistentLevel, *ReducedAssetMeshPath);
+	if (!bDeletionSuccess)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, failed to delete existing Quest 3 level 'ReducedAssets' folder and/or the merged assets located under the 'UGC/Levels/ReducedAssets' folder"));
+		return false;
+	}
 
 	/* Info */
-	LastMessage = FString::Printf(TEXT("Stage 1 - Merging (%d Clusters)"), ClusteredGroups.Num() );
-	UpdateQuest3ReducerUIProgressField();
+	SlowTask.EnterProgressFrame(0.1f);
 
-	/* >>> Merge */
-	FString ReducedAssetMeshPath = FString::Printf(TEXT("/Game/ZeroPayMods/UGC%s/Levels/ReducedAssets/Meshes"), *dataAsset->Definition.UGCID); 
+	/* Get PCVR World */
+	UWorld* PCVRWorld = dataAsset->Definition.pcvrlevel.Get(); // Convert from soft to hard reference
+	if (!PCVRWorld)
+		return false;
 
-	bSuccess = MergeMeshIslands(ClusteredGroups, 0.5f, *ReducedAssetMeshPath);
+	ULevel* PCVRLevel = PCVRWorld->PersistentLevel;
 
-	LastMessage = FString::Printf(TEXT("Stage 1 - Merging (%d Clusters)"), ClusteredGroups.Num());
-	UpdateQuest3ReducerUIProgressField();
+	/* >>> Get the maximum bounding box for all actors we care to merge */
+	FBox MaxBoundingBox = GetMaximumVisibleBoundingBox(PCVRLevel) ;
 
+	if (runtimeSettings.bStage1_ShowVisualDebug)
+		DrawDebugBox(GEditor->GetEditorWorldContext().World(), MaxBoundingBox.GetCenter(), MaxBoundingBox.GetExtent(), FColor::Blue, false, runtimeSettings.fStage1_VisualDebugDuration, 0, 5.0f);
 
+	/* >>> Break the world into chunks and returns all meshes in that chunk */
 
+	FVector ChunkSize(reducerSettings->MeshReductionSettings.BoundingClusterSize, reducerSettings->MeshReductionSettings.BoundingClusterSize, reducerSettings->MeshReductionSettings.BoundingClusterSize);
+	auto Chunks = PartitionActorsIntoBoundingBoxes(MaxBoundingBox, ChunkSize, PCVRLevel);
+
+	if (runtimeSettings.bStage1_ShowVisualDebug)
+	{
+		for (const auto& Pair : Chunks)
+		{
+			const FBox& Box = Pair.Key;
+			const FVector Center = Box.GetCenter();
+			const FVector Extent = Box.GetExtent();
+
+			DrawDebugBox(GEditor->GetEditorWorldContext().World(), Center, Extent, FColor::Green, false, runtimeSettings.fStage1_VisualDebugDuration, 0, 2.0f);
+		}
+	}
+
+	SlowTask.EnterProgressFrame(0.1f);
+
+	/* >>> Merge actors within each cluster */
+
+	bSuccess = MergeMeshIslands(Chunks, 0.5f, *ReducedAssetMeshPath, dataAsset->Definition.quest3level);
 	return true;
 }
 
@@ -188,201 +140,149 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 /*                                   MESH, WORLD, ETC. SUPPORT FUNCTIONS                                */
 /********************************************************************************************************/
 
+
 /***************************************************************************************************************
 *
-* GetStaticMeshesInSubLevel - Get's a list of all static mesh components (and they're parent actors).
+* GetMaximumVisibleBoundingBox - Returns a bounding box of actual visible / usable actors which should be considered for merging
+*
+*/
+FBox FZeroPayEditorButtonsPluginModule::GetMaximumVisibleBoundingBox(ULevel* Level)
+{
+	if (!Level) return FBox(ForceInit);
+
+	// Class name substrings to skip (can be expanded as needed)
+	TArray<FString> IgnoredClassNames = {
+		TEXT("BlockingVolume"),
+		TEXT("NavMeshBoundsVolume"),
+		TEXT("LightmassImportanceVolume"),
+		TEXT("PrecomputedVisibilityVolume"),
+		TEXT("CullDistanceVolume"),
+		TEXT("KillZVolume"),
+		TEXT("AudioVolume"),
+		TEXT("TriggerVolume"),
+		TEXT("PhysicsVolume"),
+		TEXT("PostProcessVolume")
+	};
+
+	FBox BoundingBox(ForceInit);
+
+	for (AActor* Actor : Level->Actors)
+	{
+		if (!Actor) continue;
+
+		const FString ClassName = Actor->GetClass()->GetName();
+
+		bool bShouldIgnore = false;
+		for (const FString& Ignored : IgnoredClassNames)
+		{
+			if (ClassName.Contains(Ignored))
+			{
+				bShouldIgnore = true;
+				break;
+			}
+		}
+		if (bShouldIgnore) continue;
+
+		// Add bounds of all visible, registered primitive components
+		for (UActorComponent* Comp : Actor->GetComponents())
+		{
+			if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(Comp))
+			{
+				if (Prim->IsRegistered() && Prim->IsVisible())
+				{
+					BoundingBox += Prim->Bounds.GetBox();
+				}
+			}
+		}
+	}
+
+	return BoundingBox;
+}
+
+
+
+/***************************************************************************************************************
+*
+* PartitionActorsIntoBoundingBoxes - Create a list of actors based on a larger global bounding box, chunked into the required size
 *
 */
 
-TMap<AActor*, TArray<UStaticMeshComponent*>> FZeroPayEditorButtonsPluginModule::GetStaticMeshesInSubLevel(const FString& SubLevelName)
+TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginModule::PartitionActorsIntoBoundingBoxes(const FBox& GlobalBounds, const FVector& ChunkSize, ULevel* Level)
 {
-	TMap<AActor*, TArray<UStaticMeshComponent*>> ActorMeshMap;
+	TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> Results;
 
-	UWorld* EditorWorld = GEditor->GetEditorWorldContext().World();
-	if (!EditorWorld)
+	if (!Level || !ChunkSize.X || !ChunkSize.Y || !ChunkSize.Z)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[FZeroPayEditorButtonsPluginModule::GetStaticMeshesInSubLevel] Failed, Editor world not found."));
-		return ActorMeshMap;
+		return Results;
 	}
 
-	for (ULevel* Level : EditorWorld->GetLevels())
+	// Compute grid extents
+	const FVector Min = GlobalBounds.Min;
+	const FVector Max = GlobalBounds.Max;
+
+	const int32 CountX = FMath::CeilToInt((Max.X - Min.X) / ChunkSize.X);
+	const int32 CountY = FMath::CeilToInt((Max.Y - Min.Y) / ChunkSize.Y);
+	const int32 CountZ = FMath::CeilToInt((Max.Z - Min.Z) / ChunkSize.Z);
+
+	// Pre-allocate grid of bounds
+	TArray<FBox> GridBoxes;
+	GridBoxes.Reserve(CountX * CountY * CountZ);
+
+	for (int32 x = 0; x < CountX; ++x)
 	{
-		if (!Level || !Level->GetOutermost()->GetName().Contains(SubLevelName))
+		for (int32 y = 0; y < CountY; ++y)
+		{
+			for (int32 z = 0; z < CountZ; ++z)
+			{
+				const FVector BoxMin = Min + FVector(x, y, z) * ChunkSize;
+				const FVector BoxMax = BoxMin + ChunkSize;
+				GridBoxes.Add(FBox(BoxMin, BoxMax));
+			}
+		}
+	}
+
+	// Create output structure matching each FBox to a component array
+	Results.SetNum(GridBoxes.Num());
+	for (int32 i = 0; i < GridBoxes.Num(); ++i)
+	{
+		Results[i].Key = GridBoxes[i];
+		Results[i].Value = TArray<UStaticMeshComponent*>();
+	}
+
+	// Scan actors and assign their components to correct cells
+	for (AActor* Actor : Level->Actors)
+	{
+		if (!Actor) continue;
+
+		const FVector ActorBoundsCenter = Actor->GetComponentsBoundingBox().GetCenter();
+
+		// Determine grid cell index this actor belongs to
+		int32 x = FMath::FloorToInt((ActorBoundsCenter.X - Min.X) / ChunkSize.X);
+		int32 y = FMath::FloorToInt((ActorBoundsCenter.Y - Min.Y) / ChunkSize.Y);
+		int32 z = FMath::FloorToInt((ActorBoundsCenter.Z - Min.Z) / ChunkSize.Z);
+
+		// Clamp to valid range
+		if (x < 0 || y < 0 || z < 0 || x >= CountX || y >= CountY || z >= CountZ)
 			continue;
 
-		for (AActor* Actor : Level->Actors)
+		const int32 FlatIndex = x * CountY * CountZ + y * CountZ + z;
+
+		if (!Results.IsValidIndex(FlatIndex)) continue;
+
+		for (UActorComponent* Comp : Actor->GetComponents())
 		{
-			if (!Actor || !Actor->Tags.Contains(FName("ReduceMe")))
-				continue;
-
-			TArray<UStaticMeshComponent*> FoundMeshes;
-			Actor->GetComponents<UStaticMeshComponent>(FoundMeshes);
-
-			if (FoundMeshes.Num() > 0)
+			if (UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(Comp))
 			{
-				ActorMeshMap.Add(Actor, FoundMeshes);
-			}
-		}
-	}
-
-	return ActorMeshMap;
-}
-
-/***************************************************************************************************************
-*
-* GroupMeshComponentsByMesh - Returns a mapping of all mesh components against the StaticMesh asset
-*
-*/
-
-TMap<UStaticMesh*, TArray<UStaticMeshComponent*>> FZeroPayEditorButtonsPluginModule::GroupMeshComponentsByMesh(const TMap<AActor*, TArray<UStaticMeshComponent*>>& ActorMeshMap)
-{
-	TMap<UStaticMesh*, TArray<UStaticMeshComponent*>> MeshGroups;
-
-	for (const auto& ActorPair : ActorMeshMap)
-	{
-		for (UStaticMeshComponent* MeshComp : ActorPair.Value)
-		{
-			if (UStaticMesh* Mesh = MeshComp->GetStaticMesh())
-			{
-				MeshGroups.FindOrAdd(Mesh).Add(MeshComp);
-			}
-		}
-	}
-
-	return MeshGroups;
-}
-
-/***************************************************************************************************************
-*
-* GroupByMeshThenProximity - Returns a mapping of all mesh components against the StaticMesh asset
-*
-*/
-
-TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginModule::GroupByMeshThenProximity_MaterialAware(const TMap<UStaticMesh*, TArray<UStaticMeshComponent*>>& MeshGroups, float MaxDistance)
-{
-	TMap<FMeshMaterialKey, TArray<UStaticMeshComponent*>> MaterialGroups;
-
-	// Step 1: Group by mesh + material signature
-	for (const auto& MeshGroup : MeshGroups)
-	{
-		UStaticMesh* Mesh = MeshGroup.Key;
-		const TArray<UStaticMeshComponent*>& Components = MeshGroup.Value;
-
-		for (UStaticMeshComponent* Comp : Components)
-		{
-			if (!Comp) continue;
-
-			FMeshMaterialKey Key;
-			Key.Mesh = Mesh;
-
-			const int32 NumSlots = Comp->GetNumMaterials();
-			for (int32 i = 0; i < NumSlots; ++i)
-			{
-				Key.Materials.Add(Comp->GetMaterial(i));
-			}
-
-			MaterialGroups.FindOrAdd(Key).Add(Comp);
-		}
-	}
-
-	// Step 2: Spatial clustering within each mesh/material group
-	TMap<FMeshMaterialKey, TArray<TArray<UStaticMeshComponent*>>> OutClusters;
-
-	for (const auto& Group : MaterialGroups)
-	{
-		const FMeshMaterialKey& Key = Group.Key;
-		const TArray<UStaticMeshComponent*>& Components = Group.Value;
-
-		TArray<TArray<UStaticMeshComponent*>> Clusters;
-
-		for (UStaticMeshComponent* MeshComp : Components)
-		{
-			if (!MeshComp) continue;
-
-			const FVector Center = MeshComp->Bounds.Origin;
-			bool bAdded = false;
-
-			for (TArray<UStaticMeshComponent*>& Cluster : Clusters)
-			{
-				if (Cluster.Num() == 0) continue;
-
-				const FVector RefCenter = Cluster[0]->Bounds.Origin;
-				if (FVector::Dist(Center, RefCenter) <= MaxDistance)
+				if (MeshComp->IsRegistered())
 				{
-					Cluster.Add(MeshComp);
-					bAdded = true;
-					break;
+					Results[FlatIndex].Value.Add(MeshComp);
 				}
 			}
-
-			if (!bAdded)
-			{
-				TArray<UStaticMeshComponent*> NewCluster;
-				NewCluster.Add(MeshComp);
-				Clusters.Add(NewCluster);
-			}
 		}
-
-		OutClusters.Add(Key, Clusters);
 	}
 
-	return OutClusters;
+	return Results;
 }
-
-
-/***************************************************************************************************************
-*
-* GroupByMeshesViaProximity - Returns a mapping of all mesh components against the StaticMesh asset
-*
-*/
-
-TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginModule::GroupByMeshesViaProximity(const TMap<UStaticMesh*, TArray<UStaticMeshComponent*>>& MeshGroups, float MaxDistance)
-{
-	TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>> OutClusters;
-
-	for (const auto& MeshGroup : MeshGroups)
-	{
-		UStaticMesh* Mesh = MeshGroup.Key;
-		const TArray<UStaticMeshComponent*>& Components = MeshGroup.Value;
-
-		TArray<TArray<UStaticMeshComponent*>> Clusters;
-
-		for (UStaticMeshComponent* MeshComp : Components)
-		{
-			if (!MeshComp) continue;
-
-			const FVector Center = MeshComp->Bounds.Origin;
-			bool bAdded = false;
-
-			// Check against each existing cluster
-			for (TArray<UStaticMeshComponent*>& Cluster : Clusters)
-			{
-				if (Cluster.Num() == 0) continue;
-
-				const FVector RefCenter = Cluster[0]->Bounds.Origin;
-				if (FVector::Dist(Center, RefCenter) <= MaxDistance)
-				{
-					Cluster.Add(MeshComp);
-					bAdded = true;
-					break;
-				}
-			}
-
-			// If not added to an existing cluster, start a new one
-			if (!bAdded)
-			{
-				TArray<UStaticMeshComponent*> NewCluster;
-				NewCluster.Add(MeshComp);
-				Clusters.Add(NewCluster);
-			}
-		}
-
-		OutClusters.Add(Mesh, Clusters);
-	}
-
-	return OutClusters;
-}
-
 
 /***************************************************************************************************************
 *
@@ -390,48 +290,44 @@ TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsP
 *
 */
 
-bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath)
+bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath, TSoftObjectPtr<UWorld> Quest3World)
 {
-	/* Get total operations to keep user happy.. */
-	int32 nMergeCount = 0;
-	for (const auto& ClusterPair : ClusteredIslands)
-	{
-		const TArray<TArray<UStaticMeshComponent*>>& IslandGroups = ClusterPair.Value;
-		for (const TArray<UStaticMeshComponent*>& IslandGroup : IslandGroups)
-		{
-			nMergeCount++;
-		}
-	}
+	// Count how many merge operations we'll perform
+	const int32 nMergeCount = ClusteredIslands.Num();
 
-	/* Info */
+	// Show progress to the user
 	FScopedSlowTask SlowTask(nMergeCount, FText::FromString(TEXT("Merging and replacing...")));
 	SlowTask.MakeDialog();
 
-	/* Iterate all supplied mesh islands and merge them, placing them in the target folder under unique names*/
+	/* Get PCVR World */
+	if (!Quest3World.IsValid())
+		return false;
+
+	/* Loop round clusters / islands*/
 	int32 nMergeIndex = 0;
-	for (const auto& ClusterPair : ClusteredIslands)
+	for (const TPair<FBox, TArray<UStaticMeshComponent*>>& Pair : ClusteredIslands)
 	{
-		const TArray<TArray<UStaticMeshComponent*>>& IslandGroups = ClusterPair.Value;
+		const TArray<UStaticMeshComponent*>& IslandGroup = Pair.Value;
 
-		for (const TArray<UStaticMeshComponent*>& IslandGroup : IslandGroups)
-		{
-			FString PackageName = FString::Printf(TEXT("%s/Merged_Island_%05d"), *TargetFolderPath, nMergeIndex);
-			MergeMesh(IslandGroup, PackageName);
-			nMergeIndex++;
+		if (IslandGroup.Num() == 0)
+			continue;
 
-			SlowTask.EnterProgressFrame(1);
-		}
+		const FString PackageName = FString::Printf(TEXT("%s/Merged_Island_%05d"), *TargetFolderPath, nMergeIndex);
+
+		MergeMesh(IslandGroup, PackageName, Quest3World.Get() );
+
+		nMergeIndex++;
+		SlowTask.EnterProgressFrame(1);
 	}
+
 	return true;
 }
 
-
-bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName)
+bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World)
 {
 	const IMeshMergeUtilities& MeshUtilities = FModuleManager::Get().LoadModuleChecked<IMeshMergeModule>("MeshMergeUtilities").GetUtilities();
 	TArray<AActor*> Actors;
-	TArray<ULevel*> UniqueLevels;
-	bool bReplaceSourceActors = false;
+	bool bReplaceSourceActors = true;
 
 	FScopedSlowTask SlowTask(1.0f, FText::FromString(TEXT("Merging actors...")));
 	SlowTask.MakeDialog();
@@ -459,6 +355,11 @@ bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshCompon
 
 		// Setup merge settings
 		FMeshMergingSettings SettingsObject;
+		SettingsObject.TargetLightMapResolution = 4096;
+		SettingsObject.GutterSize = 0;
+		SettingsObject.bMergePhysicsData = true;
+		SettingsObject.bUseTextureBinning = true;
+		SettingsObject.bMergeEquivalentMaterials = true;
 		SettingsObject.bMergeMaterials = true;
 		SettingsObject.bGenerateLightMapUV = true;
 		SettingsObject.bComputedLightMapResolution = true;
@@ -531,17 +432,17 @@ bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshCompon
 			if (AssetsToSync.FindItemByClass(&MergedMesh))
 			{
 				const FScopedTransaction Transaction(FText::FromString(TEXT("Placing merged actors...")));
-				UniqueLevels[0]->Modify();
+				targetQuest3World->Modify();
 
-				UWorld* World = UniqueLevels[0]->OwningWorld;
 				FActorSpawnParameters Params;
-				Params.OverrideLevel = UniqueLevels[0];
+				Params.OverrideLevel = targetQuest3World->PersistentLevel ;
 				FRotator MergedActorRotation(ForceInit);
 
-				AStaticMeshActor* MergedActor = World->SpawnActor<AStaticMeshActor>(MergedActorLocation, MergedActorRotation, Params);
+				AStaticMeshActor* MergedActor = targetQuest3World->SpawnActor<AStaticMeshActor>(MergedActorLocation, MergedActorRotation, Params);
 				MergedActor->GetStaticMeshComponent()->SetStaticMesh(MergedMesh);
 				MergedActor->SetActorLabel(MergedMesh->GetName());
-				World->UpdateCullDistanceVolumes(MergedActor, MergedActor->GetStaticMeshComponent());
+				MergedActor->SetFolderPath("ReducedAssets"); // Automatically creates folder if needed
+				targetQuest3World->UpdateCullDistanceVolumes(MergedActor, MergedActor->GetStaticMeshComponent());
 				GEditor->SelectNone(true, true);
 				GEditor->SelectActor(MergedActor, true, true);
 				// Remove source actors
@@ -637,6 +538,136 @@ void FZeroPayEditorButtonsPluginModule::DrawClusterDebugBoxes(const TMap<UStatic
 /********************************************************************************************************/
 /*                                          SUPPORT FUNCTIONS                                           */
 /********************************************************************************************************/
+
+FFoundAssetInformation FZeroPayEditorButtonsPluginModule::ScanLevelActorsAndDirectory(ULevel* LevelToScan, const FString& TargetAssetPath)
+{
+	FFoundAssetInformation Result;
+
+	if (!LevelToScan)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Invalid level pointer."));
+		return Result ;
+	}
+
+	// === 1. Count actors under "ReducedAssets" folder in level ===
+	int32 ReducedFolderActorCount = 0;
+
+	for (AActor* Actor : LevelToScan->Actors)
+	{
+		if (!Actor) continue;
+
+		// Check folder path (this is the editor-level folder grouping in World Outliner)
+		FName FolderPath = Actor->GetFolderPath();
+
+		// Match top-level folder called "ReducedAssets"
+		if (FolderPath.ToString().StartsWith(TEXT("ReducedAssets")))
+		{
+			Result.FoundInstances++;
+		}
+	}
+
+	// === 2. Count all assets under given content folder ===
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	TArray<FAssetData> AssetList;
+
+	FARFilter Filter;
+	Filter.PackagePaths.Add(*TargetAssetPath); 
+	Filter.bRecursivePaths = true;
+
+	AssetRegistryModule.Get().GetAssets(Filter, AssetList);
+
+	Result.FoundAssets = AssetList.Num();
+
+	return Result;
+}
+
+bool FZeroPayEditorButtonsPluginModule::DeleteActorsAndAssets(ULevel* TargetLevel, const FString& AssetFolderPathToDelete)
+{
+	if (!TargetLevel)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Invalid level pointer."));
+		return false ;
+	}
+
+	UWorld* World = TargetLevel->GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Level has no valid world."));
+		return false;
+	}
+
+	// === 1. Destroy actors under World Outliner folder "ReducedAssets" ===
+	TArray<AActor*> ActorsToDestroy;
+	for (AActor* Actor : TargetLevel->Actors)
+	{
+		if (!Actor) continue;
+
+		if (Actor->GetFolderPath().ToString().StartsWith(TEXT("ReducedAssets")))
+		{
+			ActorsToDestroy.Add(Actor);
+		}
+	}
+
+	for (AActor* Actor : ActorsToDestroy)
+	{
+		World->EditorDestroyActor(Actor, true);
+	}
+
+	UE_LOG(LogTemp, Display, TEXT("Destroyed %d actor(s) in folder 'ReducedAssets'."), ActorsToDestroy.Num());
+
+	// === 2. Save the level ===
+	if (TargetLevel->GetOutermost())
+	{
+		UPackage* LevelPackage = TargetLevel->GetOutermost();
+		bool bSaved = FEditorFileUtils::PromptForCheckoutAndSave({ LevelPackage }, /*bCheckDirty=*/true, /*bPromptToSave=*/false) == FEditorFileUtils::EPromptReturnCode::PR_Success;
+		if (!bSaved)
+		{
+			EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, failed to save the existing Quest3 level after destroying all 'ReducedAssets' - Cannot continue."));
+			return false;
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Could not get level package to save."));
+		return false;
+	}
+
+	// === 3. Delete all assets under the specified folder ===
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+
+	TArray<FAssetData> AssetsToDelete;
+	FARFilter Filter;
+	Filter.PackagePaths.Add(*AssetFolderPathToDelete);
+	Filter.bRecursivePaths = true;
+	Filter.bIncludeOnlyOnDiskAssets = false;
+
+	AssetRegistryModule.Get().GetAssets(Filter, AssetsToDelete);
+
+	if (AssetsToDelete.Num() == 0)
+	{
+		UE_LOG(LogTemp, Display, TEXT("No assets found in path: %s"), *AssetFolderPathToDelete);
+		return true ;
+	}
+
+	// Gather object references to delete
+	TArray<UObject*> ObjectsToDelete;
+	for (const FAssetData& Asset : AssetsToDelete)
+	{
+		UObject* LoadedAsset = Asset.GetAsset();
+		if (LoadedAsset)
+		{
+			ObjectsToDelete.Add(LoadedAsset);
+		}
+	}
+
+	if (ObjectsToDelete.Num() > 0)
+	{
+		ObjectTools::DeleteObjectsUnchecked(ObjectsToDelete);
+	}
+
+	UE_LOG(LogTemp, Display, TEXT("Deleted %d asset(s) from folder '%s'."), ObjectsToDelete.Num(), *AssetFolderPathToDelete);
+	return true;
+}
 
 void FZeroPayEditorButtonsPluginModule::UpdateQuest3ReducerUIProgressField()
 {
