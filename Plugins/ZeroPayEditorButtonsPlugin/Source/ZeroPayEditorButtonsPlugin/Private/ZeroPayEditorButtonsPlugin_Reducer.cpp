@@ -326,135 +326,98 @@ bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TArray<TPair<FBox
 bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World)
 {
 	const IMeshMergeUtilities& MeshUtilities = FModuleManager::Get().LoadModuleChecked<IMeshMergeModule>("MeshMergeUtilities").GetUtilities();
-	TArray<AActor*> Actors;
+	TArray<UObject*> AssetsToSync;
 	bool bReplaceSourceActors = true;
 
 	FScopedSlowTask SlowTask(1.0f, FText::FromString(TEXT("Merging actors...")));
 	SlowTask.MakeDialog();
 
 	// Extracting static mesh components from the selected mesh components in the dialog
-	TArray<UPrimitiveComponent*> ComponentsToMerge;
+	TArray<UStaticMeshComponent*> StaticMeshComponentsToMerge;
 
 	for (UStaticMeshComponent* SelectedComponent : SelectedComponents)
 	{
 		// Determine whether or not this component should be incorporated according the user settings
-		if (SelectedComponent->IsValidLowLevel())
+		if ( SelectedComponent->IsValidLowLevel() )
 		{
-			ComponentsToMerge.Add(Cast<UPrimitiveComponent>(SelectedComponent));
+			// Should always have an owner, but maybe not.. 
+			if (SelectedComponent->GetOwner())
+			{
+				StaticMeshComponentsToMerge.Add(SelectedComponent);
+			}
+			
 		}
 	}
 
-	FVector MergedActorLocation;
-	TArray<UObject*> AssetsToSync;
+	// Get the module for the mesh merge utilities
+	const IMeshMergeUtilities& MeshMergeUtilities = FModuleManager::Get().LoadModuleChecked<IMeshMergeModule>("MeshMergeUtilities").GetUtilities();
 
-	if (ComponentsToMerge.Num())
+	if (StaticMeshComponentsToMerge.Num())
 	{
-		UWorld* World = ComponentsToMerge[0]->GetWorld();
-		checkf(World != nullptr, TEXT("Invalid World retrieved from Mesh components"));
-		const float ScreenAreaSize = TNumericLimits<float>::Max();
+		FVector ProxyLocation = FVector::ZeroVector;
+		TArray<UObject*> NewAssetsToSync;
 
-		// Setup merge settings
-		FMeshMergingSettings SettingsObject;
-		SettingsObject.TargetLightMapResolution = 4096;
-		SettingsObject.GutterSize = 0;
-		SettingsObject.bMergePhysicsData = true;
-		SettingsObject.bUseTextureBinning = true;
-		SettingsObject.bMergeEquivalentMaterials = true;
-		SettingsObject.bMergeMaterials = true;
-		SettingsObject.bGenerateLightMapUV = true;
-		SettingsObject.bComputedLightMapResolution = true;
-		SettingsObject.LODSelectionType = EMeshLODSelectionType::AllLODs;
-		SettingsObject.bUseLandscapeCulling = false;
-		SettingsObject.bBakeVertexDataToMesh = true;
-		SettingsObject.bAllowDistanceField = false;
-
-		// If the merge destination package already exists, it is possible that the mesh is already used in a scene somewhere, or its materials or even just its textures.
-		// Static primitives uniform buffers could become invalid after the operation completes and lead to memory corruption. To avoid it, we force a global reregister.
-		if (FindObject<UObject>(nullptr, *PackageName))
-		{
-			FGlobalComponentReregisterContext GlobalReregister;
-			MeshUtilities.MergeComponentsToStaticMesh(ComponentsToMerge, World, SettingsObject, nullptr, nullptr, PackageName, AssetsToSync, MergedActorLocation, ScreenAreaSize, true);
-		}
-		else
-		{
-			MeshUtilities.MergeComponentsToStaticMesh(ComponentsToMerge, World, SettingsObject, nullptr, nullptr, PackageName, AssetsToSync, MergedActorLocation, ScreenAreaSize, true);
-		}
-	}
-
-	if (AssetsToSync.Num())
-	{
-		FAssetRegistryModule& AssetRegistry = FModuleManager::Get().LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-
-		for (UObject* AssetToSync : AssetsToSync)
-		{
-			// MergeComponentsToStaticMesh() will have outered all assets (material instance, textures) to the static mesh package.
-			// Move each of them to their own package, so that they show up in the Content Browser
-			if (AssetToSync && !AssetToSync->IsA<UStaticMesh>())
+		FCreateProxyDelegate ProxyDelegate;
+		ProxyDelegate.BindLambda(
+			[&NewAssetsToSync](const FGuid Guid, TArray<UObject*>& InAssetsToSync)
 			{
-				FString AssetName = AssetToSync->GetName();
-				FString AssetPackagePath = FPackageName::GetLongPackagePath(AssetToSync->GetPathName());
-				FString AssetPackageName = AssetPackagePath / AssetName;
-
-				UPackage* AssetPackage = CreatePackage(*AssetPackageName);
-				check(AssetPackage);
-				AssetPackage->FullyLoad();
-				AssetPackage->Modify();
-
-				// Replace existing asset by the new one.
-				if (UObject* OldAsset = FindObject<UObject>(AssetPackage, *AssetName))
+				//Update the asset registry that a new static mash and material has been created
+				if (InAssetsToSync.Num())
 				{
-					FName ObjectName = OldAsset->GetFName();
-					UObject* Outer = OldAsset->GetOuter();
-					OldAsset->Rename(nullptr, GetTransientPackage(), REN_DoNotDirty | REN_DontCreateRedirectors);
+					FAssetRegistryModule& AssetRegistry = FModuleManager::Get().LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+					int32 AssetCount = InAssetsToSync.Num();
+					for (int32 AssetIndex = 0; AssetIndex < AssetCount; AssetIndex++)
+					{
+						AssetRegistry.AssetCreated(InAssetsToSync[AssetIndex]);
+						GEditor->BroadcastObjectReimported(InAssetsToSync[AssetIndex]);
+					}
 
-					// Consolidate or "Replace" the old object with the new object for any living references.
-					bool bShowDeleteConfirmation = false;
-					TArray<UObject*> OldDataAssetArray = { OldAsset };
-					ObjectTools::ConsolidateObjects(AssetToSync, { OldDataAssetArray }, bShowDeleteConfirmation);
+					//Also notify the content browser that the new assets exists
+					FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+					ContentBrowserModule.Get().SyncBrowserToAssets(InAssetsToSync, true);
+
+					NewAssetsToSync += InAssetsToSync;
 				}
+			});
 
-				AssetToSync->Rename(*AssetName, AssetPackage, REN_DontCreateRedirectors);
-				AssetToSync->SetFlags(RF_Public | RF_Standalone);
-			}
+		StaticMeshComponentsToMerge.RemoveAll([](UStaticMeshComponent* Val) { return Val->GetStaticMesh() == nullptr; });
 
-			AssetRegistry.AssetCreated(AssetToSync);
-			GEditor->BroadcastObjectReimported(AssetToSync);
-		}
-
-		//Also notify the content browser that the new assets exists
-		FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
-		ContentBrowserModule.Get().SyncBrowserToAssets(AssetsToSync, true);
-
-		// Place new mesh in the world
-		if (bReplaceSourceActors)
+		if (StaticMeshComponentsToMerge.Num())
 		{
-			UStaticMesh* MergedMesh = nullptr;
-			if (AssetsToSync.FindItemByClass(&MergedMesh))
-			{
-				const FScopedTransaction Transaction(FText::FromString(TEXT("Placing merged actors...")));
-				targetQuest3World->Modify();
-
-				FActorSpawnParameters Params;
-				Params.OverrideLevel = targetQuest3World->PersistentLevel ;
-				FRotator MergedActorRotation(ForceInit);
-
-				AStaticMeshActor* MergedActor = targetQuest3World->SpawnActor<AStaticMeshActor>(MergedActorLocation, MergedActorRotation, Params);
-				MergedActor->GetStaticMeshComponent()->SetStaticMesh(MergedMesh);
-				MergedActor->SetActorLabel(MergedMesh->GetName());
-				MergedActor->SetFolderPath("ReducedAssets"); // Automatically creates folder if needed
-				targetQuest3World->UpdateCullDistanceVolumes(MergedActor, MergedActor->GetStaticMeshComponent());
-				GEditor->SelectNone(true, true);
-				GEditor->SelectActor(MergedActor, true, true);
-				// Remove source actors
-				for (AActor* Actor : Actors)
-				{
-					Actor->Destroy();
-				}
-			}
+			FGuid JobGuid = FGuid::NewGuid();
+			FMeshProxySettings Settings;
+			MeshMergeUtilities.CreateProxyMesh(StaticMeshComponentsToMerge, Settings, nullptr, PackageName, JobGuid, ProxyDelegate);
 		}
+
+		PlaceMeshProxyInQuest3Level(NewAssetsToSync, targetQuest3World->PersistentLevel);
 	}
 
 	return true;
+}
+
+
+void FZeroPayEditorButtonsPluginModule::PlaceMeshProxyInQuest3Level(TArray<UObject*>& NewAssetsToSync, ULevel* Level)
+{
+	UStaticMesh* MergedMesh = nullptr;
+	if (NewAssetsToSync.FindItemByClass(&MergedMesh))
+	{
+		Level->Modify();
+
+		UWorld* World = Level->OwningWorld;
+		FActorSpawnParameters Params;
+		Params.OverrideLevel = Level;
+		FRotator MergedActorRotation(ForceInit);
+		// The pivot of the merged mesh is always at the origin
+		FVector MergedActorLocation(0, 0, 0);
+
+		AStaticMeshActor* MergedActor = World->SpawnActor<AStaticMeshActor>(MergedActorLocation, MergedActorRotation, Params);
+		MergedActor->GetStaticMeshComponent()->SetStaticMesh(MergedMesh);
+		MergedActor->SetActorLabel(MergedMesh->GetName());
+		MergedActor->SetFolderPath("ReducedAssets"); 
+		World->UpdateCullDistanceVolumes(MergedActor, MergedActor->GetStaticMeshComponent());
+		GEditor->SelectNone(true, true);
+		GEditor->SelectActor(MergedActor, true, true);
+	}
 }
 
 /********************************************************************************************************/
