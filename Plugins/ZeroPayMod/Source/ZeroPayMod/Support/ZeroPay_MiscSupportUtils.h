@@ -151,4 +151,10 @@ public:
 		return returnValue;
 	};
 
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Support")
+	static FString FormatStringWithDelimiters(int32 Number)
+	{
+		return FText::AsNumber(Number).ToString();
+	}
+
 };

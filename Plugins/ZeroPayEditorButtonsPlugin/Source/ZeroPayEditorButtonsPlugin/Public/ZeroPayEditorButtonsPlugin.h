@@ -116,6 +116,54 @@ struct FFoundAssetInformation
 	int32 FoundInstances = 0 ;
 };
 
+
+USTRUCT(BlueprintType)
+struct FReducerResults
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
+	bool bFailed ;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
+	int32 OriginalTriangleCount;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
+	int32 OriginalVertexCount;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
+	int32 OriginalMaterialCount;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
+	int32 OriginalActorCount;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
+	int32 ReducedTriangleCount;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
+	int32 ReducedVertexCount;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
+	int32 ReducedMaterialCount;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
+	int32 ReducedActorCount;
+
+	FReducerResults()
+	{
+		bFailed = true;
+		OriginalTriangleCount = 0;
+		OriginalVertexCount = 0;
+		OriginalMaterialCount = 0;
+		OriginalActorCount = 0;
+		ReducedTriangleCount = 0;
+		ReducedVertexCount = 0;
+		ReducedMaterialCount = 0;
+		ReducedActorCount = 0;
+
+	};
+};
+
 /**********************************************************************************************************************
 *
 * FMeshMaterialKey - Provides a mesh and unique material map
@@ -168,7 +216,7 @@ public:
 	void CancelUploadStatus();
 
 	/* >>> Reducer Logic - Called from Function Library */
-	bool ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
+	FReducerResults ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
 private:
 	/* >>> Vars */
 	bool bIsOperationRunning;
@@ -206,16 +254,16 @@ private:
 	void UpdateModManagementUIProgressField(); 
 
 	/* >>> Reducer Logic */
-	bool Stage1MergeUniformMeshes(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings) ;
+	FReducerResults ReducePCVRLevelForQuest3(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings) ;
 
 	/* Reducer mesh, world, etc. support */
 	FBox GetMaximumVisibleBoundingBox(ULevel* Level) ;
-	TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> PartitionActorsIntoBoundingBoxes(const FBox& GlobalBounds, const FVector& ChunkSize, ULevel* Level);
+	TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> PartitionActorsIntoBoundingBoxes(const FBox& GlobalBounds, const FVector& ChunkSize, ULevel* Level, FReducerResults& returnValue);
 
 	/* Merge system */
-	bool MergeMeshIslands(const TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath, TSoftObjectPtr<UWorld> Quest3World);
-	bool MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World);
-	void PlaceMeshProxyInQuest3Level(TArray<UObject*>& NewAssetsToSync, ULevel* Level) ;
+	bool MergeMeshIslands(const TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath, TSoftObjectPtr<UWorld> Quest3World, FReducerResults& returnValue);
+	bool MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World, FReducerResults& returnValue);
+	void PlaceMeshProxyInQuest3Level(TArray<UObject*>& NewAssetsToSync, ULevel* Level, FReducerResults& returnValue) ;
 
 	/* Reducer debug */
 	void DrawClusterDebugBoxes(const TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>>& ClusteredGroups, UWorld* World, float Lifetime);
@@ -254,6 +302,6 @@ public:
 
 	/* Reduces a PCVR level using the supplied settings, to a Quest3 level */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
-	static bool ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
+	static FReducerResults ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
 
 };

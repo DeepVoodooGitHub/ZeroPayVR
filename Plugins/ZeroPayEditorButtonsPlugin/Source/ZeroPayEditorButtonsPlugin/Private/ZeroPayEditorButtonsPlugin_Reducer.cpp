@@ -31,16 +31,9 @@
 #include "Components/PrimitiveComponent.h"
 #include "FileHelpers.h" 
 
-bool FZeroPayEditorButtonsPluginModule::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
+FReducerResults FZeroPayEditorButtonsPluginModule::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
-	/* Find the settings file and validate it's correct */
-	bAbortOperation = false;
-
-	/* >>> Stage 1 - Uniform Mesh Merging <<< */
-	if (!Stage1MergeUniformMeshes(dataAsset, reducerSettings, runtimeSettings))
-		bAbortOperation = true;
-
-	return !bAbortOperation;
+	return ReducePCVRLevelForQuest3(dataAsset, reducerSettings, runtimeSettings);
 }
 
 /********************************************************************************************************/
@@ -48,9 +41,10 @@ bool FZeroPayEditorButtonsPluginModule::ReduceLevel(UZeroPayMod_DefinitionDataAs
 /********************************************************************************************************/
 
 
-bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
+FReducerResults FZeroPayEditorButtonsPluginModule::ReducePCVRLevelForQuest3(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
-	bool bSuccess = false;
+	FReducerResults returnValue;
+
 	FString ReducedAssetMeshPath = FString::Printf(TEXT("/Game/ZeroPayMods/UGC%s/Levels/ReducedAssets/Meshes"), *dataAsset->Definition.UGCID);
 
 	/* Handle bad dataAsset */
@@ -58,7 +52,7 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 	{
 		LastMessage = "Error S1 - PCVR Level is not defined (in data asset in UGC folder)";
 		UpdateQuest3ReducerUIProgressField();
-		return false ;
+		return returnValue ;
 	}
 
 	/* Validate existing installation */
@@ -76,13 +70,12 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 			{
 				LastMessage = "User aborted.";
 				UpdateQuest3ReducerUIProgressField();
-				return false;
+				return returnValue;
 				break;
 			}
 		}
 	}
 
-	/* Remove old */
 	FScopedSlowTask SlowTask(1.0f, FText::FromString(TEXT("Gathering actors...")));
 	SlowTask.MakeDialog();
 
@@ -91,16 +84,20 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 	if (!bDeletionSuccess)
 	{
 		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, failed to delete existing Quest 3 level 'ReducedAssets' folder and/or the merged assets located under the 'UGC/Levels/ReducedAssets' folder"));
-		return false;
+		return returnValue;
 	}
 
 	/* Info */
-	SlowTask.EnterProgressFrame(0.1f);
+	SlowTask.EnterProgressFrame(0.5f);
 
 	/* Get PCVR World */
 	UWorld* PCVRWorld = dataAsset->Definition.pcvrlevel.Get(); // Convert from soft to hard reference
 	if (!PCVRWorld)
-		return false;
+	{
+		LastMessage = "Error.";
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, PCVR level supplied in dataasset was not valid."));
+		return returnValue;
+	}
 
 	ULevel* PCVRLevel = PCVRWorld->PersistentLevel;
 
@@ -110,10 +107,29 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 	if (runtimeSettings.bStage1_ShowVisualDebug)
 		DrawDebugBox(GEditor->GetEditorWorldContext().World(), MaxBoundingBox.GetCenter(), MaxBoundingBox.GetExtent(), FColor::Blue, false, runtimeSettings.fStage1_VisualDebugDuration, 0, 5.0f);
 
+	/* Check it's not MASSIVE */
+	const FVector Min = MaxBoundingBox.Min;
+	const FVector Max = MaxBoundingBox.Max;
+
+	volatile  int32 CountX = FMath::CeilToInt((Max.X - Min.X) / reducerSettings->MeshReductionSettings.BoundingClusterSize);
+	volatile  int32 CountY = FMath::CeilToInt((Max.Y - Min.Y) / reducerSettings->MeshReductionSettings.BoundingClusterSize);
+	volatile  int32 CountZ = FMath::CeilToInt((Max.Z - Min.Z) / reducerSettings->MeshReductionSettings.BoundingClusterSize);
+
+	int64 OverflowCheckMultiplication = static_cast<int64>(CountX) * static_cast<int64>(CountY);
+	OverflowCheckMultiplication *= static_cast<int64>(CountZ);
+
+	UE_LOG(LogTemp, Display, TEXT("++++++++++++++++ OVERFLOW %d "), OverflowCheckMultiplication);
+
+	if (OverflowCheckMultiplication >= 2147483646)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, when dividing your PCVR level into 'BoundingClusterSize' (as per the 'DA_Quest3_Reducer_Settings' dataset in the 'Game/ZeroPayMods/UGCxxxxxxx/Levels' directory) we ran out of memory. Please increase the 'BoundingClusterSize', or exclude actors which are too far away, or more then closer to the center"));
+		return returnValue;
+	}
+
 	/* >>> Break the world into chunks and returns all meshes in that chunk */
 
 	FVector ChunkSize(reducerSettings->MeshReductionSettings.BoundingClusterSize, reducerSettings->MeshReductionSettings.BoundingClusterSize, reducerSettings->MeshReductionSettings.BoundingClusterSize);
-	auto Chunks = PartitionActorsIntoBoundingBoxes(MaxBoundingBox, ChunkSize, PCVRLevel);
+	auto Chunks = PartitionActorsIntoBoundingBoxes(MaxBoundingBox, ChunkSize, PCVRLevel, returnValue);
 
 	if (runtimeSettings.bStage1_ShowVisualDebug)
 	{
@@ -127,12 +143,21 @@ bool FZeroPayEditorButtonsPluginModule::Stage1MergeUniformMeshes(UZeroPayMod_Def
 		}
 	}
 
-	SlowTask.EnterProgressFrame(0.1f);
+	SlowTask.EnterProgressFrame(0.5f, FText::FromString(TEXT("Generated Quest 3 merged meshes and materials...")));
 
 	/* >>> Merge actors within each cluster */
+	bool bSuccess = MergeMeshIslands(Chunks, 0.5f, *ReducedAssetMeshPath, dataAsset->Definition.quest3level, returnValue);
 
-	bSuccess = MergeMeshIslands(Chunks, 0.5f, *ReducedAssetMeshPath, dataAsset->Definition.quest3level);
-	return true;
+	/* >>> Save the changes */
+	UPackage* LevelPackage = dataAsset->Definition.quest3level->PersistentLevel->GetOutermost();
+	bool bSaved = FEditorFileUtils::PromptForCheckoutAndSave({ LevelPackage }, /*bCheckDirty=*/true, /*bPromptToSave=*/false) == FEditorFileUtils::EPromptReturnCode::PR_Success;
+	if (!bSaved)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, failed to save the updated quest 3 sub-level, please manually save it."));
+		return returnValue;
+	}
+
+	return returnValue;
 }
 
 
@@ -207,7 +232,7 @@ FBox FZeroPayEditorButtonsPluginModule::GetMaximumVisibleBoundingBox(ULevel* Lev
 *
 */
 
-TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginModule::PartitionActorsIntoBoundingBoxes(const FBox& GlobalBounds, const FVector& ChunkSize, ULevel* Level)
+TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginModule::PartitionActorsIntoBoundingBoxes(const FBox& GlobalBounds, const FVector& ChunkSize, ULevel* Level, FReducerResults& returnValue)
 {
 	TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> Results;
 
@@ -268,14 +293,26 @@ TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginMo
 		const int32 FlatIndex = x * CountY * CountZ + y * CountZ + z;
 
 		if (!Results.IsValidIndex(FlatIndex)) continue;
+		/* Stats */
+		returnValue.OriginalActorCount++;
 
 		for (UActorComponent* Comp : Actor->GetComponents())
 		{
-			if (UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(Comp))
+			if (UStaticMeshComponent* MeshComponent = Cast<UStaticMeshComponent>(Comp))
 			{
-				if (MeshComp->IsRegistered())
+				if (MeshComponent->IsRegistered())
 				{
-					Results[FlatIndex].Value.Add(MeshComp);
+					Results[FlatIndex].Value.Add(MeshComponent);
+
+					/* Stats */
+					UStaticMesh* Mesh = MeshComponent->GetStaticMesh();
+					if (Mesh && Mesh->GetRenderData())
+					{
+						const FStaticMeshLODResources& LOD0 = Mesh->GetRenderData()->LODResources[0];
+						returnValue.OriginalTriangleCount += LOD0.GetNumTriangles();
+						returnValue.OriginalVertexCount += LOD0.GetNumVertices();
+						returnValue.OriginalMaterialCount += Mesh->GetStaticMaterials().Num();
+					}
 				}
 			}
 		}
@@ -290,7 +327,7 @@ TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginMo
 *
 */
 
-bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath, TSoftObjectPtr<UWorld> Quest3World)
+bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath, TSoftObjectPtr<UWorld> Quest3World, FReducerResults& returnValue)
 {
 	// Count how many merge operations we'll perform
 	const int32 nMergeCount = ClusteredIslands.Num();
@@ -305,25 +342,34 @@ bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TArray<TPair<FBox
 
 	/* Loop round clusters / islands*/
 	int32 nMergeIndex = 0;
+	double LastTickTime = FPlatformTime::Seconds();
 	for (const TPair<FBox, TArray<UStaticMeshComponent*>>& Pair : ClusteredIslands)
 	{
 		const TArray<UStaticMeshComponent*>& IslandGroup = Pair.Value;
+
+		/* Update progress */
+		nMergeIndex++;
+		SlowTask.EnterProgressFrame(1);
+		// Throttle UI updates: only tick once per second
+		double Now = FPlatformTime::Seconds();
+		if (Now - LastTickTime >= 1.0)
+		{
+			FSlateApplication::Get().Tick();
+			LastTickTime = Now;
+		}
 
 		if (IslandGroup.Num() == 0)
 			continue;
 
 		const FString PackageName = FString::Printf(TEXT("%s/Merged_Island_%05d"), *TargetFolderPath, nMergeIndex);
 
-		MergeMesh(IslandGroup, PackageName, Quest3World.Get() );
-
-		nMergeIndex++;
-		SlowTask.EnterProgressFrame(1);
+		MergeMesh(IslandGroup, PackageName, Quest3World.Get(), returnValue);
 	}
 
 	return true;
 }
 
-bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World)
+bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World, FReducerResults& returnValue)
 {
 	const IMeshMergeUtilities& MeshUtilities = FModuleManager::Get().LoadModuleChecked<IMeshMergeModule>("MeshMergeUtilities").GetUtilities();
 	TArray<UObject*> AssetsToSync;
@@ -389,14 +435,14 @@ bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshCompon
 			MeshMergeUtilities.CreateProxyMesh(StaticMeshComponentsToMerge, Settings, nullptr, PackageName, JobGuid, ProxyDelegate);
 		}
 
-		PlaceMeshProxyInQuest3Level(NewAssetsToSync, targetQuest3World->PersistentLevel);
+		PlaceMeshProxyInQuest3Level(NewAssetsToSync, targetQuest3World->PersistentLevel, returnValue);
 	}
 
 	return true;
 }
 
 
-void FZeroPayEditorButtonsPluginModule::PlaceMeshProxyInQuest3Level(TArray<UObject*>& NewAssetsToSync, ULevel* Level)
+void FZeroPayEditorButtonsPluginModule::PlaceMeshProxyInQuest3Level(TArray<UObject*>& NewAssetsToSync, ULevel* Level, FReducerResults& returnValue)
 {
 	UStaticMesh* MergedMesh = nullptr;
 	if (NewAssetsToSync.FindItemByClass(&MergedMesh))
@@ -415,8 +461,24 @@ void FZeroPayEditorButtonsPluginModule::PlaceMeshProxyInQuest3Level(TArray<UObje
 		MergedActor->SetActorLabel(MergedMesh->GetName());
 		MergedActor->SetFolderPath("ReducedAssets"); 
 		World->UpdateCullDistanceVolumes(MergedActor, MergedActor->GetStaticMeshComponent());
-		GEditor->SelectNone(true, true);
-		GEditor->SelectActor(MergedActor, true, true);
+		//GEditor->SelectNone(true, true);
+		//GEditor->SelectActor(MergedActor, true, true);
+
+		/* Stats */
+		returnValue.ReducedActorCount++ ;
+
+		if (MergedActor->GetStaticMeshComponent())
+		{
+			UStaticMesh* Mesh = MergedActor->GetStaticMeshComponent()->GetStaticMesh();
+			if (Mesh && Mesh->GetRenderData())
+			{
+				const FStaticMeshLODResources& LOD0 = Mesh->GetRenderData()->LODResources[0];
+				returnValue.ReducedTriangleCount += LOD0.GetNumTriangles();
+				returnValue.ReducedVertexCount += LOD0.GetNumVertices();
+				returnValue.ReducedMaterialCount += Mesh->GetStaticMaterials().Num();
+			}
+		}
+
 	}
 }
 

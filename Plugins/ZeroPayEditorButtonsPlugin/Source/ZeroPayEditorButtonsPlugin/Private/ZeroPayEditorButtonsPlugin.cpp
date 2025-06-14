@@ -334,14 +334,14 @@ void UZeroPayEditorButtonsFunctionLibrary::CancelUploadStatus()
 
 }
 
-bool UZeroPayEditorButtonsFunctionLibrary::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
+FReducerResults UZeroPayEditorButtonsFunctionLibrary::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
 	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
 	{
 		return Plugin->ReduceLevel(dataAsset, reducerSettings, runtimeSettings);
 	}
 
-	return false ;
+	return FReducerResults() ;
 }
 
 #undef LOCTEXT_NAMESPACE

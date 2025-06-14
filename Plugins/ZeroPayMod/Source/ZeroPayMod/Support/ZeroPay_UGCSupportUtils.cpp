@@ -85,9 +85,13 @@ TArray<FString> AZeroPay_UGCSupportUtils::GetUGCFoldersAsNumbers()
 	TArray<FString> SubFolders;
 	AssetRegistryModule.Get().GetSubPaths(RootPath, SubFolders, false);
 
+	UE_LOG(LogTemp, Display, TEXT("------------------------------------------------- Found folders %d."), SubFolders.Num());
+
 	for (const FString& FolderPath : SubFolders)
 	{
 		FString FolderName = FPaths::GetCleanFilename(FolderPath); // e.g. "UGC123"
+
+		UE_LOG(LogTemp, Display, TEXT("------------------------------------------------- folders %s."), *FolderName);
 
 		if (FolderName.StartsWith(TEXT("UGC")) && FolderName.Len() > 3)
 		{
