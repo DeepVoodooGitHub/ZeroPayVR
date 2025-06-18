@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "ZeroPayEditorButtonsPlugin.h"
 #include "ZeroPayEditorButtonsPluginStyle.h"
@@ -30,6 +30,18 @@
 #include "GameFramework/Actor.h"
 #include "Components/PrimitiveComponent.h"
 #include "FileHelpers.h" 
+#include "ZeroPayEditor_Reducer_Zone.h"
+#include "ZeroPayEditor_Reducer_PlayerZone.h"
+#include "EngineUtils.h"
+#include "Components/StaticMeshComponent.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "PhysicsEngine/AggregateGeom.h"
+#include "PhysicsEngine/BoxElem.h"
+#include "PhysicsEngine/SphereElem.h"
+#include "PhysicsEngine/SphylElem.h"
+#include "PhysicsEngine/ConvexElem.h"
+#include "Engine/StaticMesh.h"
+#include "Logging/LogMacros.h"
 
 FReducerResults FZeroPayEditorButtonsPluginModule::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
@@ -80,11 +92,14 @@ FReducerResults FZeroPayEditorButtonsPluginModule::ReducePCVRLevelForQuest3(UZer
 	SlowTask.MakeDialog();
 
 	/* >>> Delete old things */
-	bool bDeletionSuccess = DeleteActorsAndAssets(dataAsset->Definition.quest3level->PersistentLevel, *ReducedAssetMeshPath);
-	if (!bDeletionSuccess)
+	if (!reducerSettings->MeshReductionSettings.bDryRun)
 	{
-		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, failed to delete existing Quest 3 level 'ReducedAssets' folder and/or the merged assets located under the 'UGC/Levels/ReducedAssets' folder"));
-		return returnValue;
+		bool bDeletionSuccess = DeleteActorsAndAssets(dataAsset->Definition.quest3level->PersistentLevel, *ReducedAssetMeshPath);
+		if (!bDeletionSuccess)
+		{
+			EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, failed to delete existing Quest 3 level 'ReducedAssets' folder and/or the merged assets located under the 'UGC/Levels/ReducedAssets' folder"));
+			return returnValue;
+		}
 	}
 
 	/* Info */
@@ -107,46 +122,44 @@ FReducerResults FZeroPayEditorButtonsPluginModule::ReducePCVRLevelForQuest3(UZer
 	if (runtimeSettings.bStage1_ShowVisualDebug)
 		DrawDebugBox(GEditor->GetEditorWorldContext().World(), MaxBoundingBox.GetCenter(), MaxBoundingBox.GetExtent(), FColor::Blue, false, runtimeSettings.fStage1_VisualDebugDuration, 0, 5.0f);
 
-	/* Check it's not MASSIVE */
-	const FVector Min = MaxBoundingBox.Min;
-	const FVector Max = MaxBoundingBox.Max;
-
-	volatile  int32 CountX = FMath::CeilToInt((Max.X - Min.X) / reducerSettings->MeshReductionSettings.BoundingClusterSize);
-	volatile  int32 CountY = FMath::CeilToInt((Max.Y - Min.Y) / reducerSettings->MeshReductionSettings.BoundingClusterSize);
-	volatile  int32 CountZ = FMath::CeilToInt((Max.Z - Min.Z) / reducerSettings->MeshReductionSettings.BoundingClusterSize);
-
-	int64 OverflowCheckMultiplication = static_cast<int64>(CountX) * static_cast<int64>(CountY);
-	OverflowCheckMultiplication *= static_cast<int64>(CountZ);
-
-	UE_LOG(LogTemp, Display, TEXT("++++++++++++++++ OVERFLOW %d "), OverflowCheckMultiplication);
-
-	if (OverflowCheckMultiplication >= 2147483646)
-	{
-		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, when dividing your PCVR level into 'BoundingClusterSize' (as per the 'DA_Quest3_Reducer_Settings' dataset in the 'Game/ZeroPayMods/UGCxxxxxxx/Levels' directory) we ran out of memory. Please increase the 'BoundingClusterSize', or exclude actors which are too far away, or more then closer to the center"));
-		return returnValue;
-	}
-
 	/* >>> Break the world into chunks and returns all meshes in that chunk */
 
-	FVector ChunkSize(reducerSettings->MeshReductionSettings.BoundingClusterSize, reducerSettings->MeshReductionSettings.BoundingClusterSize, reducerSettings->MeshReductionSettings.BoundingClusterSize);
-	auto Chunks = PartitionActorsIntoBoundingBoxes(MaxBoundingBox, ChunkSize, PCVRLevel, returnValue);
+	FVector ChunkSize(reducerSettings->MeshReductionSettings.BoundingChunkSize, reducerSettings->MeshReductionSettings.BoundingChunkSize, reducerSettings->MeshReductionSettings.BoundingChunkSize);
+	auto Chunks = PartitionActorsIntoBoundingBoxes(MaxBoundingBox, ChunkSize, PCVRLevel, returnValue, reducerSettings);
 
-	if (runtimeSettings.bStage1_ShowVisualDebug)
+	/* >>> If we are supporting zoning, where meshes closer to the player get higher quality settings build some quick lookups */
+	if (reducerSettings->MeshReductionSettings.bEnablePlayerZoning)
 	{
-		for (const auto& Pair : Chunks)
+		bool bFoundZoning = false ;
+		PlayerZoneBounds.Empty();
+		for (TActorIterator<AZeroPayEditor_Reducer_PlayerZone> It(PCVRWorld); It; ++It)
 		{
-			const FBox& Box = Pair.Key;
-			const FVector Center = Box.GetCenter();
-			const FVector Extent = Box.GetExtent();
-
-			DrawDebugBox(GEditor->GetEditorWorldContext().World(), Center, Extent, FColor::Green, false, runtimeSettings.fStage1_VisualDebugDuration, 0, 2.0f);
+			AZeroPayEditor_Reducer_PlayerZone* Zone = *It;
+			if (Zone)
+			{
+				FBox Bounds = Zone->GetWorldBoundingBox();
+				if (Bounds.IsValid)
+				{
+					PlayerZoneBounds.Add(Bounds);
+					bFoundZoning = true;
+				}
+			}
+		}
+		if (!bFoundZoning)
+		{
+			EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, EnablePlayerZoning is turned on but could not find any AZeroPayEditor_Reducer_PlayerZone actors in PCVR level (make sure it's in the PCVR sub-level and not persistent, and that this layer is visible!)"));
+			return returnValue;
 		}
 	}
 
+	/* Info */
 	SlowTask.EnterProgressFrame(0.5f, FText::FromString(TEXT("Generated Quest 3 merged meshes and materials...")));
 
+	/* Remove all debug lines, we draw lots more.. */
+	FlushPersistentDebugLines(PCVRWorld);
+
 	/* >>> Merge actors within each cluster */
-	bool bSuccess = MergeMeshIslands(Chunks, 0.5f, *ReducedAssetMeshPath, dataAsset->Definition.quest3level, returnValue);
+	bool bSuccess = MergeMeshIslands(Chunks, 0.5f, *ReducedAssetMeshPath, dataAsset->Definition.quest3level, returnValue, reducerSettings, runtimeSettings);
 
 	/* >>> Save the changes */
 	UPackage* LevelPackage = dataAsset->Definition.quest3level->PersistentLevel->GetOutermost();
@@ -195,6 +208,13 @@ FBox FZeroPayEditorButtonsPluginModule::GetMaximumVisibleBoundingBox(ULevel* Lev
 	{
 		if (!Actor) continue;
 
+		// Check if it's the type you're looking for
+		if (AZeroPayEditor_Reducer_Zone* ReducerZone = Cast<AZeroPayEditor_Reducer_Zone>(Actor))
+		{
+			ShowNotification("The reducation operation has been limied to the 'zone' provided by ZeroPayEditor_Reducer_PlayerZone component inside the PCVR level, meshes outside this bounding box will be ignored.", SNotificationItem::ECompletionState::CS_Success) ;
+			return ReducerZone->GetWorldBoundingBox();
+		}
+
 		const FString ClassName = Actor->GetClass()->GetName();
 
 		bool bShouldIgnore = false;
@@ -232,16 +252,16 @@ FBox FZeroPayEditorButtonsPluginModule::GetMaximumVisibleBoundingBox(ULevel* Lev
 *
 */
 
-TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginModule::PartitionActorsIntoBoundingBoxes(const FBox& GlobalBounds, const FVector& ChunkSize, ULevel* Level, FReducerResults& returnValue)
+TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginModule::PartitionActorsIntoBoundingBoxes(const FBox& GlobalBounds, const FVector& ChunkSize, ULevel* Level, FReducerResults& returnValue, UZeroPayEditor_ReducerSettingsAsset* reducerSettings)
 {
+	int nDebugCount = 0;
 	TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> Results;
 
-	if (!Level || !ChunkSize.X || !ChunkSize.Y || !ChunkSize.Z)
+	if (!Level || ChunkSize.X <= 0 || ChunkSize.Y <= 0 || ChunkSize.Z <= 0)
 	{
 		return Results;
 	}
 
-	// Compute grid extents
 	const FVector Min = GlobalBounds.Min;
 	const FVector Max = GlobalBounds.Max;
 
@@ -249,51 +269,53 @@ TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginMo
 	const int32 CountY = FMath::CeilToInt((Max.Y - Min.Y) / ChunkSize.Y);
 	const int32 CountZ = FMath::CeilToInt((Max.Z - Min.Z) / ChunkSize.Z);
 
-	// Pre-allocate grid of bounds
-	TArray<FBox> GridBoxes;
-	GridBoxes.Reserve(CountX * CountY * CountZ);
+	// Map FlatIndex → Results array index
+	TMap<int32, int32> IndexMap;
 
-	for (int32 x = 0; x < CountX; ++x)
-	{
-		for (int32 y = 0; y < CountY; ++y)
-		{
-			for (int32 z = 0; z < CountZ; ++z)
-			{
-				const FVector BoxMin = Min + FVector(x, y, z) * ChunkSize;
-				const FVector BoxMax = BoxMin + ChunkSize;
-				GridBoxes.Add(FBox(BoxMin, BoxMax));
-			}
-		}
-	}
-
-	// Create output structure matching each FBox to a component array
-	Results.SetNum(GridBoxes.Num());
-	for (int32 i = 0; i < GridBoxes.Num(); ++i)
-	{
-		Results[i].Key = GridBoxes[i];
-		Results[i].Value = TArray<UStaticMeshComponent*>();
-	}
-
-	// Scan actors and assign their components to correct cells
 	for (AActor* Actor : Level->Actors)
 	{
 		if (!Actor) continue;
 
-		const FVector ActorBoundsCenter = Actor->GetComponentsBoundingBox().GetCenter();
+		const FVector Center = Actor->GetComponentsBoundingBox(true, false).GetCenter();
 
-		// Determine grid cell index this actor belongs to
-		int32 x = FMath::FloorToInt((ActorBoundsCenter.X - Min.X) / ChunkSize.X);
-		int32 y = FMath::FloorToInt((ActorBoundsCenter.Y - Min.Y) / ChunkSize.Y);
-		int32 z = FMath::FloorToInt((ActorBoundsCenter.Z - Min.Z) / ChunkSize.Z);
+		int32 x = FMath::FloorToInt((Center.X - Min.X) / ChunkSize.X);
+		int32 y = FMath::FloorToInt((Center.Y - Min.Y) / ChunkSize.Y);
+		int32 z = FMath::FloorToInt((Center.Z - Min.Z) / ChunkSize.Z);
 
-		// Clamp to valid range
 		if (x < 0 || y < 0 || z < 0 || x >= CountX || y >= CountY || z >= CountZ)
 			continue;
 
 		const int32 FlatIndex = x * CountY * CountZ + y * CountZ + z;
 
-		if (!Results.IsValidIndex(FlatIndex)) continue;
-		/* Stats */
+		/* Validate array is not going to be too large */
+		constexpr int32 MaxBytes = MAX_int32; 
+		constexpr int32 ApproxBytesPerEntry = 24;
+		constexpr int32 MaxSafeEntries = MaxBytes / ApproxBytesPerEntry;
+
+		if (IndexMap.Num() >= MaxSafeEntries)
+		{
+			EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, when dividing your PCVR level into 'BoundingChunkSize' (as per the 'DA_Quest3_Reducer_Settings' dataset in the 'Game/ZeroPayMods/UGCxxxxxxx/Levels' directory) we ran out of memory. Please INCREASE the 'BoundingChunkSize', or exclude actors which are too far away, or more then closer to the center"));
+			return TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>();
+		}
+
+		// Create new entry only if needed
+		int32 ResultIndex = -1;
+		if (!IndexMap.Contains(FlatIndex))
+		{
+			const FVector BoxMin = Min + FVector(x, y, z) * ChunkSize;
+			const FVector BoxMax = BoxMin + ChunkSize;
+			const FBox ChunkBox(BoxMin, BoxMax);
+
+			ResultIndex = Results.Num();
+			Results.Add(TPair<FBox, TArray<UStaticMeshComponent*>>(ChunkBox, TArray<UStaticMeshComponent*>()));
+			IndexMap.Add(FlatIndex, ResultIndex);
+		}
+		else
+		{
+			ResultIndex = IndexMap[FlatIndex];
+		}
+
+		// Stats
 		returnValue.OriginalActorCount++;
 
 		for (UActorComponent* Comp : Actor->GetComponents())
@@ -302,20 +324,51 @@ TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginMo
 			{
 				if (MeshComponent->IsRegistered())
 				{
-					Results[FlatIndex].Value.Add(MeshComponent);
+					Results[ResultIndex].Value.Add(MeshComponent);
 
-					/* Stats */
-					UStaticMesh* Mesh = MeshComponent->GetStaticMesh();
-					if (Mesh && Mesh->GetRenderData())
+					if (UStaticMesh* Mesh = MeshComponent->GetStaticMesh())
 					{
-						const FStaticMeshLODResources& LOD0 = Mesh->GetRenderData()->LODResources[0];
-						returnValue.OriginalTriangleCount += LOD0.GetNumTriangles();
-						returnValue.OriginalVertexCount += LOD0.GetNumVertices();
-						returnValue.OriginalMaterialCount += Mesh->GetStaticMaterials().Num();
+						if (const FStaticMeshRenderData* RenderData = Mesh->GetRenderData())
+						{
+							const FStaticMeshLODResources& LOD0 = RenderData->LODResources[0];
+							returnValue.OriginalTriangleCount += LOD0.GetNumTriangles();
+							returnValue.OriginalVertexCount += LOD0.GetNumVertices();
+							returnValue.OriginalMaterialCount += Mesh->GetStaticMaterials().Num();
+						}
 					}
 				}
 			}
 		}
+	}
+
+	int32 nCounter = 0;
+	bool bBadMeshChunking = false ;
+	for (const TPair<FBox, TArray<UStaticMeshComponent*>>& Pair : Results)
+	{
+		int32 MaxCount = Pair.Value.Num();
+		nCounter++;
+		/* Check we aren't adding loads of meshes, i.e. the chunk size is too small */
+		if (MaxCount > reducerSettings->MeshReductionSettings.MaxMeshesPerChunk)
+		{
+			bBadMeshChunking = true;
+			UE_LOG(LogTemp, Error, TEXT("PartitionActorsIntoBoundingBoxes failed, following box area had %d meshes in that chunk (%d allowed, as specified in 'DA_Quest3_Reducer_Settings' dataset in the 'Game/ZeroPayMods/UGCxxxxxxx/Levels' directory)"), MaxCount, reducerSettings->MeshReductionSettings.MaxMeshesPerChunk);
+			const FBox& Box = Pair.Key;
+			UE_LOG(LogTemp, Error, TEXT("     + Box Center: %s | Extent: %s"), *Box.GetCenter().ToString(), *Box.GetExtent().ToString());
+			if (reducerSettings->MeshReductionSettings.bShowBadMaxMeshChunks)
+			{
+				DrawDebugBox(GEditor->GetEditorWorldContext().World(), Box.GetCenter(), Box.GetExtent(), FColor::Red, true, 15.0f, 0, 4.0f);
+				
+			};
+		}
+	}
+
+	/* Log */
+	UE_LOG(LogTemp, Log, TEXT("PartitionActorsIntoBoundingBoxes scanned %d chunks"), nCounter);
+
+	if (bBadMeshChunking)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, when dividing your PCVR level into 'BoundingChunkSize' (as per the 'DA_Quest3_Reducer_Settings' dataset in the 'Game/ZeroPayMods/UGCxxxxxxx/Levels' directory) we found too many meshes in a single chunk. See 'Output Log' for more details, or enable 'bShowBadMaxMeshChunks' in data asset -OR- DECREASE the 'BoundingChunkSize'"));
+		return TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>();
 	}
 
 	return Results;
@@ -327,7 +380,7 @@ TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> FZeroPayEditorButtonsPluginMo
 *
 */
 
-bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath, TSoftObjectPtr<UWorld> Quest3World, FReducerResults& returnValue)
+bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath, TSoftObjectPtr<UWorld> Quest3World, FReducerResults& returnValue, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {
 	// Count how many merge operations we'll perform
 	const int32 nMergeCount = ClusteredIslands.Num();
@@ -361,15 +414,81 @@ bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TArray<TPair<FBox
 		if (IslandGroup.Num() == 0)
 			continue;
 
-		const FString PackageName = FString::Printf(TEXT("%s/Merged_Island_%05d"), *TargetFolderPath, nMergeIndex);
+		FZeroPayEditor_MeshReductionZone* reductionZoneSettings = nullptr;
+		int32 ZoneSettingsID = 0;
+		if (reducerSettings->MeshReductionSettings.bEnablePlayerZoning)
+		{			
+			const FBox& ClusterBox = Pair.Key;
 
-		MergeMesh(IslandGroup, PackageName, Quest3World.Get(), returnValue);
+			//UE_LOG(LogTemp, Error, TEXT("---- Box Center: %s | Extent: %s"), *PlayerZoneBounds[0].GetCenter().ToString(), *ClusterBox.GetCenter().ToString());
+
+			/* Find the distance from any player zone to this box */
+			float ClosestDistance = TNumericLimits<float>::Max();
+			for (const FBox& ZoneBox : PlayerZoneBounds)
+			{
+				float Distance = BoxSurfaceDistance(ClusterBox, ZoneBox);
+				if (Distance < ClosestDistance)
+				{
+					ClosestDistance = Distance;
+				}
+			}
+
+			//UE_LOG(LogTemp, Display, TEXT("--- ClosestDistance %.2f... "), ClosestDistance);
+
+			/* Pick settings based on distance  */
+			if (ClosestDistance < reducerSettings->MeshReductionSettings.PlayerZone1_Settings.ZoneDistance)
+			{
+				reductionZoneSettings = &reducerSettings->MeshReductionSettings.PlayerZone1_Settings;
+				ZoneSettingsID = 1;
+			}
+			else
+				if (ClosestDistance < (reducerSettings->MeshReductionSettings.PlayerZone1_Settings.ZoneDistance + reducerSettings->MeshReductionSettings.PlayerZone2_Settings.ZoneDistance))
+				{
+					reductionZoneSettings = &reducerSettings->MeshReductionSettings.PlayerZone2_Settings;
+					ZoneSettingsID = 2 ;
+				}
+				else
+				{
+					reductionZoneSettings = &reducerSettings->MeshReductionSettings.PlayerZone3_Settings;
+					ZoneSettingsID = 3;
+				}
+		}
+
+		/* Show debug? */
+		if (runtimeSettings.bStage1_ShowVisualDebug)
+		{
+			const FBox& Box = Pair.Key;
+			const FVector Center = Box.GetCenter();
+			const FVector Extent = Box.GetExtent();
+			FColor Color = FColor::Green ; 
+			switch (ZoneSettingsID)
+			{
+				case 1:
+					Color = FColor::Green;
+					break;
+				case 2:
+					Color = FColor(255, 165, 0); // Orange (not predefined)
+					break;
+				case 3:
+					Color = FColor::Red;
+					break;
+				default:
+					Color = FColor::White; // Fallback color
+					break;
+			}
+			DrawDebugBox(GEditor->GetEditorWorldContext().World(), Center, Extent, Color, false, runtimeSettings.fStage1_VisualDebugDuration, 0, 2.0f);
+		}
+
+
+		const FString PackageName = FString::Printf(TEXT("%s/Merged_Island_%05d"), *TargetFolderPath, nMergeIndex);
+		if (!reducerSettings->MeshReductionSettings.bDryRun)
+			MergeMesh(IslandGroup, PackageName, Quest3World.Get(), reductionZoneSettings, returnValue);
 	}
 
 	return true;
 }
 
-bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World, FReducerResults& returnValue)
+bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World, FZeroPayEditor_MeshReductionZone* reductionZoneSettings, FReducerResults& returnValue)
 {
 	const IMeshMergeUtilities& MeshUtilities = FModuleManager::Get().LoadModuleChecked<IMeshMergeModule>("MeshMergeUtilities").GetUtilities();
 	TArray<UObject*> AssetsToSync;
@@ -379,8 +498,7 @@ bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshCompon
 	SlowTask.MakeDialog();
 
 	// Extracting static mesh components from the selected mesh components in the dialog
-	TArray<UStaticMeshComponent*> StaticMeshComponentsToMerge;
-
+	StaticMeshComponentsToMerge.Empty() ;
 	for (UStaticMeshComponent* SelectedComponent : SelectedComponents)
 	{
 		// Determine whether or not this component should be incorporated according the user settings
@@ -405,7 +523,7 @@ bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshCompon
 
 		FCreateProxyDelegate ProxyDelegate;
 		ProxyDelegate.BindLambda(
-			[&NewAssetsToSync](const FGuid Guid, TArray<UObject*>& InAssetsToSync)
+			[&NewAssetsToSync, this](const FGuid Guid, TArray<UObject*>& InAssetsToSync)
 			{
 				//Update the asset registry that a new static mash and material has been created
 				if (InAssetsToSync.Num())
@@ -414,6 +532,7 @@ bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshCompon
 					int32 AssetCount = InAssetsToSync.Num();
 					for (int32 AssetIndex = 0; AssetIndex < AssetCount; AssetIndex++)
 					{
+						/* Register with editor */
 						AssetRegistry.AssetCreated(InAssetsToSync[AssetIndex]);
 						GEditor->BroadcastObjectReimported(InAssetsToSync[AssetIndex]);
 					}
@@ -432,10 +551,36 @@ bool FZeroPayEditorButtonsPluginModule::MergeMesh(const TArray<UStaticMeshCompon
 		{
 			FGuid JobGuid = FGuid::NewGuid();
 			FMeshProxySettings Settings;
+			Settings.bCreateCollision = false;
+			Settings.bGenerateLightmapUVs = true;
+			Settings.bComputeLightMapResolution = true;
+			Settings.bReuseMeshLightmapUVs = true;
+			/* If a zone has been supplied, alter settings to reflect it */
+			if (reductionZoneSettings)
+			{
+				Settings.MergeDistance = reductionZoneSettings->MergeDistance;
+				Settings.ScreenSize = reductionZoneSettings->ScreenSize;
+			}
 			MeshMergeUtilities.CreateProxyMesh(StaticMeshComponentsToMerge, Settings, nullptr, PackageName, JobGuid, ProxyDelegate);
 		}
 
+		GEngine->ForceGarbageCollection(true) ;
+
+		int32 AssetCount = NewAssetsToSync.Num() ;
+		for (int32 AssetIndex = 0; AssetIndex < AssetCount; AssetIndex++)
+		{
+			/* If static mesh? Merge in collision data at this point */
+			if (UStaticMesh* StaticMesh = Cast<UStaticMesh>(NewAssetsToSync[AssetIndex]))
+			{
+				MergeCollisionFromComponents(StaticMeshComponentsToMerge, StaticMesh);
+
+				StaticMesh->MarkPackageDirty();
+				StaticMesh->Modify();
+			}
+		}
+
 		PlaceMeshProxyInQuest3Level(NewAssetsToSync, targetQuest3World->PersistentLevel, returnValue);
+		NewAssetsToSync.Empty() ;
 	}
 
 	return true;
@@ -481,84 +626,6 @@ void FZeroPayEditorButtonsPluginModule::PlaceMeshProxyInQuest3Level(TArray<UObje
 
 	}
 }
-
-/********************************************************************************************************/
-/*                                           DEBUG FUNCTIONS                                            */
-/********************************************************************************************************/
-
-void FZeroPayEditorButtonsPluginModule::DrawClusterDebugBoxes(const TMap<UStaticMesh*, TArray<TArray<UStaticMeshComponent*>>>& ClusteredGroups, UWorld* World, float Lifetime)
-{
-	if (!World) return;
-
-	int32 ClusterIndexGlobal = 0;
-
-	for (const auto& Group : ClusteredGroups)
-	{
-		UStaticMesh* Mesh = Group.Key;
-		const TArray<TArray<UStaticMeshComponent*>>& Clusters = Group.Value;
-
-		for (const TArray<UStaticMeshComponent*>& Cluster : Clusters)
-		{
-			if (Cluster.Num() == 0) continue;
-
-			// Compute combined bounding box of the cluster
-			FBox ClusterBox(EForceInit::ForceInit);
-			for (UStaticMeshComponent* Comp : Cluster)
-			{
-				if (Comp)
-				{
-					ClusterBox += Comp->Bounds.GetBox();
-				}
-			}
-
-			// Draw cluster box (blue)
-			DrawDebugBox(
-				World,
-				ClusterBox.GetCenter(),
-				ClusterBox.GetExtent(),
-				FColor::Blue,
-				false,
-				Lifetime,
-				0,
-				2.0f
-			);
-
-			// Optional: Label cluster
-			DrawDebugString(
-				World,
-				ClusterBox.GetCenter() + FVector(0, 0, 30),
-				FString::Printf(TEXT("Cluster %d\nMesh: %s"),
-					ClusterIndexGlobal++,
-					*Mesh->GetName()),
-				nullptr,
-				FColor::White,
-				Lifetime,
-				false,
-				1.5f
-			);
-
-			// Draw individual mesh component boxes (green)
-			for (UStaticMeshComponent* Comp : Cluster)
-			{
-				if (!Comp) continue;
-
-				const FBox CompBox = Comp->Bounds.GetBox();
-
-				DrawDebugBox(
-					World,
-					CompBox.GetCenter(),
-					CompBox.GetExtent(),
-					FColor::Green,
-					false,
-					Lifetime,
-					0,
-					0.5f
-				);
-			}
-		}
-	}
-}
-
 
 /********************************************************************************************************/
 /*                                          SUPPORT FUNCTIONS                                           */
@@ -694,6 +761,160 @@ bool FZeroPayEditorButtonsPluginModule::DeleteActorsAndAssets(ULevel* TargetLeve
 	return true;
 }
 
+
+float FZeroPayEditorButtonsPluginModule::BoxSurfaceDistance(const FBox& A, const FBox& B)
+{
+	if (A.Intersect(B))
+	{
+		return 0.0f;
+	}
+
+	FVector Dist(0);
+
+	// For each axis, compute the gap between the two boxes
+	for (int i = 0; i < 3; ++i)
+	{
+		if (A.Max[i] < B.Min[i])
+			Dist[i] = B.Min[i] - A.Max[i];
+		else if (B.Max[i] < A.Min[i])
+			Dist[i] = A.Min[i] - B.Max[i];
+		else
+			Dist[i] = 0.0f; // Overlap on this axis
+	}
+
+	// Return Euclidean distance
+	return Dist.Size();
+}
+
+void FZeroPayEditorButtonsPluginModule::MergeCollisionFromComponents(const TArray<UStaticMeshComponent*>& Components, UStaticMesh* OutMergedMesh)
+{
+	if (!OutMergedMesh)
+		return;
+
+	OutMergedMesh->CreateBodySetup();
+	UBodySetup* MergedBodySetup = OutMergedMesh->GetBodySetup();
+	MergedBodySetup->AggGeom = FKAggregateGeom(); // Clear any existing
+
+	bool bHasSimple = false;
+	bool bHasComplex = false;
+
+	for (UStaticMeshComponent* Comp : Components)
+	{
+		if (!Comp || !Comp->GetStaticMesh())
+			continue;
+
+		UBodySetup* SourceBodySetup = Comp->GetStaticMesh()->GetBodySetup();
+		if (!SourceBodySetup)
+			continue;
+
+		// Sphere Colliders - Add spheres with component transform offsets
+		const FKAggregateGeom& AggGeom = SourceBodySetup->AggGeom;
+		for (const FKSphereElem& Sphere : SourceBodySetup->AggGeom.SphereElems)
+		{
+			FTransform CompToMerged = Comp->GetComponentTransform();
+
+			// Transform the center
+			FVector NewCenter = CompToMerged.TransformPosition(Sphere.Center);
+
+			// Uniform scaling approximation (avoids distortion from non-uniform scale)
+			FVector CompScale = CompToMerged.GetScale3D();
+			float UniformScale = CompScale.GetMax(); // Or average: (X+Y+Z)/3.0f
+
+			FKSphereElem NewSphere = Sphere;
+			NewSphere.Center = NewCenter;
+			NewSphere.Radius *= UniformScale;
+
+			MergedBodySetup->AggGeom.SphereElems.Add(NewSphere);
+		}
+
+		// Sphy Colliders - Add with local to mesh space
+		for (const FKSphylElem& Sphyl : AggGeom.SphylElems)
+		{
+			FTransform CompToMerged = Comp->GetComponentTransform();
+
+			// Transform center
+			FVector NewCenter = CompToMerged.TransformPosition(Sphyl.Center);
+
+			// Transform rotation
+			FQuat NewRotation = CompToMerged.GetRotation() * Sphyl.Rotation.Quaternion();
+
+			// Uniform scale for radius/length
+			FVector Scale = CompToMerged.GetScale3D();
+			float UniformScale = Scale.GetMax(); // or average
+
+			FKSphylElem NewSphyl = Sphyl;
+			NewSphyl.Center = NewCenter;
+			NewSphyl.Rotation = NewRotation.Rotator();
+			NewSphyl.Radius *= UniformScale;
+			NewSphyl.Length *= UniformScale;
+
+			MergedBodySetup->AggGeom.SphylElems.Add(NewSphyl);
+		}
+
+		// Convex colliders - Add with local mesh space
+		for (const FKConvexElem& Convex : AggGeom.ConvexElems)
+		{
+			FTransform CompToMerged = Comp->GetComponentTransform();
+
+			FKConvexElem NewConvex;
+
+			// Transform each vertex
+			for (const FVector& Vertex : Convex.VertexData)
+			{
+				FVector TransformedVertex = CompToMerged.TransformPosition(Vertex);
+				NewConvex.VertexData.Add(TransformedVertex);
+			}
+			NewConvex.UpdateElemBox();           
+
+			MergedBodySetup->AggGeom.ConvexElems.Add(NewConvex);
+		}
+
+		// Box Colliders - Add boxes but recenter boxes from local to mesh space
+		FTransform SourceToMerged = Comp->GetComponentTransform() ;
+		for (const FKBoxElem& Box : AggGeom.BoxElems)
+		{
+			// Convert box center and orientation to merged space
+			FVector NewCenter = SourceToMerged.TransformPosition(Box.Center);
+			FQuat NewRot = SourceToMerged.GetRotation() * Box.Rotation.Quaternion();
+
+			FKBoxElem NewBox = Box;
+			NewBox.Center = NewCenter;
+			NewBox.Rotation = NewRot.Rotator(); // UE uses FRotator here
+
+			MergedBodySetup->AggGeom.BoxElems.Add(NewBox);
+		}
+
+		// Track what type of collision was used
+		ECollisionTraceFlag TraceFlag = SourceBodySetup->CollisionTraceFlag;
+
+		if (TraceFlag == CTF_UseSimpleAsComplex)
+			bHasSimple = true;
+		else if (TraceFlag == CTF_UseComplexAsSimple)
+			bHasComplex = true;
+	}
+
+	// We use default, unless ANY of the meshes use something else..
+	MergedBodySetup->CollisionTraceFlag = CTF_UseDefault;
+	if (bHasSimple && bHasComplex)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Merged mesh has mixed collision modes (simple and complex). Using complex."));
+		MergedBodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
+	}
+	else if (bHasComplex)
+	{
+		MergedBodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
+	}
+	else if (bHasSimple)
+	{
+		MergedBodySetup->CollisionTraceFlag = CTF_UseSimpleAsComplex;
+	}
+
+	// Regenerate physics data
+	MergedBodySetup->InvalidatePhysicsData();
+	MergedBodySetup->CreatePhysicsMeshes();
+}
+
+
 void FZeroPayEditorButtonsPluginModule::UpdateQuest3ReducerUIProgressField()
 {
 	// Post result back to main thread safely
@@ -724,4 +945,5 @@ void FZeroPayEditorButtonsPluginModule::UpdateQuest3ReducerUIProgressField()
 			WidgetQuest3ReducerInstance->ProcessEvent(Func, &Params);
 		});
 }
+
 

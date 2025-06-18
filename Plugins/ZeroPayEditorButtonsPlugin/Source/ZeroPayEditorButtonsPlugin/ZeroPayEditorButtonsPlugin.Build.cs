@@ -31,7 +31,8 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
 				"Slate", 
 				"SlateCore", 
 				"UMG",
-                "EditorWidgets"
+                "EditorWidgets",
+                "GPULightmass"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
@@ -64,7 +65,8 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
 				"StaticMeshDescription",
                 "ContentBrowser",
 				"EditorSubsystem",
-                "EditorScriptingUtilities"
+                "EditorScriptingUtilities",
+                "GPULightmass"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );

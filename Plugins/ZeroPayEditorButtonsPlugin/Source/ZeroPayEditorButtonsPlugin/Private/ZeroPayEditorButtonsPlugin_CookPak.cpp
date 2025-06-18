@@ -97,7 +97,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_Definitio
 	ProjectCookedPath_Windows += "Cooked/Windows/" + FString(FApp::GetProjectName()) + "/Content";
 	FString PakFileName_Windows = "Windows.pak";
 	FString CookedPakLocation_Windows = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakLocation_Windows += "Workshop/" + PakFileName_Windows;
+	CookedPakLocation_Windows += "Workshop/Windows/" + PakFileName_Windows;
 	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	CookedPakListFilePath += "custommap_paklist.txt";
 
@@ -210,7 +210,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 	ProjectCookedPath_Android += "Cooked/Android/" + FString(FApp::GetProjectName()) + "/Content";
 	FString PakFileName_Android = "Android.pak";
 	FString CookedPakLocation_Android = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakLocation_Android += "Workshop/" + PakFileName_Android;
+	CookedPakLocation_Android += "Workshop/Android/" + PakFileName_Android;
 	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	CookedPakListFilePath += "custommap_paklist.txt";
 
@@ -319,7 +319,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 	ProjectCookedPath_LinuxServer += "Cooked/LinuxServer/" + FString(FApp::GetProjectName()) + "/Content";
 	FString PakFileName_LinuxServer = "LinuxServer.pak";
 	FString CookedPakLocation_LinuxServer = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	CookedPakLocation_LinuxServer += "Workshop/" + PakFileName_LinuxServer;
+	CookedPakLocation_LinuxServer += "Workshop/LinuxServer/" + PakFileName_LinuxServer;
 	FString CookedPakListFilePath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	CookedPakListFilePath += "custommap_paklist.txt";
 

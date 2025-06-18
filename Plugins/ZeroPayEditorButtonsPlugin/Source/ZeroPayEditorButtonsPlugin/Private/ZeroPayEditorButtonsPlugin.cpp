@@ -21,12 +21,12 @@
 #include "Widgets/Layout/SBox.h"
 #include "HAL/PlatformProcess.h"
 #include "Misc/Paths.h"
-#include "Misc/OutputDeviceNull.h"
 #include "Windows/WindowsPlatformProcess.h"
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include <windows.h>
 #include "Windows/HideWindowsPlatformTypes.h"
 #include "Subsystems/AssetEditorSubsystem.h"
+#include "IBlutilityModule.h"
 
 static const FName ZeroPayEditorButtonsPluginTabName("ZeroPayEditorButtonsPlugin");
 
@@ -44,13 +44,23 @@ void FZeroPayEditorButtonsPluginModule::StartupModule()
 	PluginCommands = MakeShareable(new FUICommandList);
 
 	PluginCommands->MapAction(
-		FZeroPayEditorButtonsPluginCommands::Get().GenerateQuest3ReducedLevel,
-		FExecuteAction::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::GenerateQuest3ReducedLevel_Clicked),
+		FZeroPayEditorButtonsPluginCommands::Get().ShowQuest3View,
+		FExecuteAction::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::ShowQuest3View_Clicked),
 		FCanExecuteAction());
-
+	
 	PluginCommands->MapAction(
 		FZeroPayEditorButtonsPluginCommands::Get().ShowPCVRView,
 		FExecuteAction::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::ShowPCVRView_Clicked),
+		FCanExecuteAction());
+
+	PluginCommands->MapAction(
+		FZeroPayEditorButtonsPluginCommands::Get().BakeLightsOnLevels,
+		FExecuteAction::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::BakeLightsOnLevels_Clicked),
+		FCanExecuteAction());
+
+	PluginCommands->MapAction(
+		FZeroPayEditorButtonsPluginCommands::Get().GenerateQuest3ReducedLevel,
+		FExecuteAction::CreateRaw(this, &FZeroPayEditorButtonsPluginModule::GenerateQuest3ReducedLevel_Clicked),
 		FCanExecuteAction());
 
 	PluginCommands->MapAction(
@@ -90,64 +100,95 @@ void FZeroPayEditorButtonsPluginModule::ShutdownModule()
 TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnModManagementDockableTab(const FSpawnTabArgs& Args)
 {
 	FString WidgetPath = TEXT("/ZeroPayEditorPlugin/Blueprints/EUW_ZP_ModioWindow.EUW_ZP_ModioWindow");
-	UEditorUtilityWidgetBlueprint* WidgetBP = Cast<UEditorUtilityWidgetBlueprint>(
-		StaticLoadObject(UEditorUtilityWidgetBlueprint::StaticClass(), nullptr, *WidgetPath));
+	UEditorUtilityWidgetBlueprint* WidgetBP = Cast<UEditorUtilityWidgetBlueprint>(StaticLoadObject(UEditorUtilityWidgetBlueprint::StaticClass(), nullptr, *WidgetPath));
 
 	WidgetModManagementInstance = nullptr;
-
-	if (WidgetBP && WidgetBP->GeneratedClass)
+	if (UEditorUtilitySubsystem* EditorUtilitySubsystem = GEditor->GetEditorSubsystem<UEditorUtilitySubsystem>())
 	{
-		WidgetModManagementInstance = NewObject<UEditorUtilityWidget>(GetTransientPackage(), WidgetBP->GeneratedClass);
-		WidgetModManagementInstance->AddToRoot(); // Prevent GC
+		WidgetModManagementInstance = EditorUtilitySubsystem->SpawnAndRegisterTab(WidgetBP);
+
 	}
+
+	TabName = FName(*FString::Printf(TEXT("EditorUtilityTab_%s"), *WidgetBP->GetName()));
+
+	// Defer to next tick to allow the tab to actually spawn
+	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float DeltaTime)
+		{
+			ModManagementDockTab = FGlobalTabmanager::Get()->FindExistingLiveTab(TabName);
+			if (ModManagementDockTab.IsValid())
+			{
+				ModManagementDockTab->SetCanCloseTab(SDockTab::FCanCloseTab::CreateLambda([this]()
+					{
+						/* During development, changes to the editor utility BP can cause the instance to disappear */
+						if (WidgetModManagementInstance == nullptr)
+							return true;
+						if (!IsValid(WidgetModManagementInstance))
+							return true;
+
+						/* Find the function inside the widget to see if we can close the window (i.e. no operation is running) */
+						UFunction* Func = WidgetModManagementInstance->FindFunction("IsOperationRunning");
+						if (Func)
+						{
+							struct { bool ReturnValue;  FString Message; } Params;
+							WidgetModManagementInstance->ProcessEvent(Func, &Params);
+							bIsOperationRunning = Params.ReturnValue;
+							ClosurePreventationMessage = Params.Message;
+						}
+
+						/* If an operation is running, show a 5 second "hint" as to why we can't close (like uploading..) */
+						if (bIsOperationRunning)
+						{
+							FNotificationInfo Info(FText::FromString(ClosurePreventationMessage));
+							Info.FadeInDuration = 0.2f;
+							Info.FadeOutDuration = 0.5f;
+							Info.ExpireDuration = 5.0f;
+							Info.bUseThrobber = false;
+							Info.bUseSuccessFailIcons = true;
+							Info.bUseLargeFont = false;
+
+							TSharedPtr<SNotificationItem> Notification = FSlateNotificationManager::Get().AddNotification(Info);
+							if (Notification.IsValid())
+							{
+								Notification->SetCompletionState(SNotificationItem::CS_Fail);
+							}
+						}
+						return !bIsOperationRunning;
+					}
+				));
+			}
+
+			return false;
+		}));
+
+#if 0
+//	if (WidgetBP && WidgetBP->GeneratedClass)
+//	{
+		//WidgetModManagementInstance = NewObject<UEditorUtilityWidget>(GetTransientPackage(), WidgetBP->GeneratedClass);
+		//W/idgetModManagementInstance->AddToRoot(); // Prevent GC
+	//}
 
 	TSharedRef<SDockTab> DockTab = SNew(SDockTab)
 		.TabRole(ETabRole::NomadTab)
 		.OnCanCloseTab_Lambda([this]()
 			{
-				/* During development, changes to the editor utility BP can cause the instance to disappear */
-				if (WidgetModManagementInstance == nullptr)
-					return true ;
-				if (!IsValid(WidgetModManagementInstance))
-					return true;
-
-				/* Find the function inside the widget to see if we can close the window (i.e. no operation is running) */
-				UFunction* Func = WidgetModManagementInstance->FindFunction("IsOperationRunning");
-				if (Func)
-				{
-					struct { bool ReturnValue;  FString Message; } Params;
-					WidgetModManagementInstance->ProcessEvent(Func, &Params);
-					bIsOperationRunning = Params.ReturnValue;
-					ClosurePreventationMessage = Params.Message;
-				}
-
-				/* If an operation is running, show a 5 second "hint" as to why we can't close (like uploading..) */
-				if (bIsOperationRunning)
-				{
-					FNotificationInfo Info(FText::FromString(ClosurePreventationMessage));
-					Info.FadeInDuration = 0.2f;
-					Info.FadeOutDuration = 0.5f;
-					Info.ExpireDuration = 5.0f;
-					Info.bUseThrobber = false;
-					Info.bUseSuccessFailIcons = true ;
-					Info.bUseLargeFont = false;
-
-					TSharedPtr<SNotificationItem> Notification = FSlateNotificationManager::Get().AddNotification(Info);
-					if (Notification.IsValid())
-					{
-						Notification->SetCompletionState(SNotificationItem::CS_Fail);
-					}
-				}
-				return !bIsOperationRunning; 
+			
 			});
 
 	if (WidgetModManagementInstance)
 	{
+
 		TSharedRef<SWidget> SlateWidget = WidgetModManagementInstance->TakeWidget();
 		DockTab->SetContent(SlateWidget);
-	}
 
-	return DockTab;
+
+		//BlutilityModule->
+		//IBlutilityModule* BlutilityModule = FModuleManager::GetModulePtr<IBlutilityModule>("Blutility");
+		//BlutilityModule->AddLoadedScriptUI(WidgetBP);
+
+	}
+#endif
+
+	return ModManagementDockTab.ToSharedRef() ;
 }
 
 TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnQuest3ReducerDockableTab(const FSpawnTabArgs& Args)
@@ -213,6 +254,13 @@ TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnQuest3ReducerDockab
 	return DockTab;
 }
 
+void FZeroPayEditorButtonsPluginModule::BakeLightsOnLevels_Clicked()
+{
+	PerformLightBake();
+
+
+}
+
 void FZeroPayEditorButtonsPluginModule::GenerateQuest3ReducedLevel_Clicked()
 {
 	/* Try and show the window */
@@ -229,8 +277,103 @@ void FZeroPayEditorButtonsPluginModule::GenerateQuest3ReducedLevel_Clicked()
 	}
 }
 
+
+void FZeroPayEditorButtonsPluginModule::ShowQuest3View_Clicked()
+{
+	/* Get persistent world */
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[ShowQuest3View_Clicked] failed to find persistent level"));
+		return;
+	}
+
+	/* Get the path to this level */
+	FString PersistentWorldPath = FPackageName::GetLongPackagePath(World->GetOutermost()->GetName());
+	/* Strip off "Levels" so we get path to definition file.. */
+	if (PersistentWorldPath.EndsWith("/Levels"))
+		PersistentWorldPath.LeftChopInline(7);
+	/* Add in defition file (we expect) */
+	PersistentWorldPath += "/ZeroPayDefinition";
+
+	/* Attempt to open the data asset */
+	UZeroPayMod_DefinitionDataAsset* DefinitionDataAsset = LoadObject<UZeroPayMod_DefinitionDataAsset>(nullptr, *PersistentWorldPath);
+	if (DefinitionDataAsset == nullptr)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::Format(FText::FromString("Error, could not find DefinitionDataAsset at path '{0}'"), FText::FromString(PersistentWorldPath)));
+		return;
+	}
+
+	pcvrLevelLightBake = DefinitionDataAsset->Definition.pcvrlevel.Get();
+	if (pcvrLevelLightBake == nullptr)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::Format(
+			FText::FromString("Error, could not find PCVR Level as specified in the DefinitionDataAsset at path '{0}'"),
+			FText::FromString(PersistentWorldPath)));
+		return;
+	}
+	quest3LevelLightBake = DefinitionDataAsset->Definition.quest3level.Get();
+	if (quest3LevelLightBake == nullptr)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::Format(
+			FText::FromString("Error, could not find Quest 3 Level as specified in the DefinitionDataAsset at path '{0}'"),
+			FText::FromString(PersistentWorldPath)));
+		return;
+	}
+
+	SetSpecificSublevelVisible(pcvrLevelLightBake, false);
+	SetSpecificSublevelVisible(quest3LevelLightBake, true);
+
+	ShowNotification("Quest 3 sub-level visible", SNotificationItem::ECompletionState::CS_Success);
+}
+
 void FZeroPayEditorButtonsPluginModule::ShowPCVRView_Clicked()
 {
+	/* Get persistent world */
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[ShowQuest3View_Clicked] failed to find persistent level"));
+		return;
+	}
+
+	/* Get the path to this level */
+	FString PersistentWorldPath = FPackageName::GetLongPackagePath(World->GetOutermost()->GetName());
+	/* Strip off "Levels" so we get path to definition file.. */
+	if (PersistentWorldPath.EndsWith("/Levels"))
+		PersistentWorldPath.LeftChopInline(7);
+	/* Add in defition file (we expect) */
+	PersistentWorldPath += "/ZeroPayDefinition";
+
+	/* Attempt to open the data asset */
+	UZeroPayMod_DefinitionDataAsset* DefinitionDataAsset = LoadObject<UZeroPayMod_DefinitionDataAsset>(nullptr, *PersistentWorldPath);
+	if (DefinitionDataAsset == nullptr)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::Format(FText::FromString("Error, could not find DefinitionDataAsset at path '{0}'"), FText::FromString(PersistentWorldPath)));
+		return;
+	}
+
+	pcvrLevelLightBake = DefinitionDataAsset->Definition.pcvrlevel.Get();
+	if (pcvrLevelLightBake == nullptr)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::Format(
+			FText::FromString("Error, could not find PCVR Level as specified in the DefinitionDataAsset at path '{0}'"),
+			FText::FromString(PersistentWorldPath)));
+		return;
+	}
+	quest3LevelLightBake = DefinitionDataAsset->Definition.quest3level.Get();
+	if (quest3LevelLightBake == nullptr)
+	{
+		EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::Format(
+			FText::FromString("Error, could not find Quest 3 Level as specified in the DefinitionDataAsset at path '{0}'"),
+			FText::FromString(PersistentWorldPath)));
+		return;
+	}
+
+	SetSpecificSublevelVisible(pcvrLevelLightBake, true);
+	SetSpecificSublevelVisible(quest3LevelLightBake, false);
+
+	ShowNotification("PCVR sub-level visible", SNotificationItem::ECompletionState::CS_Success);
 }
 
 void FZeroPayEditorButtonsPluginModule::OpenModIOWindow_Clicked()
@@ -259,8 +402,10 @@ void FZeroPayEditorButtonsPluginModule::RegisterMenus()
 		UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
 		{
 			FToolMenuSection& Section = Menu->FindOrAddSection("WindowLayout");
-			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().GenerateQuest3ReducedLevel, PluginCommands);
+			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().ShowQuest3View, PluginCommands);
 			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().ShowPCVRView, PluginCommands);
+			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().BakeLightsOnLevels, PluginCommands);			
+			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().GenerateQuest3ReducedLevel, PluginCommands);
 			Section.AddMenuEntryWithCommandList(FZeroPayEditorButtonsPluginCommands::Get().OpenModioWindow, PluginCommands);
 		}
 	}
@@ -270,10 +415,14 @@ void FZeroPayEditorButtonsPluginModule::RegisterMenus()
 		{
 			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("PluginTools");
 			{
-				FToolMenuEntry& GenerateQuest3ReducedLevel_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().GenerateQuest3ReducedLevel));
-				GenerateQuest3ReducedLevel_Entry.SetCommandList(PluginCommands);
+				FToolMenuEntry& ShowQuest3View_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().ShowQuest3View));
+				ShowQuest3View_Entry.SetCommandList(PluginCommands);
 				FToolMenuEntry& ShowPCVRView_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().ShowPCVRView));
 				ShowPCVRView_Entry.SetCommandList(PluginCommands);
+				FToolMenuEntry& BakeLightsOnLevels_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().BakeLightsOnLevels));
+				BakeLightsOnLevels_Entry.SetCommandList(PluginCommands);				
+				FToolMenuEntry& GenerateQuest3ReducedLevel_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().GenerateQuest3ReducedLevel));
+				GenerateQuest3ReducedLevel_Entry.SetCommandList(PluginCommands);
 				FToolMenuEntry& BakeMap_Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FZeroPayEditorButtonsPluginCommands::Get().OpenModioWindow));
 				BakeMap_Entry.SetCommandList(PluginCommands);
 			}
