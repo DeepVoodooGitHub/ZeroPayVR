@@ -292,8 +292,6 @@ private:
 	TSharedPtr<class FUICommandList> PluginCommands;
 	/* Window widget instances */
 	UEditorUtilityWidget* WidgetModManagementInstance;
-	TSharedPtr<SDockTab> ModManagementDockTab ;
-	FName TabName;
 	UEditorUtilityWidget* WidgetQuest3ReducerInstance;
 	/* >>> Cooking vars */
 	UZeroPayEditorCookPakOperationHandle* CookPakHandle;
@@ -316,6 +314,7 @@ private:
 	TSharedRef<SDockTab> SpawnQuest3ReducerDockableTab(const FSpawnTabArgs& Args);
 	void RegisterMenus();
 	void ShowTemporaryNotification(const FString& Message, float Duration = 2.0f);
+	TSharedPtr<SWidget> FindWidgetRecursive(TSharedPtr<SWidget> Root, TSharedRef<SWidget> Target) ;
 	FString FormatDataRateResponse(int64 BytesPerSecond) ;
 
 	/* --->>> Cooking logic <<<--- */

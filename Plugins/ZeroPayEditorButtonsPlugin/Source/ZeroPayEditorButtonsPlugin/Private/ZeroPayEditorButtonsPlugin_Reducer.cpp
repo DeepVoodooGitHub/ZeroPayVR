@@ -483,6 +483,8 @@ bool FZeroPayEditorButtonsPluginModule::MergeMeshIslands(const TArray<TPair<FBox
 		const FString PackageName = FString::Printf(TEXT("%s/Merged_Island_%05d"), *TargetFolderPath, nMergeIndex);
 		if (!reducerSettings->MeshReductionSettings.bDryRun)
 			MergeMesh(IslandGroup, PackageName, Quest3World.Get(), reductionZoneSettings, returnValue);
+		else
+			returnValue.bFailed = false;
 	}
 
 	return true;

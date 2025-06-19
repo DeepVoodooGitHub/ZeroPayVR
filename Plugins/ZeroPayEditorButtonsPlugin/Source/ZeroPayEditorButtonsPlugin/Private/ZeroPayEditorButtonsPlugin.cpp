@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "ZeroPayEditorButtonsPlugin.h"
 #include "ZeroPayEditorButtonsPluginStyle.h"
@@ -100,95 +100,75 @@ void FZeroPayEditorButtonsPluginModule::ShutdownModule()
 TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnModManagementDockableTab(const FSpawnTabArgs& Args)
 {
 	FString WidgetPath = TEXT("/ZeroPayEditorPlugin/Blueprints/EUW_ZP_ModioWindow.EUW_ZP_ModioWindow");
-	UEditorUtilityWidgetBlueprint* WidgetBP = Cast<UEditorUtilityWidgetBlueprint>(StaticLoadObject(UEditorUtilityWidgetBlueprint::StaticClass(), nullptr, *WidgetPath));
+	UEditorUtilityWidgetBlueprint* WidgetBP = Cast<UEditorUtilityWidgetBlueprint>(
+		StaticLoadObject(UEditorUtilityWidgetBlueprint::StaticClass(), nullptr, *WidgetPath));
 
 	WidgetModManagementInstance = nullptr;
-	if (UEditorUtilitySubsystem* EditorUtilitySubsystem = GEditor->GetEditorSubsystem<UEditorUtilitySubsystem>())
+
+	if (WidgetBP && WidgetBP->GeneratedClass)
 	{
-		WidgetModManagementInstance = EditorUtilitySubsystem->SpawnAndRegisterTab(WidgetBP);
-
+		WidgetModManagementInstance = NewObject<UEditorUtilityWidget>(GetTransientPackage(), WidgetBP->GeneratedClass);
+		WidgetModManagementInstance->AddToRoot(); // Prevent GC
 	}
-
-	TabName = FName(*FString::Printf(TEXT("EditorUtilityTab_%s"), *WidgetBP->GetName()));
-
-	// Defer to next tick to allow the tab to actually spawn
-	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float DeltaTime)
-		{
-			ModManagementDockTab = FGlobalTabmanager::Get()->FindExistingLiveTab(TabName);
-			if (ModManagementDockTab.IsValid())
-			{
-				ModManagementDockTab->SetCanCloseTab(SDockTab::FCanCloseTab::CreateLambda([this]()
-					{
-						/* During development, changes to the editor utility BP can cause the instance to disappear */
-						if (WidgetModManagementInstance == nullptr)
-							return true;
-						if (!IsValid(WidgetModManagementInstance))
-							return true;
-
-						/* Find the function inside the widget to see if we can close the window (i.e. no operation is running) */
-						UFunction* Func = WidgetModManagementInstance->FindFunction("IsOperationRunning");
-						if (Func)
-						{
-							struct { bool ReturnValue;  FString Message; } Params;
-							WidgetModManagementInstance->ProcessEvent(Func, &Params);
-							bIsOperationRunning = Params.ReturnValue;
-							ClosurePreventationMessage = Params.Message;
-						}
-
-						/* If an operation is running, show a 5 second "hint" as to why we can't close (like uploading..) */
-						if (bIsOperationRunning)
-						{
-							FNotificationInfo Info(FText::FromString(ClosurePreventationMessage));
-							Info.FadeInDuration = 0.2f;
-							Info.FadeOutDuration = 0.5f;
-							Info.ExpireDuration = 5.0f;
-							Info.bUseThrobber = false;
-							Info.bUseSuccessFailIcons = true;
-							Info.bUseLargeFont = false;
-
-							TSharedPtr<SNotificationItem> Notification = FSlateNotificationManager::Get().AddNotification(Info);
-							if (Notification.IsValid())
-							{
-								Notification->SetCompletionState(SNotificationItem::CS_Fail);
-							}
-						}
-						return !bIsOperationRunning;
-					}
-				));
-			}
-
-			return false;
-		}));
-
-#if 0
-//	if (WidgetBP && WidgetBP->GeneratedClass)
-//	{
-		//WidgetModManagementInstance = NewObject<UEditorUtilityWidget>(GetTransientPackage(), WidgetBP->GeneratedClass);
-		//W/idgetModManagementInstance->AddToRoot(); // Prevent GC
-	//}
 
 	TSharedRef<SDockTab> DockTab = SNew(SDockTab)
 		.TabRole(ETabRole::NomadTab)
 		.OnCanCloseTab_Lambda([this]()
 			{
-			
+				/* During development, changes to the editor utility BP can cause the instance to disappear */
+				if (WidgetModManagementInstance == nullptr)
+					return true;
+				if (!IsValid(WidgetModManagementInstance))
+					return true;
+
+				/* Find the function inside the widget to see if we can close the window (i.e. no operation is running) */
+				UFunction* Func = WidgetModManagementInstance->FindFunction("IsOperationRunning");
+				if (Func)
+				{
+					struct { bool ReturnValue;  FString Message; } Params;
+					WidgetModManagementInstance->ProcessEvent(Func, &Params);
+					bIsOperationRunning = Params.ReturnValue;
+					ClosurePreventationMessage = Params.Message;
+				}
+
+				/* If an operation is running, show a 5 second "hint" as to why we can't close (like uploading..) */
+				if (bIsOperationRunning)
+				{
+					FNotificationInfo Info(FText::FromString(ClosurePreventationMessage));
+					Info.FadeInDuration = 0.2f;
+					Info.FadeOutDuration = 0.5f;
+					Info.ExpireDuration = 5.0f;
+					Info.bUseThrobber = false;
+					Info.bUseSuccessFailIcons = true;
+					Info.bUseLargeFont = false;
+
+					TSharedPtr<SNotificationItem> Notification = FSlateNotificationManager::Get().AddNotification(Info);
+					if (Notification.IsValid())
+					{
+						Notification->SetCompletionState(SNotificationItem::CS_Fail);
+					}
+				}
+
+				if (!bIsOperationRunning)
+				{
+					TSharedRef<SWidget> SlateWidget = WidgetModManagementInstance->TakeWidget();
+					//SlateWidget->UnRegisterActiveTimer(activeWidgetTimer);
+				}
+				return !bIsOperationRunning;
 			});
 
 	if (WidgetModManagementInstance)
 	{
-
 		TSharedRef<SWidget> SlateWidget = WidgetModManagementInstance->TakeWidget();
 		DockTab->SetContent(SlateWidget);
-
-
-		//BlutilityModule->
-		//IBlutilityModule* BlutilityModule = FModuleManager::GetModulePtr<IBlutilityModule>("Blutility");
-		//BlutilityModule->AddLoadedScriptUI(WidgetBP);
-
+		SlateWidget->RegisterActiveTimer(0.0f, FWidgetActiveTimerDelegate::CreateLambda( [this](double InCurrentTime, float InDeltaTime) -> EActiveTimerReturnType
+			{
+				WidgetModManagementInstance->Tick(FGeometry(), 0.0f);
+				return EActiveTimerReturnType::Continue;
+			}));
 	}
-#endif
 
-	return ModManagementDockTab.ToSharedRef() ;
+	return DockTab;
 }
 
 TSharedRef<SDockTab> FZeroPayEditorButtonsPluginModule::SpawnQuest3ReducerDockableTab(const FSpawnTabArgs& Args)
@@ -376,6 +356,28 @@ void FZeroPayEditorButtonsPluginModule::ShowPCVRView_Clicked()
 	ShowNotification("PCVR sub-level visible", SNotificationItem::ECompletionState::CS_Success);
 }
 
+TSharedPtr<SWidget> FindWidgetRecursive(TSharedPtr<SWidget> Root, TSharedRef<SWidget> Target)
+{
+	if (!Root.IsValid())
+		return nullptr;
+
+	if (Root == Target)
+		return Root;
+
+	if (FChildren* Children = Root->GetChildren())
+	{
+		for (int32 i = 0; i < Children->Num(); ++i)
+		{
+			TSharedRef<SWidget> Child = Children->GetChildAt(i);
+			TSharedPtr<SWidget> Result = FindWidgetRecursive(Child, Target);
+			if (Result.IsValid())
+				return Result;
+		}
+	}
+
+	return nullptr;
+}
+
 void FZeroPayEditorButtonsPluginModule::OpenModIOWindow_Clicked()
 {
 	/* Try and show the window */
@@ -391,7 +393,6 @@ void FZeroPayEditorButtonsPluginModule::OpenModIOWindow_Clicked()
 		}
 	}
 }
-
 
 void FZeroPayEditorButtonsPluginModule::RegisterMenus()
 {
@@ -446,6 +447,28 @@ void FZeroPayEditorButtonsPluginModule::ShowTemporaryNotification(const FString&
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("Notification displayed: %s"), *Message);
+}
+
+TSharedPtr<SWidget> FZeroPayEditorButtonsPluginModule::FindWidgetRecursive(TSharedPtr<SWidget> Root, TSharedRef<SWidget> Target)
+{
+	if (!Root.IsValid())
+		return nullptr;
+
+	if (Root == Target)
+		return Root;
+
+	if (FChildren* Children = Root->GetChildren())
+	{
+		for (int32 i = 0; i < Children->Num(); ++i)
+		{
+			TSharedRef<SWidget> Child = Children->GetChildAt(i);
+			TSharedPtr<SWidget> Result = FindWidgetRecursive(Child, Target);
+			if (Result.IsValid())
+				return Result;
+		}
+	}
+
+	return nullptr;
 }
 
 /***************************************************************************************************************
