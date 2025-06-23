@@ -7,6 +7,23 @@
 #include "Engine/Texture2D.h"
 #include "ZeroPayMod_DefinitionDataAsset.generated.h"
 
+UENUM(BlueprintType)
+enum class EUGCTagCategory : uint8
+{
+	FullMod             UMETA(DisplayName = "FullMod"),
+	GameMode            UMETA(DisplayName = "GameMode"),
+	Level               UMETA(DisplayName = "Level"),
+	Weapons             UMETA(DisplayName = "Weapons"),
+	UI                  UMETA(DisplayName = "UI"),
+	Cosmetics           UMETA(DisplayName = "Cosmetics"),
+	Audio               UMETA(DisplayName = "Audio"),
+	Characters          UMETA(DisplayName = "Characters"),
+	CharacterBodyLayout UMETA(DisplayName = "CharacterBodyLayout"),
+	Vehicles            UMETA(DisplayName = "Vehicles"),
+	AI                  UMETA(DisplayName = "AI"),
+	NPCs                UMETA(DisplayName = "NPCs")
+};
+
 USTRUCT(BlueprintType)
 struct FZeroPayMod_Definition
 {
@@ -25,6 +42,9 @@ struct FZeroPayMod_Definition
 	// mod.io; instead change it in the mod.io page (and probably here)
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	FString Description;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mods", meta = (Bitmask, BitmaskEnum = "/Script/ZeroPayModCore.EUGCTagCategory"))
+	int32 ModCategoryFlags;
 
 	// The parent persistent level (REQUIRED) - MUST reference (as sub levels) the other levels
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")

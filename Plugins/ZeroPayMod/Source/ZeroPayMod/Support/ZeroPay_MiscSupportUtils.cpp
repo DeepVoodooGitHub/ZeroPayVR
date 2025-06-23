@@ -36,7 +36,6 @@ void AZeroPay_MiscSupportUtils::IsLocallyControlled(AActor* target, EZeroPay_Net
 	Result = EZeroPay_NetControllerStatus::Remote;
 }
 
-
 void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 {
 	UE_LOG(LogTemp, Display, TEXT("[Init] InitialiseZeroPayVR() called."));

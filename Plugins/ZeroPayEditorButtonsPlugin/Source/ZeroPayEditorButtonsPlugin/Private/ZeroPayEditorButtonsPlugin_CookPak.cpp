@@ -435,7 +435,7 @@ bool FZeroPayEditorButtonsPluginModule::ExecuteCookShellCmd(FString Platform, FS
 
 	// The full quoted command passed to /k (entire command in one quoted string)
 	FString CommandToRun = FString::Printf(
-		TEXT("\"%s\" \"%s\" -run=cook -targetplatform=%s -SkipCookingEditorOnlyData -versioned -map=%s -NeverCookDir=%s"),
+		TEXT("\"%s\" \"%s\" -run=cook -targetplatform=%s -SkipCookingEditorOnlyData -versioned -map=%s -NeverCookDir=/Game/KJMod -NeverCookDir=%s"),
 		*EditorExePath,  // e.g. X:/UE5-Rel/Engine/Binaries/Win64/UnrealEditor.exe
 		*ProjectPath,    // e.g. I:/GameDev/ZeroPayVR/ZeroPayVR.uproject
 		*Platform,

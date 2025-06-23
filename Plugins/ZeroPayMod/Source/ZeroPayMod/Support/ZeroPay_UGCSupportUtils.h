@@ -67,4 +67,29 @@ public:
 	}
 
 
+	UFUNCTION(BlueprintPure, Category = "ZeroPay UGC")
+	static TArray<FString> BuildModCategoryArrayFromFlags(int32 ModCategoryFlags)
+	{
+		TArray<FString> CategoryNames;
+
+		for (int32 i = 0; i <= static_cast<int32>(EUGCTagCategory::NPCs); ++i)
+		{
+			const int32 Bit = 1 << i;
+			if ((ModCategoryFlags & Bit) != 0)
+			{
+				EUGCTagCategory Category = static_cast<EUGCTagCategory>(i);
+
+				const UEnum* EnumPtr = StaticEnum<EUGCTagCategory>();
+				if (EnumPtr)
+				{
+					FString DisplayName = EnumPtr->GetDisplayNameTextByValue(i).ToString();
+					CategoryNames.Add(DisplayName);
+				}
+			}
+		}
+
+		return CategoryNames;
+	}
+
+
 };
