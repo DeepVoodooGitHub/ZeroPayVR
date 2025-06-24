@@ -157,4 +157,19 @@ public:
 		return FText::AsNumber(Number).ToString();
 	}
 
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Support")
+	static bool PlayInEditor()
+	{
+#if WITH_EDITOR
+		if (GEditor)
+		{
+			UWorld* World = GEditor->PlayWorld;
+			if (World)
+			{
+				return World->WorldType == EWorldType::PIE;
+			}
+		}
+#endif
+		return false ;
+	}
 };

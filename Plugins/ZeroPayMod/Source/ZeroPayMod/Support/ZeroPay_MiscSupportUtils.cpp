@@ -23,17 +23,19 @@ void AZeroPay_MiscSupportUtils::BeginPlay()
 
 void AZeroPay_MiscSupportUtils::IsLocallyControlled(AActor* target, EZeroPay_NetControllerStatus& Result)
 {
+	Result = EZeroPay_NetControllerStatus::Remote;
+
 	AActor* Owner = target->GetOwner() ;
 	if (Owner)
 	{
 		ACharacter* Character = Cast<ACharacter>(Owner);
-		if (Character->IsLocallyControlled())
-			Result = EZeroPay_NetControllerStatus::Local;
-
+		if (Character)
+		{
+			if (Character->IsLocallyControlled())
+				Result = EZeroPay_NetControllerStatus::Local;
+		}
 		return;
 	}
-
-	Result = EZeroPay_NetControllerStatus::Remote;
 }
 
 void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
