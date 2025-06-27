@@ -103,7 +103,7 @@ void UZeroPay_DebugConsoleComponent::AddDebugConsoleLine_MULTICAST_Implementatio
 		return;
 	
 	/* Find console BP Class */
-	FString BPClassPath = FString("Blueprint'/ZeroPayMod/Blueprints/Library/DebugUtils/BP_ZPVR_DebugConsole.BP_ZPVR_DebugConsole_C'");
+	FString BPClassPath = FString("Blueprint'/ZeroPayMod/Blueprints/Library/DebugUtils/BP_ZP_DebugConsole.BP_ZP_DebugConsole_C'");
 	TSubclassOf<AActor> DebugConsoleBPClass = Cast<UClass>(StaticLoadObject(UObject::StaticClass(), nullptr, *BPClassPath));
 	if (DebugConsoleBPClass == nullptr)
 		return;

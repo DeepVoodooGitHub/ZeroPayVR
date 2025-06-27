@@ -58,7 +58,8 @@ public class ZeroPayMod : ModuleRules
                 "AssetRegistry",
 				"ZeroPayEditorButtonsPlugin",
 				"ZeroPayModCore",
-                "Modio"
+                "Modio",
+				"UMG"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );
