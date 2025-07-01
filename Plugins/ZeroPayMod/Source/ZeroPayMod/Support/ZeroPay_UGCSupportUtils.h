@@ -7,11 +7,9 @@
 #include "ZeroPayMod_DefinitionDataAsset.h"
 #include "DesktopPlatformModule.h"
 #include "IDesktopPlatform.h"
-#include "EditorUtilitySubsystem.h"
-#include "EditorUtilityWidgetBlueprint.h"
 #include "Misc/Paths.h"
 #include "ModioSubsystem.h"
-#include "Editor.h" 
+//#include "Editor.h" 
 #include "Kismet/GameplayStatics.h"
 #include "Misc/OutputDeviceNull.h"
 #include "ZeroPay_UGCSupportUtils.generated.h"
@@ -91,5 +89,28 @@ public:
 		return CategoryNames;
 	}
 
+	UFUNCTION(BlueprintPure, Category = "ZeroPay UGC")
+	static bool IsModCategorySet(EUGCTagCategory ModCategoryFlags, const FModioModInfo& ModInfo)
+	{
+		UEnum* TagEnum = StaticEnum<EUGCTagCategory>();
+		if (!TagEnum) return false;
+
+		// Get the display name string for the enum value
+		const int32 EnumValue = static_cast<int32>(ModCategoryFlags);
+		FText DisplayName = TagEnum->GetDisplayNameTextByValue(EnumValue);
+		const FString TargetTag = DisplayName.ToString();
+
+		// Compare each tag in the mod
+		for (const FModioModTag& Tag : ModInfo.Tags)
+		{
+			const FString TagString = Tag.Tag ;
+			if (TagString.Equals(TargetTag, ESearchCase::IgnoreCase))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
 
 };

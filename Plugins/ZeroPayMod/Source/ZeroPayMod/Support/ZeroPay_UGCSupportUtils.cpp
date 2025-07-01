@@ -1,7 +1,9 @@
 // (c) Ginger Ninja Games Ltd
 
 #include "Support/ZeroPay_UGCSupportUtils.h"
+#if WITH_EDITOR
 #include "ZeroPayEditorButtonsPlugin.h"
+#endif
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Misc/Paths.h"
 

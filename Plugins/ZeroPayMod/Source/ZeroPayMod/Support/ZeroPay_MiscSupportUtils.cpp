@@ -2,6 +2,8 @@
 
 #include "Support/ZeroPay_MiscSupportUtils.h"
 #include "GameFramework/Character.h"
+#include "ZeroPayMod.h"
+#include "Debug/ZeroPay_DebugConsole.h"
 
 
 AZeroPay_MiscSupportUtils::AZeroPay_MiscSupportUtils()
@@ -40,12 +42,12 @@ void AZeroPay_MiscSupportUtils::IsLocallyControlled(AActor* target, EZeroPay_Net
 
 void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 {
-	UE_LOG(LogTemp, Display, TEXT("[Init] InitialiseZeroPayVR() called."));
+	AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("[Init] InitialiseZeroPayVR() called."));
 
 	/* Server-side only */
 	if (!target->HasAuthority())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Init] InitialiseKJModGame() Was not called in authority (on server)"));
+		AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ InitialiseKJModGame() Was not called in authority (on server)."), FDebugConsoleLevel::Error);
 		return;
 	}
 
@@ -58,7 +60,7 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 	UGameplayStatics::GetAllActorsOfClass(target->GetWorld(), ZeroPayVRBPClass, Found);
 	if (Found.Num() != 0)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[Error] \\ InitialiseZeroPayVR() was called twice, ignoring secondary call."));
+		AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ InitialiseZeroPayVR() was called twice, ignoring secondary call."), FDebugConsoleLevel::Error);
 		return;
 	}
 
@@ -75,13 +77,13 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 		ServerLogicBP->CallFunctionByNameWithArguments(TEXT("InitialiseServer"), ar, NULL, true);
 
 		if (ServerLogicBP != nullptr)
-			UE_LOG(LogTemp, Display, TEXT("[info] \\ InitialiseZeroPayVR completed correctly"))
+			AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ Completed."));
 		else
-			UE_LOG(LogTemp, Display, TEXT("[info] \\ InitialiseZeroPayVR failed to spawn"));
+			AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ failed to spawn."), FDebugConsoleLevel::Error);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Display, TEXT("[Error] \\ InitialiseZeroPayVR() failed to spawn server logic, game will be broken!"));
+		AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ failed to spawn server logic, game will be broken!"), FDebugConsoleLevel::Error);
 		return;
 	}
 }

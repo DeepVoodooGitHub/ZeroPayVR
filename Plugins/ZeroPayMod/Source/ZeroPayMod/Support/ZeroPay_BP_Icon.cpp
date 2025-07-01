@@ -5,7 +5,9 @@
 
 UZeroPay_BP_Icon::UZeroPay_BP_Icon() : Super()
 {
+#if WITH_EDITOR
 	SetIsVisualizationComponent(true);
+#endif
 	bHiddenInGame = true;
 }
 

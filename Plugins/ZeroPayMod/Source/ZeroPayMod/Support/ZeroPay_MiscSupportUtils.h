@@ -5,9 +5,11 @@
 #include "ZeroPayMod_DefinitionDataAsset.h"
 #include "DesktopPlatformModule.h"
 #include "IDesktopPlatform.h"
+#if WITH_EDITOR
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "EditorUtilitySubsystem.h"
 #include "EditorUtilityWidgetBlueprint.h"
+#endif
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Misc/Paths.h"

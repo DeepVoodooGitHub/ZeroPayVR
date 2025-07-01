@@ -46,31 +46,40 @@ public class ZeroPayMod : ModuleRules
                 "GameplayTags",
                 "OpenXRExpansionPlugin",
                 "VRExpansionPlugin",
-                "EditorFramework",
-                "UnrealEd",
-				"UMGEditor",
                 "ToolMenus",
                 "ToolWidgets",
-                "BlueprintGraph",
-                "Blutility",
-				"EditorSubsystem",
-				"UnrealEd",
                 "AssetRegistry",
-				"ZeroPayEditorButtonsPlugin",
 				"ZeroPayModCore",
                 "Modio",
 				"UMG"
 				// ... add private dependencies that you statically link with here ...	
 			}
             );
-		
-		
-		DynamicallyLoadedModuleNames.AddRange(
-			new string[]
+
+		// Editor based builds require some editor dependencies..
+		if (Target.bBuildEditor)
+		{
+            PrivateDependencyModuleNames.AddRange(
+		    new string[]
 			{
-				// ... add any modules that your module loads dynamically here ...
-			}
-			);
+                "EditorFramework",
+                "UnrealEd",
+                "UMGEditor",
+                "BlueprintGraph",
+                "Blutility",
+                "EditorSubsystem",
+                "ZeroPayEditorButtonsPlugin",
+	            }
+            );
+        }
+
+
+        DynamicallyLoadedModuleNames.AddRange(
+		new string[]
+		{
+			// ... add any modules that your module loads dynamically here ...
+		}
+		);
 
         PublicIncludePaths.Add(Path.Combine(ModuleDirectory, "../../Content"));
     }
