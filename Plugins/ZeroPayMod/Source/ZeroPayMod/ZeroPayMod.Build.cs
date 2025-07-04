@@ -29,13 +29,27 @@ public class ZeroPayMod : ModuleRules
                 "Core",
                 "AdvancedSessions",
                 "OpenXRExpansionPlugin",
-                "VRExpansionPlugin"
+                "VRExpansionPlugin",
+                "HTTP",
+				"Json",
+                "JsonUtilities"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
-			
-		
-		PrivateDependencyModuleNames.AddRange(
+
+		// Editor based builds require some editor dependencies..
+		if (Target.bBuildEditor)
+		{
+        PublicDependencyModuleNames.AddRange(
+            new string[]
+            {
+			    "BlueprintGraph",
+            }
+            );
+		}
+
+
+        PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
 				"Core",
@@ -72,7 +86,6 @@ public class ZeroPayMod : ModuleRules
 	            }
             );
         }
-
 
         DynamicallyLoadedModuleNames.AddRange(
 		new string[]
