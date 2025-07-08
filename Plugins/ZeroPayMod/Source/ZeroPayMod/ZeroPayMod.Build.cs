@@ -32,7 +32,8 @@ public class ZeroPayMod : ModuleRules
                 "VRExpansionPlugin",
                 "HTTP",
 				"Json",
-                "JsonUtilities"
+                "JsonUtilities",
+                "PakFile",
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
@@ -65,8 +66,9 @@ public class ZeroPayMod : ModuleRules
                 "AssetRegistry",
 				"ZeroPayModCore",
                 "Modio",
-				"UMG"
-				// ... add private dependencies that you statically link with here ...	
+				"UMG",
+                "AssetRegistry",
+				"PakFile",
 			}
             );
 

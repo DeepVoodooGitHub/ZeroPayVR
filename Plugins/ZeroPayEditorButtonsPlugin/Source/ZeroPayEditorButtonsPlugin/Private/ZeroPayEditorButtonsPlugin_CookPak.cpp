@@ -171,7 +171,8 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_Definitio
 	FString ProjectAssetRegistryPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	ProjectAssetRegistryPath += "Cooked/Windows/" + FString(FApp::GetProjectName()) + "/AssetRegistry.bin";
 	FString realignedFilePath = ProjectAssetRegistryPath.Replace(TEXT("\\"), TEXT("/"));
-	generatedPakListLine += "\"" + realignedFilePath + "\"   \"../../../AssetRegistry.bin\" \n";
+	FString TargetPath = FString::Printf(TEXT("../../../ZeroPayMods/UGC%s/AssetRegistry.bin"), *UGCID);
+	generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + TargetPath + "\" \n";
 
 	/* Write all lines.. */
 	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
@@ -284,7 +285,8 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 	FString ProjectAssetRegistryPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	ProjectAssetRegistryPath += "Cooked/Android/" + FString(FApp::GetProjectName()) + "/AssetRegistry.bin";
 	FString realignedFilePath = ProjectAssetRegistryPath.Replace(TEXT("\\"), TEXT("/"));
-	generatedPakListLine += "\"" + realignedFilePath + "\"   \"../../../AssetRegistry.bin\" \n";
+	FString TargetPath = FString::Printf(TEXT("../../../ZeroPayMods/UGC%s/AssetRegistry.bin"), *UGCID);
+	generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + TargetPath + "\" \n";
 
 	/* Write all lines.. */
 	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
@@ -393,7 +395,8 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 	FString ProjectAssetRegistryPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	ProjectAssetRegistryPath += "Cooked/LinuxServer/" + FString(FApp::GetProjectName()) + "/AssetRegistry.bin";
 	FString realignedFilePath = ProjectAssetRegistryPath.Replace(TEXT("\\"), TEXT("/"));
-	generatedPakListLine += "\"" + realignedFilePath + "\"   \"../../../AssetRegistry.bin\" \n";
+	FString TargetPath = FString::Printf(TEXT("../../../ZeroPayMods/UGC%s/AssetRegistry.bin"), *UGCID);
+	generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + TargetPath + "\" \n";
 
 	/* Write all lines.. */
 	bool bSuccess = FFileHelper::SaveStringToFile(generatedPakListLine, *CookedPakListFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
