@@ -95,7 +95,7 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID 
 }
 
 
-void UZeroPay_ModEngine::WriteModStateFile(FModioModID ModID, int64 ModFileID, int64 DateUpdated)
+void UZeroPay_ModEngine::WriteModStateFile(FModioModID ModID, int64 ModFileID, int64 DateUpdated, FString DisplayName)
 {
     FString BasePath = FPaths::ProjectSavedDir();
     FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
@@ -108,6 +108,7 @@ void UZeroPay_ModEngine::WriteModStateFile(FModioModID ModID, int64 ModFileID, i
     TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject());
     JsonObject->SetStringField(TEXT("file_id"), FString::Printf(TEXT("%lld"), ModFileID));
     JsonObject->SetStringField(TEXT("date_updated"), FString::Printf(TEXT("%lld"), DateUpdated));
+    JsonObject->SetStringField(TEXT("display_name"), DisplayName);
 
     // Write JSON to string
     FString OutputString;
@@ -132,7 +133,7 @@ void UZeroPay_ModEngine::WriteModStateFile(FModioModID ModID, int64 ModFileID, i
 
 
 
-bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, int64& OutModID, int64& OutDateUpdated)
+bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, int64& OutModID, int64& OutDateUpdated, FString& DisplayName)
 {
     FString BasePath = FPaths::ProjectSavedDir();
     FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
@@ -167,7 +168,7 @@ bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, int64& OutModID, in
     }
 
     // Extract fields
-    FString ModIDStr, DateUpdatedStr;
+    FString ModIDStr, DateUpdatedStr, DisplayNameStr ;
     if (!JsonObject->TryGetStringField(TEXT("file_id"), ModIDStr) ||
         !JsonObject->TryGetStringField(TEXT("date_updated"), DateUpdatedStr))
     {
@@ -178,6 +179,10 @@ bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, int64& OutModID, in
     // Convert strings to int64
     OutModID = FCString::Strtoui64(*ModIDStr, nullptr, 10);
     OutDateUpdated = FCString::Strtoui64(*DateUpdatedStr, nullptr, 10);
+
+    // Display name is optional
+    if (JsonObject->TryGetStringField(TEXT("display_name"), DisplayNameStr))
+        DisplayName = DisplayNameStr;
 
     UE_LOG(LogTemp, Display, TEXT("Read state.json: ModID=%lld, DateUpdated=%lld"), OutModID, OutDateUpdated);
     return true;

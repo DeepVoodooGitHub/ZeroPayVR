@@ -26,11 +26,11 @@ public:
 
     // Writes a mod state file (so we can check for updates)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static void WriteModStateFile(FModioModID ModID, int64 ModFileID, int64 DateUpdated) ;
+    static void WriteModStateFile(FModioModID ModID, int64 ModFileID, int64 DateUpdated, FString DisplayName = "");
 
     // Reads a mod state file (so we can check for updates)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static bool ReadModStateFile(FModioModID ModID, int64& OutModID, int64& OutDateUpdated) ;
+    static bool ReadModStateFile(FModioModID ModID, int64& OutModID, int64& OutDateUpdated, FString& DisplayName) ;
 
     // Ensure's temp zip is removed
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
