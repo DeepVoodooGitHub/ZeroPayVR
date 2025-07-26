@@ -314,7 +314,8 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 {
 	FString UGCID = dataAsset->Definition.UGCID;
 	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
-	FString neverCookMapName = dataAsset->Definition.pcvrlevel.GetAssetName();
+	// Cook everything (all map 'data' anyway for server)
+	FString neverCookMapName = "" ;
 
 	// All build paths, names, etc
 	FString ProjectCookedPath_LinuxServer = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
@@ -434,11 +435,15 @@ bool FZeroPayEditorButtonsPluginModule::ExecuteCookShellCmd(FString Platform, FS
 	FString ProjectPath = *FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
 
 	FString MapPath = TEXT("/Game/ZeroPayMods/UGC" + UGCID + "/Levels/" + MapName);
-	FString NeverCookDir = TEXT("/Game/ZeroPayMods/UGC" + UGCID + "/Levels/" + NeverCookMapName);
+	FString NeverCookDir = TEXT("-NeverCookDir=/Game/ZeroPayMods/UGC" + UGCID + "/Levels/" + NeverCookMapName);
+
+	// Disable this is not required
+	if (NeverCookMapName.IsEmpty())
+		NeverCookDir = "";
 
 	// The full quoted command passed to /k (entire command in one quoted string)
 	FString CommandToRun = FString::Printf(
-		TEXT("\"%s\" \"%s\" -run=cook -targetplatform=%s -SkipCookingEditorOnlyData -versioned -map=%s -NeverCookDir=/Game/KJMod -NeverCookDir=%s"),
+		TEXT("\"%s\" \"%s\" -run=cook -targetplatform=%s -SkipCookingEditorOnlyData -versioned -map=%s -NeverCookDir=/Game/KJMod %s"),
 		*EditorExePath,  // e.g. X:/UE5-Rel/Engine/Binaries/Win64/UnrealEditor.exe
 		*ProjectPath,    // e.g. I:/GameDev/ZeroPayVR/ZeroPayVR.uproject
 		*Platform,
