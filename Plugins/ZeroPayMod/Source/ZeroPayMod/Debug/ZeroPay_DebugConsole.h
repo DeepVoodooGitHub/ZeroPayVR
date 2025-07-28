@@ -11,6 +11,7 @@
 #include "ZeroPay_DebugConsoleComponent.h"
 #include "ZeroPay_DebugConsole.generated.h"
 
+
 UCLASS()
 class ZEROPAYMOD_API AZeroPay_DebugConsole : public AActor
 {
@@ -31,12 +32,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", AdvancedDisplay = "debugConsoleLevel, bIncludeObjectName"))
 	static void AddDebugConsoleLine(AActor* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
 	{
+		// Note the GameInstance uses a null target, as it's not an AActor so we default to that here
+		FString ObjectName = "[GameInstance]";
+
 		// Dedicated server's just log to standard UE5 output
 		if (IsRunningDedicatedServer() || target == nullptr)
 		{
-
-			/* Include name (note the GameInstance uses a null target, as it's not an AActor so we default to that) */
-			FString ObjectName = "[GameInstance]";
+			/* Include name  */
 			if (bIncludeObjectName)
 			{
 				if (target != nullptr)
@@ -50,46 +52,46 @@ public:
 				}
 			}
 
-			switch(debugConsoleLevel)
+			switch (debugConsoleLevel)
 			{
-				case None:
-				case Log:
-				{
-					/* Output in Green the message */
-					UE_LOG(LogZeroPay, Log, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName , *value);
-
-					return;
-				}
-				case Warn:
-				{
-					/* Yellow warnings */
-					UE_LOG(LogZeroPay, Warning, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName, *value);
-					return;
-				}
-				case Error:
-				{
-					/* Red errors */
-					UE_LOG(LogZeroPay, Error, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName, *value);
-					return;
-				}
-				
+			case None:
+			case Log:
+			{
+				/* Output in Green the message */
+				UE_LOG(LogZeroPay, Log, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName, *value);
+				break;
 			}
-			return;
-		}			
+			case Warn:
+			{
+				/* Yellow warnings */
+				UE_LOG(LogZeroPay, Warning, TEXT("\x1b[93m(%s)\x1b[0m \x1b[33m%s\x1b[0m"), *ObjectName, *value);
+				break;
+			}
+			case Error:
+			{
+				/* Red errors */
+				UE_LOG(LogZeroPay, Error, TEXT("\x1b[93m(%s)\x1b[0m \x1b[31m%s\x1b[0m"), *ObjectName, *value);
+				break;
+			}
 
-		if (!target) return;
-
-		UZeroPay_DebugConsoleComponent* DebugConsoleComponent = target->FindComponentByClass<UZeroPay_DebugConsoleComponent>();
-
-		if (!DebugConsoleComponent)
-		{
-			DebugConsoleComponent = NewObject<UZeroPay_DebugConsoleComponent>(target);
-			DebugConsoleComponent->RegisterComponent(); // Make sure it gets ticking/network support
-
-			UE_LOG(LogZeroPay, Warning, TEXT("AddDebugConsoleLine() called on actor %s with ZeroPay_DebugConsole component. Created component but first output line may not RPC correctly or disconnection will occur!"), *target->GetName());
+			}
 		}
 
-		DebugConsoleComponent->AddDebugConsoleLine(debugConsoleLevel, bIncludeObjectName, value );
+		if (target)
+		{
+			UZeroPay_DebugConsoleComponent* DebugConsoleComponent = target->FindComponentByClass<UZeroPay_DebugConsoleComponent>();
+
+			if (!DebugConsoleComponent)
+			{
+				DebugConsoleComponent = NewObject<UZeroPay_DebugConsoleComponent>(target);
+				DebugConsoleComponent->RegisterComponent(); // Make sure it gets ticking/network support
+
+				UE_LOG(LogZeroPay, Warning, TEXT("AddDebugConsoleLine() called on actor %s with ZeroPay_DebugConsole component. Created component but first output line may not RPC correctly or disconnection will occur!"), *target->GetName());
+			}
+
+			DebugConsoleComponent->AddDebugConsoleLine(debugConsoleLevel, bIncludeObjectName, value);
+		}
+
 	}
 
 	// Disable (for this actor) any AddDebugConsoleLine's
