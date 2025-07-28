@@ -17,7 +17,7 @@ class ZEROPAYMOD_API IZeroPay_PrintInternalString_Interface
 
 public:
 	/* Log a message to the somewhere (can be implemented in BP) */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "ZeroPay Internal PrintString")
+	UFUNCTION(BlueprintNativeEvent, Category = "ZeroPay Internal PrintString")
 	void PrintInternalString(const FString& ObjectName, const FString& LogText, FDebugConsoleLevel Level);
 };
 
@@ -46,11 +46,36 @@ class ZEROPAYMOD_API UZeroPay_InternalDebugFunctionLibrary : public UBlueprintFu
 public:
 
 	// Internal print string, useful in editor and game (shown on main menu 'logs', any anything else that implements ZeroPay_InternalDebugConsole_Interface
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", AdvancedDisplay = "debugConsoleLevel, bIncludeObjectName"))
-	static void PrintInternalString(AActor* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", WorldContext = "WorldContextObject", CallableWithoutWorldContext, AdvancedDisplay = "debugConsoleLevel, bIncludeObjectName"))
+	static void PrintInternalString(const UObject* WorldContextObject, AActor* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
 	{
 		// Note the GameInstance uses a null target, as it's not an AActor so we default to that here
 		FString ObjectName = "[GameInstance]";
+
+		UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
+		FString Prefix;
+		if (World)
+		{
+			if (World->WorldType == EWorldType::PIE)
+			{
+				switch (World->GetNetMode())
+				{
+				case NM_Client:
+					// GPlayInEditorID 0 is always the server, so 1 will be first client.
+					// You want to keep this logic in sync with GeneratePIEViewportWindowTitle and UpdatePlayInEditorWorldDebugString
+					Prefix = FString::Printf(TEXT("Client %d: "), UE::GetPlayInEditorID());
+					break;
+				case NM_DedicatedServer:
+				case NM_ListenServer:
+					Prefix = FString::Printf(TEXT("Server: "));
+					break;
+				case NM_Standalone:
+					break;
+				}
+			}
+		}
+		// Append
+		FString combinedPrefixValue = Prefix + value;
 
 		/* Include name  */
 		if (bIncludeObjectName)
@@ -77,7 +102,7 @@ public:
 				IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(
 					Widget,
 					*ObjectName,
-					*value,
+					*combinedPrefixValue,
 					debugConsoleLevel
 				);
 			}

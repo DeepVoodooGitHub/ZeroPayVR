@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Kismet/BlueprintFunctionLibrary.h"
 #include "ZeroPayMod.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -9,20 +10,13 @@
 #include "Misc/OutputDeviceNull.h"
 #include "Support/ZeroPay_MiscSupportUtils.h"
 #include "ZeroPay_DebugConsoleComponent.h"
-#include "ZeroPay_DebugConsole.generated.h"
-
+#include "ZeroPay_DebugSupport.generated.h"
 
 UCLASS()
-class ZEROPAYMOD_API AZeroPay_DebugConsole : public AActor
+class ZEROPAYMOD_API UZeroPay_DebugConsole : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 	
-public:	
-	AZeroPay_DebugConsole();
-
-protected:
-	virtual void BeginPlay() override;
-
 public:	
 
 	// CLIENT: Adds a debug line to the in-world console (if it exists) this is replicated

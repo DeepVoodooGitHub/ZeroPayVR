@@ -3,7 +3,7 @@
 #include "Support/ZeroPay_MiscSupportUtils.h"
 #include "GameFramework/Character.h"
 #include "ZeroPayMod.h"
-#include "Debug/ZeroPay_DebugConsole.h"
+#include "Debug/ZeroPay_DebugSupport.h"
 
 
 AZeroPay_MiscSupportUtils::AZeroPay_MiscSupportUtils()
@@ -42,12 +42,12 @@ void AZeroPay_MiscSupportUtils::IsLocallyControlled(AActor* target, EZeroPay_Net
 
 void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 {
-	AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("[Init] InitialiseZeroPayVR() called."));
+	UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("[Init] InitialiseZeroPayVR() called."));
 
 	/* Server-side only */
 	if (!target->HasAuthority())
 	{
-		AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ InitialiseKJModGame() Was not called in authority (on server)."), FDebugConsoleLevel::Error);
+		UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ InitialiseKJModGame() Was not called in authority (on server)."), FDebugConsoleLevel::Error);
 		return;
 	}
 
@@ -60,7 +60,7 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 	UGameplayStatics::GetAllActorsOfClass(target->GetWorld(), ZeroPayVRBPClass, Found);
 	if (Found.Num() != 0)
 	{
-		AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ InitialiseZeroPayVR() was called twice, ignoring secondary call."), FDebugConsoleLevel::Error);
+		UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ InitialiseZeroPayVR() was called twice, ignoring secondary call."), FDebugConsoleLevel::Error);
 		return;
 	}
 
@@ -77,13 +77,13 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 		ServerLogicBP->CallFunctionByNameWithArguments(TEXT("InitialiseServer"), ar, NULL, true);
 
 		if (ServerLogicBP != nullptr)
-			AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ Completed."));
+			UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ Completed."));
 		else
-			AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ failed to spawn."), FDebugConsoleLevel::Error);
+			UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ failed to spawn."), FDebugConsoleLevel::Error);
 	}
 	else
 	{
-		AZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ failed to spawn server logic, game will be broken!"), FDebugConsoleLevel::Error);
+		UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ failed to spawn server logic, game will be broken!"), FDebugConsoleLevel::Error);
 		return;
 	}
 }
