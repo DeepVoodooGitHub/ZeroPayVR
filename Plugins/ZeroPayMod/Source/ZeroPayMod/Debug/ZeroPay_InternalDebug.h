@@ -2,6 +2,7 @@
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Support/ZeroPay_MiscSupportUtils.h"
+#include "EngineUtils.h"
 #include "ZeroPay_InternalDebug.generated.h"
 
 // Forward declaration so UE generates boilerplate
@@ -16,27 +17,26 @@ class ZEROPAYMOD_API IZeroPay_PrintInternalString_Interface
 	GENERATED_BODY()
 
 public:
+	/* Can accept a message? I.e READY */
+	UFUNCTION(BlueprintNativeEvent, Category = "ZeroPay Internal PrintString")
+	bool IsPrintInternalReady();
+
 	/* Log a message to the somewhere (can be implemented in BP) */
 	UFUNCTION(BlueprintNativeEvent, Category = "ZeroPay Internal PrintString")
-	void PrintInternalString(const FString& ObjectName, const FString& LogText, FDebugConsoleLevel Level);
+	void PrintInternalString(const FString& Prefix, const FString& ObjectName, const FString& LogText, FDebugConsoleLevel Level);
 };
 
-// Forward declaration so UE generates boilerplate
-UINTERFACE(Blueprintable)
-class ZEROPAYMOD_API UZeroPay_DebugConsole_Interface : public UInterface
+struct ZEROPAYMOD_API FZeroPayStoredPrintStringParams
 {
-	GENERATED_BODY()
+	FString Prefix;
+	FString ObjectName;
+	FString Value;
+	FDebugConsoleLevel DebugConsoleLevel = FDebugConsoleLevel::Log;
 };
 
-class ZEROPAYMOD_API IZeroPay_DebugConsole_Interface
-{
-	GENERATED_BODY()
-
-public:
-	/** Log a message to the console (can be implemented in BP) */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "ZeroPay Debug Console")
-	void LogToDebugConsole(const FString& ObjectName, const FString& LogText, FDebugConsoleLevel Level);
-};
+/* Global vars (until we find a better solution) - Reset via ZeroPay_GameInstance_r1 Init (to avoid crashes on multiple PIE plays) */
+static TArray<FZeroPayStoredPrintStringParams> StoredLogEntries;
+static TWeakObjectPtr<AActor> InternalDebugTargetActor = nullptr ;
 
 UCLASS()
 class ZEROPAYMOD_API UZeroPay_InternalDebugFunctionLibrary : public UBlueprintFunctionLibrary
@@ -44,10 +44,19 @@ class ZEROPAYMOD_API UZeroPay_InternalDebugFunctionLibrary : public UBlueprintFu
 	GENERATED_BODY()
 
 public:
+	// Register an actor to receive debug messages (there can only be one..)
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target") )
+	static void RegisterInternalStringTarget(AActor* target = nullptr)
+	{
+		if (target->GetClass()->ImplementsInterface(UZeroPay_PrintInternalString_Interface::StaticClass()))
+			InternalDebugTargetActor = target;
+		else
+			UE_LOG(LogTemp, Error, TEXT("Actor %s is not a valid target, does not implement ZeroPay_PrintInternalString_Interface"), *target->GetName());
+	}
 
 	// Internal print string, useful in editor and game (shown on main menu 'logs', any anything else that implements ZeroPay_InternalDebugConsole_Interface
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", WorldContext = "WorldContextObject", CallableWithoutWorldContext, AdvancedDisplay = "debugConsoleLevel, bIncludeObjectName"))
-	static void PrintInternalString(const UObject* WorldContextObject, AActor* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", WorldContext = "WorldContextObject", CallableWithoutWorldContext, AdvancedDisplay = "WorldContextObject, debugConsoleLevel, bIncludeObjectName"))
+	static void PrintInternalString(const UObject* WorldContextObject, AActor* target = nullptr, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
 	{
 		// Note the GameInstance uses a null target, as it's not an AActor so we default to that here
 		FString ObjectName = "[GameInstance]";
@@ -74,8 +83,6 @@ public:
 				}
 			}
 		}
-		// Append
-		FString combinedPrefixValue = Prefix + value;
 
 		/* Include name  */
 		if (bIncludeObjectName)
@@ -91,21 +98,62 @@ public:
 			}
 		}
 
-		/* Also replicate to anything "listening" via the IZeroPay_DebugConsole_Interface */
-		for (TObjectIterator<UUserWidget> It; It; ++It)
+		bool bOutputSunk = false ;
+		if (InternalDebugTargetActor.IsValid())
 		{
-			UUserWidget* Widget = *It;
-
-			// Must be valid, not pending kill, and implement the interface
-			if (IsValid(Widget) && Widget->GetClass()->ImplementsInterface(UZeroPay_PrintInternalString_Interface::StaticClass()))
+			if (IZeroPay_PrintInternalString_Interface::Execute_IsPrintInternalReady(InternalDebugTargetActor.Get()))
 			{
-				IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(
-					Widget,
-					*ObjectName,
-					*combinedPrefixValue,
-					debugConsoleLevel
-				);
+				/* Any stored data for when we had no actor to sink the logs? */
+				if (StoredLogEntries.Num() > 0)
+				{
+					for (const FZeroPayStoredPrintStringParams& Entry : StoredLogEntries)
+					{
+						IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(InternalDebugTargetActor.Get(), Entry.Prefix, Entry.ObjectName, Entry.Value, Entry.DebugConsoleLevel);
+					}
+					StoredLogEntries.Empty();
+				}
+
+				/* Send data */
+				IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(InternalDebugTargetActor.Get(), Prefix, ObjectName, value, debugConsoleLevel);
+						
+				bOutputSunk = true;
 			}
+		}
+
+		if (!bOutputSunk)
+		{
+			/* Standard UE logs.. */
+			FString FinalLog = FString::Printf(TEXT("%s(%s): %s"), *Prefix, *ObjectName, *value);
+
+			switch (debugConsoleLevel)
+			{
+			case FDebugConsoleLevel::Log:
+				UE_LOG(LogTemp, Log, TEXT("%s"), *FinalLog);
+				break;
+
+			case FDebugConsoleLevel::Warn:
+				UE_LOG(LogTemp, Warning, TEXT("%s"), *FinalLog);
+				break;
+
+			case FDebugConsoleLevel::Error:
+				UE_LOG(LogTemp, Error, TEXT("%s"), *FinalLog);
+				break;
+
+			default:
+				UE_LOG(LogTemp, Log, TEXT("%s"), *FinalLog);
+				break;
+			}
+
+			// Create a new log entry struct
+			FZeroPayStoredPrintStringParams NewEntry;
+			NewEntry.Prefix = Prefix;
+			NewEntry.ObjectName = ObjectName;
+			NewEntry.Value = value;
+			NewEntry.DebugConsoleLevel = debugConsoleLevel;
+
+			// Add it to the array
+			StoredLogEntries.Add(NewEntry);
+			return;
 		}
 	}
 } ;

@@ -13,7 +13,7 @@
 #include "ZeroPay_DebugSupport.generated.h"
 
 UCLASS()
-class ZEROPAYMOD_API UZeroPay_DebugConsole : public UBlueprintFunctionLibrary
+class ZEROPAYMOD_API UZeroPay_DebugSupport : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 	

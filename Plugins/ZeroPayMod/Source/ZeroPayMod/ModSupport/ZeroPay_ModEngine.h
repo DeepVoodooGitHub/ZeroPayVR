@@ -8,11 +8,22 @@
 #include "HAL/PlatformFileManager.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
+#include "ZeroPay_ModGlobal.h"
+#include "ZeroPayMod_DefinitionDataAsset.h"
 #include "ZeroPay_ModEngine.generated.h"
 
 // Delegates for Blueprint callbacks
 DECLARE_DYNAMIC_DELEGATE(FOnUnzipSuccess);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnUnzipFailure, const FString&, ErrorMessage);
+
+UENUM(BlueprintType)
+enum FZeroPayMod_SubscribedModState
+{
+    Unknown,
+    Valid,          /* Pak is up-to-date and correct size */
+    Invalid,        /* Mod.io failed to update us */
+    Updating        /* Attempt to update mod */
+};
 
 UCLASS(BlueprintType)
 class ZEROPAYMOD_API UZeroPayMod_SubscribedMod : public UObject
@@ -24,16 +35,58 @@ public:
     int64 mod_id;
 
     UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+    int64 file_id;
+
+    UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
     FString display_name;
 
     UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
-    int64 refreshness ;
+    FString summary;
+
+    UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+    FString author;
+
+    UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+    int64 date_updated;
 
     UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
     int64 popularity_today ;
 
     UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
     int64 total_downloads ;
+
+    UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+    int64 ratings_weighted_aggregate ;
+
+    UPROPERTY(BlueprintReadWrite, Category = "ZeroPay Modio Support")
+    TEnumAsByte<FZeroPayMod_SubscribedModState> ModState = FZeroPayMod_SubscribedModState::Unknown;
+
+    UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+    EUGCTagCategory UGCCategory ;
+
+    UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+    int64 uncompressed_size ;
+
+    // Used by BP's to retry operations (such as taking to mod.io)
+    UPROPERTY(BlueprintReadWrite, Category = "ZeroPay Modio Support")
+    int64 retry_count ;
+
+    // Used by BP's to update progress (such as downloading from mod.io, UI only)
+    UPROPERTY(BlueprintReadWrite, Category = "ZeroPay Modio Support")
+    float progress ;
+
+    UFUNCTION(BlueprintPure, Category = "ZeroPay Modio Support")
+    bool IsOutOfDate(int64 current_date_updated)
+    {
+        return (current_date_updated > date_updated) ;
+    }
+
+    UFUNCTION(BlueprintPure, Category = "ZeroPay Modio Support")
+    bool IsWrongFileSize(int64 current_uncompressed_size)
+    {
+        return (current_uncompressed_size != uncompressed_size);
+    }
+
 };
 
 UCLASS(Blueprintable)
@@ -60,12 +113,52 @@ public:
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
     static TArray<UZeroPayMod_SubscribedMod*> InitInstalledMods(UObject* Outer);
 
+    // Delets a mod from disk
+    UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
+    static bool RemoveInstalledMod(UZeroPayMod_SubscribedMod* Mod);
+
+    // Returns the file size of any given mod (for a platform) on the file system
+    UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Engine")
+    static int64 GetPakFileSize(FModioModID ModID, FModioPlatform Platform);
+
     // Writes a mod state file (so we can check for updates)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static void WriteModStateFile(FModioModID ModID, int64 ModFileID, int64 DateUpdated, FString DisplayName = "");
+    static void WriteModStateFile(FModioModID ModID, FString DisplayName, int64 ModFileID, int64 DateUpdated, int64 UncompressedSize, FString Summary, FString Author, int64 Ratings, int64 Category);
 
     // Reads a mod state file (so we can check for updates)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static bool ReadModStateFile(FModioModID ModID, int64& OutModID, int64& OutDateUpdated, FString& DisplayName) ;
+    static bool ReadModStateFile(FModioModID ModID, FString& DisplayName, int64& OutModID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory) ;
+
+    // Changes certain state file information (when updates occur)
+    UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
+    static bool UpdateModStateFile(FModioModID ModID, int64 NewDateUpdated, int64 NewUncompressedSize) ;
+
+    /* >>> <Misc> Operations <<< */
+
+    // Return the platform we are running on
+    UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Engine")
+    static FModioPlatform GetPlatform()
+    {
+        #if PLATFORM_WINDOWS
+            return FModioPlatform::ModIOPlatform_Windows;
+        #endif
+
+        #if PLATFORM_LINUX
+            return FModioPlatform::ModIOPlatform_LinuxServer;
+        #endif
+
+        #if PLATFORM_ANDROID
+            return FModioPlatform::ModIOPlatform_Android ;
+        #endif
+    }
+
+    UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Engine")
+    static FString GetModLogoPath(FModioModID ModID)
+    {
+        FString BasePath = FPaths::ProjectSavedDir();
+        FString ModFolderName = FString::Printf(TEXT("Mods/%s/Logo.png"), *ModID.ToString());
+        return FPaths::Combine(BasePath, ModFolderName);
+    }
+
 
 };

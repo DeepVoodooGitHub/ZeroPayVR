@@ -174,4 +174,8 @@ public:
 #endif
 		return false ;
 	}
+
+	// Clear and invalidates a timer from a UObject (without world context)
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Support")
+	static void ClearAndInvalidateUObjectTimer(FTimerHandle Handle);
 };

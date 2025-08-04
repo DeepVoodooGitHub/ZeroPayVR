@@ -2,13 +2,13 @@
 #include "Misc/Paths.h"
 #include "HAL/PlatformProcess.h"
 #include "Async/Async.h"
+#include "miniz_cpp.hpp"
 
-
+#if PLATFORM_LINUX
+/* Linux implementation*/
 void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure)
 {
-#if PLATFORM_WINDOWS
     OnFailure.ExecuteIfBound(TEXT("Not supported under Windows"));
-#endif
     if (!FPaths::FileExists(ZipFilePath))
     {
         FString Error = FString::Printf(TEXT("ZIP file does not exist: %s"), *ZipFilePath);
@@ -39,15 +39,8 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID 
     IFileManager::Get().MakeDirectory(*DestinationPath, /*Tree=*/true);
 
     // Build unzip command
-// Linux only
-#if PLATFORM_LINUX
-    // Build unzip command
     FString UnzipBinary = TEXT("unzip");
     FString Arguments = FString::Printf(TEXT("\"%s\" -d \"%s\""), *ZipFilePath, *DestinationPath);
-#else
-    FString UnzipBinary = TEXT("cmd");
-    FString Arguments = FString::Printf(TEXT("/c unzip \"%s\" -d \"%s\""), *ZipFilePath, *DestinationPath);
-#endif
 
     UE_LOG(LogTemp, Log, TEXT("Running unzip: %s %s"), *UnzipBinary, *Arguments);
 
@@ -94,6 +87,83 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID 
         });
 
 }
+#else
+/* Windows/Android */
+void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure)
+{
+    if (!FPaths::FileExists(ZipFilePath))
+    {
+        FString Error = FString::Printf(TEXT("ZIP file does not exist: %s"), *ZipFilePath);
+        UE_LOG(LogTemp, Error, TEXT("%s"), *Error);
+        OnFailure.ExecuteIfBound(Error);
+        return;
+    }
+
+    // Get Saved directory and append "Mods/<ModID>/"
+    FString BasePath = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
+
+    // Remove old folder
+    if (IFileManager::Get().DirectoryExists(*DestinationPath))
+    {
+        TArray<FString> PakFiles;
+        IFileManager::Get().FindFiles(PakFiles, *(DestinationPath / TEXT("*.pak")), true, false);
+
+        bool bAllDeleted = true;
+        for (const FString& PakFile : PakFiles)
+        {
+            FString FullPakPath = DestinationPath / PakFile;
+            if (!IFileManager::Get().Delete(*FullPakPath, false, true))
+            {
+                UE_LOG(LogTemp, Error, TEXT("Failed to delete PAK file: %s"), *FullPakPath);
+                bAllDeleted = false;
+            }
+        }
+    }
+    else
+    {
+        /* Make folder is not existing.. */
+        IFileManager::Get().MakeDirectory(*DestinationPath, true);
+    }
+
+    // Copy values to local copies for thread use
+    FString LocalZipFilePath = ZipFilePath;
+    FString LocalDestinationPath = DestinationPath;
+
+    Async(EAsyncExecution::ThreadPool, [LocalZipFilePath, LocalDestinationPath, OnSuccess, OnFailure, ModID]()
+        {
+            try
+            {
+                std::string ZipPathStr = TCHAR_TO_UTF8(*LocalZipFilePath);
+                std::string DestFolderStr = TCHAR_TO_UTF8(*LocalDestinationPath);
+
+                miniz_cpp::zip_file zip(ZipPathStr);
+                zip.extractall(DestFolderStr);
+
+                // Back to game thread
+                AsyncTask(ENamedThreads::GameThread, [OnSuccess]()
+                    {
+                        UE_LOG(LogTemp, Log, TEXT("Unzip succeeded."));
+                        OnSuccess.ExecuteIfBound();
+                    });
+            }
+            catch (const std::exception& e)
+            {
+                FString ErrorMsg = UTF8_TO_TCHAR(e.what());
+
+                // Clean up the directory
+                IFileManager::Get().DeleteDirectory(*LocalDestinationPath, false, true);
+
+                AsyncTask(ENamedThreads::GameThread, [ErrorMsg, OnFailure]()
+                    {
+                        UE_LOG(LogTemp, Error, TEXT("Unzip failed: %s"), *ErrorMsg);
+                        OnFailure.ExecuteIfBound(ErrorMsg);
+                    });
+            }
+        });
+}
+#endif
 
 
 

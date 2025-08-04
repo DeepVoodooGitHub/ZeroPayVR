@@ -3,6 +3,7 @@
 #include "Support/ZeroPay_MiscSupportUtils.h"
 #include "GameFramework/Character.h"
 #include "ZeroPayMod.h"
+#include "Debug/ZeroPay_InternalDebug.h"
 #include "Debug/ZeroPay_DebugSupport.h"
 
 
@@ -42,12 +43,12 @@ void AZeroPay_MiscSupportUtils::IsLocallyControlled(AActor* target, EZeroPay_Net
 
 void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 {
-	UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("[Init] InitialiseZeroPayVR() called."));
+	UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("[Init] InitialiseZeroPayVR() called."));
 
 	/* Server-side only */
 	if (!target->HasAuthority())
 	{
-		UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ InitialiseKJModGame() Was not called in authority (on server)."), FDebugConsoleLevel::Error);
+		UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       Failed, was not called in authority (on server)."), FDebugConsoleLevel::Error);
 		return;
 	}
 
@@ -60,7 +61,7 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 	UGameplayStatics::GetAllActorsOfClass(target->GetWorld(), ZeroPayVRBPClass, Found);
 	if (Found.Num() != 0)
 	{
-		UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ InitialiseZeroPayVR() was called twice, ignoring secondary call."), FDebugConsoleLevel::Error);
+		UZeroPay_DebugSupport::AddDebugConsoleLine(nullptr, TEXT("       Warning, InitialiseZeroPayVR() was called twice, ignoring secondary call."), FDebugConsoleLevel::Warn);
 		return;
 	}
 
@@ -77,13 +78,38 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 		ServerLogicBP->CallFunctionByNameWithArguments(TEXT("InitialiseServer"), ar, NULL, true);
 
 		if (ServerLogicBP != nullptr)
-			UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ Completed."));
+			UZeroPay_DebugSupport::AddDebugConsoleLine(nullptr, TEXT("       Completed."));
 		else
-			UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ failed to spawn."), FDebugConsoleLevel::Error);
+			UZeroPay_DebugSupport::AddDebugConsoleLine(nullptr, TEXT("       failed to spawn BP actor."), FDebugConsoleLevel::Error);
 	}
 	else
 	{
-		UZeroPay_DebugConsole::AddDebugConsoleLine(nullptr, TEXT("       \\ failed to spawn server logic, game will be broken!"), FDebugConsoleLevel::Error);
+		UZeroPay_DebugSupport::AddDebugConsoleLine(nullptr, TEXT("       failed to spawn server logic, game will be broken!"), FDebugConsoleLevel::Error);
 		return;
 	}
+}
+
+
+void AZeroPay_MiscSupportUtils::ClearAndInvalidateUObjectTimer(FTimerHandle Handle)
+{
+	// Note: We cannot extract world from FTimerHandle directly
+	// But we can access active timers if any UObject context is globally bound (not guaranteed)
+
+	for (const FWorldContext& WorldContext : GEngine->GetWorldContexts())
+	{
+		UWorld* World = WorldContext.World();
+		if (!World) continue;
+
+		FTimerManager& TimerManager = World->GetTimerManager();
+
+		// Check if this TimerManager has that handle
+		if (TimerManager.TimerExists(Handle))
+		{
+			TimerManager.ClearTimer(Handle);
+			Handle.Invalidate();
+			return;
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Failed to clear timer — no valid world context found or timer not active."));
 }

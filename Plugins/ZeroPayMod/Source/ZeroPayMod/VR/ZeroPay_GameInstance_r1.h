@@ -13,8 +13,7 @@ UCLASS()
 class ZEROPAYMOD_API UZeroPay_GameInstance_r1 : public UAdvancedFriendsGameInstance
 {
 	GENERATED_BODY()
-	
-	
-	
+public:
+	virtual void Init() override;
 	
 };

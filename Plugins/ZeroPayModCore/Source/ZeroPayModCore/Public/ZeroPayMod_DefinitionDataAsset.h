@@ -10,15 +10,15 @@
 UENUM(BlueprintType)
 enum class EUGCTagCategory : uint8
 {
-	FullMod             UMETA(DisplayName = "FullMod"),
-	GameMode            UMETA(DisplayName = "GameMode"),
+	FullMod             UMETA(DisplayName = "Full-Mod"),
+	GameMode            UMETA(DisplayName = "Game-Mode"),
 	Level               UMETA(DisplayName = "Level"),
 	Weapons             UMETA(DisplayName = "Weapons"),
 	UI                  UMETA(DisplayName = "UI"),
 	Cosmetics           UMETA(DisplayName = "Cosmetics"),
 	Audio               UMETA(DisplayName = "Audio"),
 	Characters          UMETA(DisplayName = "Characters"),
-	CharacterBodyLayout UMETA(DisplayName = "CharacterBodyLayout"),
+	CharacterBodyLayout UMETA(DisplayName = "BodyLayout"),
 	Vehicles            UMETA(DisplayName = "Vehicles"),
 	AI                  UMETA(DisplayName = "AI"),
 	NPCs                UMETA(DisplayName = "NPCs")

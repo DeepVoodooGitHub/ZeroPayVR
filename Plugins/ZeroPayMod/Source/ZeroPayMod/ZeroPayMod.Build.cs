@@ -13,9 +13,10 @@ public class ZeroPayMod : ModuleRules
 			new string[] {
             }
             );
-				
-		
-		PrivateIncludePaths.AddRange(
+
+        PublicIncludePaths.Add(Path.Combine(ModuleDirectory, "External", "zip"));
+
+        PrivateIncludePaths.AddRange(
 			new string[] {
 				// ... add other private include paths required here ...
 				"ZeroPayMod",

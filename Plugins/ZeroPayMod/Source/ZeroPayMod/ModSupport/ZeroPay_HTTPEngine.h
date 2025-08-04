@@ -29,6 +29,9 @@ public:
 	FString filename;
 
 	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+	int64 UncompressedSize;
+
+	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
 	FString binaryurl;
 };
 
@@ -62,7 +65,7 @@ public:
 	void ParseModioFileInfoJSON(FString ResponseString) ;
 
 private:
-	void HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, const FString& BinaryURL);
+	void HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, int64 UncompressedSize, const FString& BinaryURL);
 };
 
 

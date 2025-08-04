@@ -38,7 +38,7 @@ void UZeroPayModAsync_GetModioFile::StartFileInfoRequest(FModioModID ModID, FMod
             else
             {
                 // Failed
-                HandleRequestCompleted(false, TEXT("HTTP Request to mod.io failed"), TEXT(""), 0, 0, TEXT("") );
+                HandleRequestCompleted(false, TEXT("HTTP Request to mod.io failed"), TEXT(""), 0, 0, 0, TEXT("") );
             }
         });
 
@@ -88,11 +88,16 @@ void UZeroPayModAsync_GetModioFile::ParseModioFileInfoJSON(FString ResponseStrin
                 // Extract "filename"
                 FString Filename = FirstDataObject->GetStringField(TEXT("filename"));
 
+                // Uncompress size
+                int64 UncompressedSize = 0;
+                if (FirstDataObject->TryGetStringField(TEXT("filesize_uncompressed"), DataString))
+                    UncompressedSize = FCString::Strtoui64(*DataString, nullptr, 10);
+
                 // Extract "download" object and then "binary_url"
                 TSharedPtr<FJsonObject> DownloadObject = FirstDataObject->GetObjectField(TEXT("download"));
                 FString BinaryURL = DownloadObject->GetStringField(TEXT("binary_url"));
 
-                HandleRequestCompleted(true, TEXT(""), Filename, FileID, DateUpdated, BinaryURL);
+                HandleRequestCompleted(true, TEXT(""), Filename, FileID, DateUpdated, UncompressedSize, BinaryURL);
 
             }
         }
@@ -111,27 +116,28 @@ void UZeroPayModAsync_GetModioFile::ParseModioFileInfoJSON(FString ResponseStrin
                 // Build the error string
                 FString ErrorString = FString::Printf(TEXT("Error Code: %d | Ref: %d | Message: %s"), ErrorCode, ErrorRef, *ErrorMessage);
 
-                HandleRequestCompleted(false, *ErrorString, TEXT(""), 0, 0, TEXT(""));
+                HandleRequestCompleted(false, *ErrorString, TEXT(""), 0, 0, 0, TEXT(""));
             }
             else
             {
-                HandleRequestCompleted(false, TEXT("Received unknown response from mod.io server"), TEXT(""), 0, 0, TEXT(""));
+                HandleRequestCompleted(false, TEXT("Received unknown response from mod.io server"), TEXT(""), 0, 0, 0, TEXT(""));
             }
         }
     }
     else
     {
-        HandleRequestCompleted(false, TEXT("Received bad JSON from mod.io server"), TEXT(""), 0, 0, TEXT(""));
+        HandleRequestCompleted(false, TEXT("Received bad JSON from mod.io server"), TEXT(""), 0, 0, 0, TEXT(""));
     }
 }
 
-void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, const FString& BinaryURL)
+void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, int64 UncompressedSize, const FString& BinaryURL)
 {
     UZeroPayMod_GetModioFileResult* Result = NewObject<UZeroPayMod_GetModioFileResult>();
     Result->message = Message;
     Result->filename = Filename;
     Result->file_id = FileID;
     Result->date_updated = DateUpdated ;
+    Result->UncompressedSize = UncompressedSize ;
     Result->binaryurl = BinaryURL;
 
     if (bSuccess)
@@ -156,15 +162,18 @@ void UZeroPayMod_AsyncHttpDownload::StartDownload(FString URL)
 {
     FHttpModule* Http = &FHttpModule::Get();
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+    TWeakObjectPtr<UBlueprintAsyncActionBase> WeakActor = this ;
 
     // Bind progress (we'll extract content length in OnHeaderReceived)
-    Request->OnRequestProgress64().BindLambda([this](FHttpRequestPtr Request, uint64 BytesSent, uint64 BytesReceived)
+    Request->OnRequestProgress64().BindLambda([this, WeakActor](FHttpRequestPtr Request, uint64 BytesSent, uint64 BytesReceived)
         {
             if (TotalContentLength == 0 && Request->GetResponse().IsValid())
             {
                 TotalContentLength = Request->GetResponse()->GetContentLength();
             }
-            HandleProgress(BytesReceived, TotalContentLength);
+            /* in PIE, we can be killed - check before trying to do logic.. */
+            if (WeakActor.IsValid())
+                HandleProgress(BytesReceived, TotalContentLength);
         });
 
     // Bind completion
