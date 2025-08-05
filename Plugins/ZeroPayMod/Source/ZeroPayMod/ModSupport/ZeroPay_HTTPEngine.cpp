@@ -130,7 +130,8 @@ void UZeroPayModAsync_GetModioFile::ParseModioFileInfoJSON(FString ResponseStrin
     }
 }
 
-void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, int64 UncompressedSize, const FString& BinaryURL)
+void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, int64 UncompressedSize, const FString& BinaryURL,
+                                                           FString Summary, FString Author, int64 Ratings, int64 Category, FString LogoURL) 
 {
     UZeroPayMod_GetModioFileResult* Result = NewObject<UZeroPayMod_GetModioFileResult>();
     Result->message = Message;
@@ -139,6 +140,11 @@ void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const 
     Result->date_updated = DateUpdated ;
     Result->UncompressedSize = UncompressedSize ;
     Result->binaryurl = BinaryURL;
+    Result->summary = Summary;
+    Result->author = Author;
+    Result->ratings = Ratings;
+    Result->category = Category;
+    Result->logourl = LogoURL;
 
     if (bSuccess)
     {

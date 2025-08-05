@@ -32,7 +32,25 @@ public:
 	int64 UncompressedSize;
 
 	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+	FString display_name ;
+
+	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+	FString summary ;
+
+	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+	FString author ;
+
+	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+	int64 ratings ;
+
+	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+	int64 category ;
+
+	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
 	FString binaryurl;
+
+	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+	FString logourl;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnModioFileResultReceived, UZeroPayMod_GetModioFileResult*, Result);
@@ -65,7 +83,8 @@ public:
 	void ParseModioFileInfoJSON(FString ResponseString) ;
 
 private:
-	void HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, int64 UncompressedSize, const FString& BinaryURL);
+	void HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, int64 UncompressedSize, const FString& BinaryURL,
+								FString Summary, FString Author, int64 Ratings, int64 Category, FString LogoURL);
 };
 
 

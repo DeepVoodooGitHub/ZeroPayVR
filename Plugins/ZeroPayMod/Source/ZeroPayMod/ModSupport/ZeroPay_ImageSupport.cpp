@@ -13,7 +13,7 @@ UZeroPay_ImageLoader* UZeroPay_ImageLoader::LoadPNGTextureAsync(const FString& I
 	Node->FilePath = InFilePath;
 	return Node;
 }
-
+7
 void UZeroPay_ImageLoader::Activate()
 {
 	Async(EAsyncExecution::ThreadPool, [this]()
