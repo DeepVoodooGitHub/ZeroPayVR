@@ -9,31 +9,40 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 
-ZeroPay_HTTPEngine::ZeroPay_HTTPEngine()
-{
-}
+/*******************************************************************************************************************************/
+/*                                    >>> GetFiles - Pulls the .PAK file information for a mod <<<                             *
+/*******************************************************************************************************************************/
 
-ZeroPay_HTTPEngine::~ZeroPay_HTTPEngine()
-{
-}
-
-UZeroPayModAsync_GetModioFile* UZeroPayModAsync_GetModioFile::GetModioFileInfoAsync(FModioModID ModID, FModioPlatform Platform)
+UZeroPayModAsync_GetModioFile* UZeroPayModAsync_GetModioFile::GetModioFilesAsync(FModioModID ModID, FModioPlatform Platform)
 {
     UZeroPayModAsync_GetModioFile* Node = NewObject<UZeroPayModAsync_GetModioFile>();
-    Node->StartFileInfoRequest(ModID, Platform);
+    Node->StartModioGetFilesRequest(ModID, Platform);
     return Node;
 }
 
-void UZeroPayModAsync_GetModioFile::StartFileInfoRequest(FModioModID ModID, FModioPlatform Platform)
+void UZeroPayModAsync_GetModioFile::StartModioGetFilesRequest(FModioModID ModID, FModioPlatform Platform)
 {
     FHttpModule* Http = &FHttpModule::Get();
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 
     Request->OnProcessRequestComplete().BindLambda([this](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSuccess)
         {
+
+#if WITH_EDITOR
+            /* If we're dying, ignore */
+            if (IsEngineExitRequested() || GExitPurge)
+                return;
+
+            if (GEditor && !GEditor->PlayWorld)
+                return;
+
+            if (!IsValid(this))
+                return;
+#endif
+
             if (bSuccess && Res.IsValid())
             {
-                ParseModioFileInfoJSON(Res->GetContentAsString());
+                ParseModioFilesJSON(Res->GetContentAsString());
             }
             else
             {
@@ -57,7 +66,7 @@ void UZeroPayModAsync_GetModioFile::StartFileInfoRequest(FModioModID ModID, FMod
     Request->ProcessRequest();
 }
 
-void UZeroPayModAsync_GetModioFile::ParseModioFileInfoJSON(FString ResponseString)
+void UZeroPayModAsync_GetModioFile::ParseModioFilesJSON(FString ResponseString)
 {
     // Parse the JSON string
     TSharedPtr<FJsonObject> JsonObject;
@@ -130,21 +139,20 @@ void UZeroPayModAsync_GetModioFile::ParseModioFileInfoJSON(FString ResponseStrin
     }
 }
 
-void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, int64 UncompressedSize, const FString& BinaryURL,
-                                                           FString Summary, FString Author, int64 Ratings, int64 Category, FString LogoURL) 
+void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const FString& Message, const FString& Filename, int64 FileID, int64 DateUpdated, int64 UncompressedSize, const FString& BinaryURL)
 {
-    UZeroPayMod_GetModioFileResult* Result = NewObject<UZeroPayMod_GetModioFileResult>();
+    UZeroPayMod_GetFilesResult* Result = NewObject<UZeroPayMod_GetFilesResult>();
     Result->message = Message;
     Result->filename = Filename;
     Result->file_id = FileID;
     Result->date_updated = DateUpdated ;
     Result->UncompressedSize = UncompressedSize ;
     Result->binaryurl = BinaryURL;
-    Result->summary = Summary;
-    Result->author = Author;
-    Result->ratings = Ratings;
-    Result->category = Category;
-    Result->logourl = LogoURL;
+    //Result->summary = Summary;
+    //Result->author = Author;
+    //Result->ratings = Ratings;
+    //Result->category = Category;
+    //Result->logourl = LogoURL;
 
     if (bSuccess)
     {
@@ -156,6 +164,174 @@ void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const 
     }
 }
 
+
+
+/*******************************************************************************************************************************/
+/*                                        >>> GetModInfo - Pulls common info about the mod <<<                                 *
+/*******************************************************************************************************************************/
+
+UZeroPayModAsync_GetModioModInfo* UZeroPayModAsync_GetModioModInfo::GetModioModInfoAsync(FModioModID ModID)
+{
+    UZeroPayModAsync_GetModioModInfo* Node = NewObject<UZeroPayModAsync_GetModioModInfo>();
+    Node->StartModioGetModInfoRequest(ModID);
+    return Node;
+}
+
+void UZeroPayModAsync_GetModioModInfo::StartModioGetModInfoRequest(FModioModID ModID)
+{
+    FHttpModule* Http = &FHttpModule::Get();
+    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+
+    Request->OnProcessRequestComplete().BindLambda([this](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSuccess)
+        {
+#if WITH_EDITOR
+            /* If we're dying, ignore */
+            if (IsEngineExitRequested() || GExitPurge)
+                return;
+
+            if (GEditor && !GEditor->PlayWorld) 
+                return;
+
+            if (!IsValid(this))
+                return;
+#endif
+
+            if (bSuccess && Res.IsValid())
+            {
+                ParseModioModInfoJSON(Res->GetContentAsString());
+            }
+            else
+            {
+                // Failed
+                HandleRequestCompleted(false, TEXT("HTTP Request to mod.io failed"), 0, TEXT(""), TEXT(""), TEXT(""), TEXT(""), TArray<FString>(), 0.0f, 0, 0, TEXT(""));
+            }
+        });
+
+    FString ModIDString = ModID.ToString();
+    FString URL = FString::Printf(TEXT("https://g-%s.modapi.io/v1/games/%s/mods/%s/?api_key=%s&_limit=1"), *FGameID, *FGameID, *ModIDString, *FAPIKey);
+    Request->SetURL(URL);
+
+    Request->SetVerb("GET");
+    Request->ProcessRequest();
+}
+
+void UZeroPayModAsync_GetModioModInfo::ParseModioModInfoJSON(const FString ResponseString)
+{
+    // Parse the JSON string
+    TSharedPtr<FJsonObject> JsonObject;
+    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseString);
+
+    if (FJsonSerializer::Deserialize(Reader, JsonObject) && JsonObject.IsValid())
+    {
+        int64 ModID = JsonObject->GetIntegerField(TEXT("id"));
+        FString Username;
+        if (JsonObject->HasTypedField<EJson::Object>(TEXT("submitted_by")))
+        {
+            TSharedPtr<FJsonObject> SubmittedBy = JsonObject->GetObjectField(TEXT("submitted_by"));
+            Username = SubmittedBy->GetStringField(TEXT("username"));
+        }
+
+        FString Name = JsonObject->GetStringField(TEXT("name"));
+        FString Summary = JsonObject->GetStringField(TEXT("summary"));
+
+        // Logo thumbnail
+        FString ThumbURL;
+        if (JsonObject->HasTypedField<EJson::Object>(TEXT("logo")))
+        {
+            TSharedPtr<FJsonObject> LogoObject = JsonObject->GetObjectField(TEXT("logo"));
+            ThumbURL = LogoObject->GetStringField(TEXT("thumb_640x360"));
+        }
+
+        // Tags array
+        TArray<FString> TagNames;
+        const TArray<TSharedPtr<FJsonValue>>* TagsArray;
+        if (JsonObject->TryGetArrayField(TEXT("tags"), TagsArray))
+        {
+            for (const TSharedPtr<FJsonValue>& TagValue : *TagsArray)
+            {
+                if (TagValue->Type == EJson::Object)
+                {
+                    TSharedPtr<FJsonObject> TagObject = TagValue->AsObject();
+                    if (TagObject.IsValid() && TagObject->HasField(TEXT("name")))
+                    {
+                        TagNames.Add(TagObject->GetStringField(TEXT("name")));
+                    }
+                }
+            }
+        }
+
+        // Rating
+        float RatingsPercentage = 0.0f;
+        if (JsonObject->HasTypedField<EJson::Object>(TEXT("stats")))
+        {
+            TSharedPtr<FJsonObject> StatsObject = JsonObject->GetObjectField(TEXT("stats"));
+            RatingsPercentage = StatsObject->GetNumberField(TEXT("ratings_percentage_positive"));
+        }
+
+        // Modfile info
+        int64 Filesize = 0;
+        int64 FilesizeUncompressed = 0;
+        FString BinaryURL;
+        if (JsonObject->HasTypedField<EJson::Object>(TEXT("modfile")))
+        {
+            TSharedPtr<FJsonObject> ModfileObject = JsonObject->GetObjectField(TEXT("modfile"));
+
+            Filesize = ModfileObject->GetIntegerField(TEXT("filesize"));
+            FilesizeUncompressed = ModfileObject->GetIntegerField(TEXT("filesize_uncompressed"));
+
+            if (ModfileObject->HasTypedField<EJson::Object>(TEXT("download")))
+            {
+                TSharedPtr<FJsonObject> DownloadObject = ModfileObject->GetObjectField(TEXT("download"));
+                BinaryURL = DownloadObject->GetStringField(TEXT("binary_url"));
+            }
+        }
+
+        // Now pass everything to your handler
+        HandleRequestCompleted(true, TEXT(""), ModID, Username, Name, Summary, ThumbURL, TagNames, RatingsPercentage, Filesize, FilesizeUncompressed, BinaryURL);
+    }
+    else
+    {
+        HandleRequestCompleted(
+            false,
+            TEXT("Received invalid JSON from mod.io server"), 0, TEXT(""), TEXT(""), TEXT(""), TEXT(""), TArray<FString>(), 0.0f, 0, 0, TEXT("")
+        );
+    }
+}
+
+void UZeroPayModAsync_GetModioModInfo::HandleRequestCompleted(bool bSuccess, const FString& ErrorMessage, int64 ModID, const FString& Username, const FString& Name, const FString& Summary, const FString& ThumbURL,
+                                                                const TArray<FString>& TagNames, float RatingsPercentage, int64 Filesize, int64 FilesizeUncompressed, const FString& BinaryURL)
+{
+    UZeroPayMod_GetModInfoResult* Result = NewObject<UZeroPayMod_GetModInfoResult>();
+    Result->message = ErrorMessage;
+    Result->mod_id = ModID;
+    Result->display_name = Name;
+    Result->summary = Summary;
+    Result->author = Username;
+    Result->ratings = static_cast<int64>(RatingsPercentage);
+    Result->category = TagNames.Num() > 0 ? static_cast<int64>(FCrc::StrCrc32(*TagNames[0])) : 0; // Optional: hash first tag name
+    Result->download_size = FilesizeUncompressed;
+    Result->file_size = Filesize;
+    Result->binaryurl = BinaryURL;
+    Result->logourl = ThumbURL;
+
+    if (!OnSuccess.IsBound() || !OnFailure.IsBound())
+        return ;
+
+    if (bSuccess)
+    {
+        OnSuccess.Broadcast(Result);
+    }
+    else
+    {
+        OnFailure.Broadcast(Result);
+    }
+}
+
+
+
+/*******************************************************************************************************************************/
+/*                                >>> Download Mod - Actually grabs the compress zip from mod.io <<<                           *
+/*******************************************************************************************************************************/
 
 UZeroPayMod_AsyncHttpDownload* UZeroPayMod_AsyncHttpDownload::DownloadFile(FString URL)
 {

@@ -1,7 +1,7 @@
 // (c) Ginger Ninja Games Ltd
 
-#include "Debug/ZeroPay_InternalDebug.h"
 #include "VR/ZeroPay_GameInstance_r1.h"
+#include "Debug/ZeroPay_InternalDebug.h"
 
 void UZeroPay_GameInstance_r1::Init()
 {

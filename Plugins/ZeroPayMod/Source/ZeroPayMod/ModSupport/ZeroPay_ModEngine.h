@@ -9,6 +9,7 @@
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
 #include "ZeroPay_ModGlobal.h"
+#include "ZeroPay_HTTPEngine.h"
 #include "ZeroPayMod_DefinitionDataAsset.h"
 #include "ZeroPay_ModEngine.generated.h"
 
@@ -22,7 +23,8 @@ enum FZeroPayMod_SubscribedModState
     Unknown,
     Valid,          /* Pak is up-to-date and correct size */
     Invalid,        /* Mod.io failed to update us */
-    Updating        /* Attempt to update mod */
+    Updating,       /* Attempt to update mod */
+    Unpacking       /* Unzip in operation */
 };
 
 UCLASS(BlueprintType)
@@ -117,6 +119,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
     static bool RemoveInstalledMod(UZeroPayMod_SubscribedMod* Mod);
 
+    UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
+    static UZeroPayMod_SubscribedMod* CreateSubscribedMod(UZeroPayMod_GetModInfoResult* modinfoResult);
+
     // Returns the file size of any given mod (for a platform) on the file system
     UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Engine")
     static int64 GetPakFileSize(FModioModID ModID, FModioPlatform Platform);
@@ -132,6 +137,10 @@ public:
     // Changes certain state file information (when updates occur)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
     static bool UpdateModStateFile(FModioModID ModID, int64 NewDateUpdated, int64 NewUncompressedSize) ;
+
+    // Writes a mod state file using the mod info, usually used for subscribed modes (creates directory too)
+    UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
+    static bool WriteModStateFileViaModInfo(FModioModID ModID, UZeroPayMod_GetModInfoResult* ModInfo) ;
 
     /* >>> <Misc> Operations <<< */
 

@@ -99,6 +99,34 @@ bool UZeroPay_ModEngine::RemoveInstalledMod(UZeroPayMod_SubscribedMod* Mod)
     return bSuccess;
 }
 
+UZeroPayMod_SubscribedMod* UZeroPay_ModEngine::CreateSubscribedMod(UZeroPayMod_GetModInfoResult* modinfoResult)
+{
+    if (!modinfoResult)
+    {
+        return nullptr;
+    }
+
+    UZeroPayMod_SubscribedMod* NewMod = NewObject<UZeroPayMod_SubscribedMod>();
+
+    // Zero any run-time mod file related info
+    NewMod->mod_id = modinfoResult->mod_id;
+    NewMod->file_id = 0; 
+    NewMod->display_name = modinfoResult->display_name;
+    NewMod->summary = modinfoResult->summary;
+    NewMod->author = modinfoResult->author;
+    NewMod->date_updated = 0; 
+    NewMod->popularity_today = 0; 
+    NewMod->total_downloads = 0; 
+    NewMod->ratings_weighted_aggregate = modinfoResult->ratings;
+    NewMod->ModState = FZeroPayMod_SubscribedModState::Unknown;
+    NewMod->UGCCategory = EUGCTagCategory::FullMod; // fallback default
+    NewMod->uncompressed_size = modinfoResult->download_size;
+    NewMod->retry_count = 0;
+    NewMod->progress = 0.0f;
+
+    return NewMod;
+}
+
 int64 UZeroPay_ModEngine::GetPakFileSize(FModioModID ModID, FModioPlatform Platform)
 {
     FString BasePath = FPaths::ProjectSavedDir();
@@ -271,5 +299,65 @@ bool UZeroPay_ModEngine::UpdateModStateFile(FModioModID ModID, int64 NewDateUpda
     }
 
     UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, FString::Printf(TEXT("Failed to update state.json: %s"), *StateFilePath), FDebugConsoleLevel::Error);
+    return false;
+}
+
+bool UZeroPay_ModEngine::WriteModStateFileViaModInfo(FModioModID ModID, UZeroPayMod_GetModInfoResult* ModInfo)
+{
+    if (!ModInfo)
+    {
+        UE_LOG(LogTemp, Error, TEXT("WriteModStateFile: ModInfo is null"));
+        return false ;
+    }
+
+    FString BasePath = FPaths::ProjectSavedDir();
+    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
+
+    // Ensure directory exists
+    if (!IFileManager::Get().DirectoryExists(*DestinationPath))
+    {
+        if (!IFileManager::Get().MakeDirectory(*DestinationPath, true))
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to create directory: %s"), *DestinationPath);
+            return false ;
+        }
+    }
+
+    // Construct the full path to the state.json file
+    FString StateFilePath = FPaths::Combine(DestinationPath, TEXT("state.json"));
+
+    // Create a JSON object
+    TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject());
+    JsonObject->SetStringField(TEXT("file_id"), TEXT("0")); // Not available in ModInfo
+    JsonObject->SetStringField(TEXT("date_updated"), TEXT("0")); // Not available in ModInfo
+    JsonObject->SetStringField(TEXT("display_name"), ModInfo->display_name);
+    JsonObject->SetStringField(TEXT("summary"), ModInfo->summary);
+    JsonObject->SetStringField(TEXT("author"), ModInfo->author);
+    JsonObject->SetStringField(TEXT("uncompressed_size"), FString::Printf(TEXT("%lld"), ModInfo->download_size));
+    JsonObject->SetStringField(TEXT("ratings_weighted_aggregate"), FString::Printf(TEXT("%lld"), ModInfo->ratings));
+    JsonObject->SetStringField(TEXT("category"), TEXT("0")); // Not available in ModInfo
+
+    // Write JSON to string
+    FString OutputString;
+    TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
+    if (FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer))
+    {
+        // Save the string to file
+        if (FFileHelper::SaveStringToFile(OutputString, *StateFilePath))
+        {
+            UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, FString::Printf(TEXT("Successfully wrote state.json to: %s"), *StateFilePath), FDebugConsoleLevel::Log);
+            return true ;
+        }
+        else
+        {
+            UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, FString::Printf(TEXT("Failed to write state.json to: %s"), *StateFilePath), FDebugConsoleLevel::Error);
+        }
+    }
+    else
+    {
+        UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, FString::Printf(TEXT("Failed to write state.json to: %s"), *StateFilePath), FDebugConsoleLevel::Error);
+    }
+
     return false;
 }
