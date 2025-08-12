@@ -148,11 +148,6 @@ void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const 
     Result->date_updated = DateUpdated ;
     Result->UncompressedSize = UncompressedSize ;
     Result->binaryurl = BinaryURL;
-    //Result->summary = Summary;
-    //Result->author = Author;
-    //Result->ratings = Ratings;
-    //Result->category = Category;
-    //Result->logourl = LogoURL;
 
     if (bSuccess)
     {

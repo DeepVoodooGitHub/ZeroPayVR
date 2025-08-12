@@ -123,6 +123,7 @@ UZeroPayMod_SubscribedMod* UZeroPay_ModEngine::CreateSubscribedMod(UZeroPayMod_G
     NewMod->uncompressed_size = modinfoResult->download_size;
     NewMod->retry_count = 0;
     NewMod->progress = 0.0f;
+    NewMod->logourl = modinfoResult->logourl ;
 
     return NewMod;
 }

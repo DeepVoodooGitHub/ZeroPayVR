@@ -16,6 +16,7 @@
 // Delegates for Blueprint callbacks
 DECLARE_DYNAMIC_DELEGATE(FOnUnzipSuccess);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnUnzipFailure, const FString&, ErrorMessage);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSubscribedModUpdated, UZeroPayMod_SubscribedMod*, Mod);
 
 UENUM(BlueprintType)
 enum FZeroPayMod_SubscribedModState
@@ -76,6 +77,14 @@ public:
     // Used by BP's to update progress (such as downloading from mod.io, UI only)
     UPROPERTY(BlueprintReadWrite, Category = "ZeroPay Modio Support")
     float progress ;
+
+    // Internal storage for logo URL (may be out of date, unless just read via GetModInfoAsync)
+    UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+    FString logourl;
+
+    // Event for changes to the subscribed item that require re-visualisation / procesrsing
+    UPROPERTY(BlueprintAssignable, BlueprintCallable, Category = "ZeroPay|Events")
+    FOnSubscribedModUpdated OnInternalsUpdated;
 
     UFUNCTION(BlueprintPure, Category = "ZeroPay Modio Support")
     bool IsOutOfDate(int64 current_date_updated)
