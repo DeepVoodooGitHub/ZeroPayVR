@@ -128,8 +128,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
     static bool RemoveInstalledMod(UZeroPayMod_SubscribedMod* Mod);
 
+    // Creates a subscribed mod from a GetModInfo result
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
     static UZeroPayMod_SubscribedMod* CreateSubscribedMod(UZeroPayMod_GetModInfoResult* modinfoResult);
+
+    // Server - Creates a basic mod for use in server
+    UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
+    static UZeroPayMod_SubscribedMod* CreateServerSubscribedMod(int64 ModID, EUGCTagCategory Category);
 
     // Returns the file size of any given mod (for a platform) on the file system
     UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Engine")
@@ -141,7 +146,7 @@ public:
 
     // Reads a mod state file (so we can check for updates)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static bool ReadModStateFile(FModioModID ModID, FString& DisplayName, int64& OutModID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory) ;
+    static bool ReadModStateFile(FModioModID ModID, FString& DisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory) ;
 
     // Changes certain state file information (when updates occur)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")

@@ -128,6 +128,31 @@ UZeroPayMod_SubscribedMod* UZeroPay_ModEngine::CreateSubscribedMod(UZeroPayMod_G
     return NewMod;
 }
 
+UZeroPayMod_SubscribedMod* UZeroPay_ModEngine::CreateServerSubscribedMod(int64 ModID, EUGCTagCategory Category)
+{
+
+    UZeroPayMod_SubscribedMod* NewMod = NewObject<UZeroPayMod_SubscribedMod>();
+
+    // Create a basic structure with ID and category set
+    NewMod->mod_id = ModID ;
+    NewMod->file_id = 0;
+    NewMod->display_name = "Server mod";
+    NewMod->summary = "";
+    NewMod->author = "" ;
+    NewMod->date_updated = 0;
+    NewMod->popularity_today = 0;
+    NewMod->total_downloads = 0;
+    NewMod->ratings_weighted_aggregate = 0 ;
+    NewMod->ModState = FZeroPayMod_SubscribedModState::Valid;
+    NewMod->UGCCategory = Category;
+    NewMod->uncompressed_size = 0 ;
+    NewMod->retry_count = 0;
+    NewMod->progress = 0.0f;
+    NewMod->logourl = 0;
+
+    return NewMod;
+}
+
 int64 UZeroPay_ModEngine::GetPakFileSize(FModioModID ModID, FModioPlatform Platform)
 {
     FString BasePath = FPaths::ProjectSavedDir();
@@ -188,7 +213,7 @@ void UZeroPay_ModEngine::WriteModStateFile(FModioModID ModID, FString DisplayNam
     }
 }
 
-bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, FString& OutDisplayName, int64& OutModID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory)
+bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, FString& OutDisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory)
 {
     FString BasePath = FPaths::ProjectSavedDir();
     FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
@@ -223,8 +248,8 @@ bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, FString& OutDisplay
     }
 
     // Extract fields
-    FString ModIDStr, DateUpdatedStr, DisplayNameStr, UncompressedSizeStr, SummaryStr, AuthorStr, RatingsStr, CategoryStr;
-    if (!JsonObject->TryGetStringField(TEXT("file_id"), ModIDStr) ||
+    FString FileIDStr, DateUpdatedStr, DisplayNameStr, UncompressedSizeStr, SummaryStr, AuthorStr, RatingsStr, CategoryStr;
+    if (!JsonObject->TryGetStringField(TEXT("file_id"), FileIDStr) ||
         !JsonObject->TryGetStringField(TEXT("date_updated"), DateUpdatedStr) ||
         !JsonObject->TryGetStringField(TEXT("uncompressed_size"), UncompressedSizeStr) ||
         !JsonObject->TryGetStringField(TEXT("display_name"), DisplayNameStr) ||
@@ -238,7 +263,7 @@ bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, FString& OutDisplay
     }
 
     // Convert strings to int64
-    OutModID = FCString::Strtoui64(*ModIDStr, nullptr, 10);
+    OutFileID = FCString::Strtoui64(*FileIDStr, nullptr, 10);
     OutDateUpdated = FCString::Strtoui64(*DateUpdatedStr, nullptr, 10);
     OutUncompressedSize = FCString::Strtoui64(*UncompressedSizeStr, nullptr, 10);
     OutRatings = FCString::Strtoui64(*RatingsStr, nullptr, 10);

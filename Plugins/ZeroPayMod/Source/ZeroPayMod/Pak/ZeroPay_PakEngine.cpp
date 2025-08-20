@@ -22,6 +22,11 @@ bool UZeroPay_PakEngineLibrary::UnmountPak(const FString& PakFilePath)
     return UZeroPay_PakEngine::Get()->UnmountPak(PakFilePath) ;
 }
 
+bool UZeroPay_PakEngineLibrary::IsValidMountPak(const FString& PakFilePath)
+{
+    return UZeroPay_PakEngine::Get()->IsValidMountPak(PakFilePath);
+}
+
 void UZeroPay_PakEngineLibrary::RegisterMountPoint(const FString& RootPath, const FString& ContentPath)
 {
     return UZeroPay_PakEngine::Get()->RegisterMountPoint(RootPath, ContentPath);
@@ -31,6 +36,24 @@ void UZeroPay_PakEngineLibrary::UnRegisterMountPoint(const FString& RootPath, co
 {
     return UZeroPay_PakEngine::Get()->UnRegisterMountPoint(RootPath, ContentPath);
 }
+
+void UZeroPay_PakEngineLibrary::RegisterAssetRegistryFile(const FString& GamePath)
+{
+    FArrayReader SerializedData;
+
+    if (FFileHelper::LoadFileToArray(SerializedData, *GamePath))
+    {
+        // Move to start again
+        SerializedData.Seek(0);
+
+        // Get registry module
+        IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(AssetRegistryConstants::ModuleName).Get();
+
+        FAssetRegistryState PakState;
+        PakState.Load(SerializedData);
+        AssetRegistry.AppendState(PakState);
+    }
+} 
 
 FString UZeroPay_PakEngineLibrary::GetPakPath(FModioModID ModID, FModioPlatform Platform)
 {
@@ -129,6 +152,15 @@ bool UZeroPay_PakEngine::MountPak(const FString& PakFilePath, const FString& Mou
     else
         bResult = GetPakPlatformFile()->Mount(*PakFilePath, PakOrder, NULL);
     return bResult;
+}
+
+
+bool UZeroPay_PakEngine::IsValidMountPak(const FString& PakFilePath)
+{
+    if (!FPaths::FileExists(PakFilePath))
+        return false;
+
+    return true;
 }
 
 

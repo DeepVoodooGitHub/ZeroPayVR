@@ -19,7 +19,7 @@
 #include "HAL/FileManager.h"
 #include "Runtime/Core/Public/Async/Async.h"
 #include "GenericPlatform/GenericPlatformFile.h"
-#include "HAL/PlatformFilemanager.h"
+#include "HAL/PlatformFileManager.h"
 #include "Misc/FileHelper.h"
 //#include "AssetRegistryModule.h"
 #include "Serialization/BufferArchive.h"

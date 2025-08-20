@@ -133,34 +133,20 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID 
 
     Async(EAsyncExecution::ThreadPool, [LocalZipFilePath, LocalDestinationPath, OnSuccess, OnFailure, ModID]()
         {
-            try
-            {
-                std::string ZipPathStr = TCHAR_TO_UTF8(*LocalZipFilePath);
-                std::string DestFolderStr = TCHAR_TO_UTF8(*LocalDestinationPath);
+            bool bFailed = false;
 
-                miniz_cpp::zip_file zip(ZipPathStr);
-                zip.extractall(DestFolderStr);
+            std::string ZipPathStr = TCHAR_TO_UTF8(*LocalZipFilePath);
+            std::string DestFolderStr = TCHAR_TO_UTF8(*LocalDestinationPath);
 
-                // Back to game thread
-                AsyncTask(ENamedThreads::GameThread, [OnSuccess]()
-                    {
-                        UE_LOG(LogTemp, Log, TEXT("Unzip succeeded."));
-                        OnSuccess.ExecuteIfBound();
-                    });
-            }
-            catch (const std::exception& e)
-            {
-                FString ErrorMsg = UTF8_TO_TCHAR(e.what());
+            miniz_cpp::zip_file zip(ZipPathStr);
+            zip.extractall(DestFolderStr);
 
-                // Clean up the directory
-                IFileManager::Get().DeleteDirectory(*LocalDestinationPath, false, true);
-
-                AsyncTask(ENamedThreads::GameThread, [ErrorMsg, OnFailure]()
-                    {
-                        UE_LOG(LogTemp, Error, TEXT("Unzip failed: %s"), *ErrorMsg);
-                        OnFailure.ExecuteIfBound(ErrorMsg);
-                    });
-            }
+            // Back to game thread
+            AsyncTask(ENamedThreads::GameThread, [OnSuccess]()
+                {
+                    UE_LOG(LogTemp, Log, TEXT("Unzip succeeded."));
+                    OnSuccess.ExecuteIfBound();
+                });
         });
 }
 #endif

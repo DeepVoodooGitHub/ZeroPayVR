@@ -25,6 +25,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Pak Management")
     static bool UnmountPak(const FString& PakFilePath);
 
+	/* Tests if a supplied path is to a valid Pak file (or not) */
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Pak Management")
+	static bool IsValidMountPak(const FString& PakFilePath);
+
 	/* Registers a mount point */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Pak Management")
 	static void RegisterMountPoint(const FString& RootPath, const FString& ContentPath);
@@ -32,6 +36,10 @@ public:
 	/* Unregister previous mount point */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Pak Management")
 	static void UnRegisterMountPoint(const FString& RootPath, const FString& ContentPath);
+
+	/* Registers / installed a new asset registry file */
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Pak Management")
+	static void RegisterAssetRegistryFile(const FString& GamePath) ;
 
     /* Get path to a Pak files location */
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Pak Management")
@@ -119,6 +127,7 @@ public:
 
     bool MountPak(const FString& PakFilePath, const FString& MountPoint, int32 PakOrder = 0);
     bool UnmountPak(const FString& PakFilePath);
+	bool IsValidMountPak(const FString& PakFilePath);
 
 	void RegisterMountPoint(const FString& RootPath, const FString& ContentPath); 
 	void UnRegisterMountPoint(const FString& RootPath, const FString& ContentPath);

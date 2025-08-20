@@ -12,6 +12,8 @@
 #include "ZeroPay_DebugConsoleComponent.h"
 #include "ZeroPay_DebugSupport.generated.h"
 
+static bool bClientOutputLogsToDisk = false;
+
 UCLASS()
 class ZEROPAYMOD_API UZeroPay_DebugSupport : public UBlueprintFunctionLibrary
 {
@@ -30,7 +32,7 @@ public:
 		FString ObjectName = "[GameInstance]";
 
 		// Dedicated server's just log to standard UE5 output
-		if (IsRunningDedicatedServer() || target == nullptr)
+		if (IsRunningDedicatedServer() || target == nullptr || bClientOutputLogsToDisk)
 		{
 			/* Include name  */
 			if (bIncludeObjectName)
@@ -48,26 +50,25 @@ public:
 
 			switch (debugConsoleLevel)
 			{
-			case None:
-			case Log:
-			{
-				/* Output in Green the message */
-				UE_LOG(LogZeroPay, Log, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName, *value);
-				break;
-			}
-			case Warn:
-			{
-				/* Yellow warnings */
-				UE_LOG(LogZeroPay, Warning, TEXT("\x1b[93m(%s)\x1b[0m \x1b[33m%s\x1b[0m"), *ObjectName, *value);
-				break;
-			}
-			case Error:
-			{
-				/* Red errors */
-				UE_LOG(LogZeroPay, Error, TEXT("\x1b[93m(%s)\x1b[0m \x1b[31m%s\x1b[0m"), *ObjectName, *value);
-				break;
-			}
-
+				case None:
+				case Log:
+				{
+					/* Output in Green the message */
+					UE_LOG(LogZeroPay, Log, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName, *value);
+					break;
+				}
+				case Warn:
+				{
+					/* Yellow warnings */
+					UE_LOG(LogZeroPay, Warning, TEXT("\x1b[93m(%s)\x1b[0m \x1b[33m%s\x1b[0m"), *ObjectName, *value);
+					break;
+				}
+				case Error:
+				{
+					/* Red errors */
+					UE_LOG(LogZeroPay, Error, TEXT("\x1b[93m(%s)\x1b[0m \x1b[31m%s\x1b[0m"), *ObjectName, *value);
+					break;
+				}
 			}
 		}
 
@@ -106,6 +107,13 @@ public:
 		}
 
 		DebugConsoleComponent->SetDebugConsoleDisabled(bDisableDebugOutput);
+	}
+
+	// All "Add Debug Console Logs" will be piped to log file (client only)
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target"))
+	static void SetDebugConsoleToLogFile(bool bEnableLogOutput)
+	{
+		bClientOutputLogsToDisk = true;
 	}
 	
 };

@@ -9542,7 +9542,7 @@ namespace miniz_cpp
 
             if (archive_->m_zip_mode != MZ_ZIP_MODE_INVALID)
             {
-                throw std::runtime_error("");
+                return ;
             }
 
             buffer_.clear();
@@ -9581,7 +9581,8 @@ namespace miniz_cpp
 
             if (index == -1)
             {
-                throw std::runtime_error("not found");
+                zip_info result;
+                return result ;
             }
 
             return getinfo(index);
@@ -9727,7 +9728,7 @@ namespace miniz_cpp
             char *data = static_cast<char *>(mz_zip_reader_extract_file_to_heap(archive_.get(), info.filename.c_str(), &size, 0));
             if (data == nullptr)
             {
-                throw std::runtime_error("file couldn't be read");
+                return "" ;
             }
             std::string extracted(data, data + size);
             mz_free(data);
@@ -9743,7 +9744,7 @@ namespace miniz_cpp
         {
             if (archive_->m_zip_mode == MZ_ZIP_MODE_INVALID)
             {
-                throw std::runtime_error("not open");
+                return { true, "" } ;
             }
 
             for (auto &file : infolist())
@@ -9790,7 +9791,7 @@ namespace miniz_cpp
 
             if (!mz_zip_writer_add_mem(archive_.get(), arcname.c_str(), bytes.data(), bytes.size(), MZ_BEST_COMPRESSION))
             {
-                throw std::runtime_error("write error");
+                return;
             }
         }
 
@@ -9798,7 +9799,7 @@ namespace miniz_cpp
         {
             if (info.filename.empty() || info.date_time.year < 1980)
             {
-                throw std::runtime_error("must specify a filename and valid date (year >= 1980");
+                return;
             }
 
             if (archive_->m_zip_mode != MZ_ZIP_MODE_WRITING)
@@ -9811,7 +9812,7 @@ namespace miniz_cpp
             if (!mz_zip_writer_add_mem_ex(archive_.get(), info.filename.c_str(), bytes.data(), bytes.size(), info.comment.c_str(),
                     static_cast<mz_uint16>(info.comment.size()), MZ_BEST_COMPRESSION, 0, crc))
             {
-                throw std::runtime_error("write error");
+                return;
             }
         }
 
@@ -9840,7 +9841,7 @@ namespace miniz_cpp
 
             if (!mz_zip_reader_init_mem(archive_.get(), buffer_.data(), buffer_.size(), 0))
             {
-                throw std::runtime_error("bad zip");
+                return;
             }
         }
 
@@ -9858,7 +9859,7 @@ namespace miniz_cpp
 
                 if (!mz_zip_reader_init_mem(&archive_copy, buffer_copy.data(), buffer_copy.size(), 0))
                 {
-                    throw std::runtime_error("bad zip");
+                    return;
                 }
 
                 mz_zip_reader_end(archive_.get());
@@ -9869,14 +9870,14 @@ namespace miniz_cpp
 
                 if (!mz_zip_writer_init(archive_.get(), 0))
                 {
-                    throw std::runtime_error("bad zip");
+                    return;
                 }
 
                 for (unsigned int i = 0; i < static_cast<unsigned int>(archive_copy.m_total_files); i++)
                 {
                     if (!mz_zip_writer_add_from_zip_reader(archive_.get(), &archive_copy, i))
                     {
-                        throw std::runtime_error("fail");
+                        return;
                     }
                 }
 
@@ -9896,7 +9897,7 @@ namespace miniz_cpp
 
             if (!mz_zip_writer_init(archive_.get(), 0))
             {
-                throw std::runtime_error("bad zip");
+                return;
             }
         }
 
@@ -9929,7 +9930,7 @@ namespace miniz_cpp
 
             if (position == 3)
             {
-                throw std::runtime_error("didn't find end of central directory signature");
+                return;
             }
 
             uint16_t length = static_cast<uint16_t>(buffer_[position + 1]);

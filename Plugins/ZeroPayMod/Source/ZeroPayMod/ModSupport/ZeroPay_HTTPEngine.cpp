@@ -10,7 +10,7 @@
 #include "Serialization/JsonSerializer.h"
 
 /*******************************************************************************************************************************/
-/*                                    >>> GetFiles - Pulls the .PAK file information for a mod <<<                             *
+/*                                    >>> GetFiles - Pulls the .PAK file information for a mod <<<                             */
 /*******************************************************************************************************************************/
 
 UZeroPayModAsync_GetModioFile* UZeroPayModAsync_GetModioFile::GetModioFilesAsync(FModioModID ModID, FModioPlatform Platform)
@@ -162,7 +162,7 @@ void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const 
 
 
 /*******************************************************************************************************************************/
-/*                                        >>> GetModInfo - Pulls common info about the mod <<<                                 *
+/*                                        >>> GetModInfo - Pulls common info about the mod <<<                                 */
 /*******************************************************************************************************************************/
 
 UZeroPayModAsync_GetModioModInfo* UZeroPayModAsync_GetModioModInfo::GetModioModInfoAsync(FModioModID ModID)
@@ -325,7 +325,7 @@ void UZeroPayModAsync_GetModioModInfo::HandleRequestCompleted(bool bSuccess, con
 
 
 /*******************************************************************************************************************************/
-/*                                >>> Download Mod - Actually grabs the compress zip from mod.io <<<                           *
+/*                                >>> Download Mod - Actually grabs the compress zip from mod.io <<<                           */
 /*******************************************************************************************************************************/
 
 UZeroPayMod_AsyncHttpDownload* UZeroPayMod_AsyncHttpDownload::DownloadFile(FString URL)
