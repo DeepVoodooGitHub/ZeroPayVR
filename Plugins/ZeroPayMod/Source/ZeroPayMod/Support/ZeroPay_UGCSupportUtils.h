@@ -33,7 +33,7 @@ public:
 
 	// Create a new definition file with some initial data
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay UGC")
-	static void CreateAndSaveModDefinitionFile(FString UGCValue);
+	static void CreateAndSaveModDefinitionFile(FString UGCValue, FString Name, FString Description);
 
 	// Opens a file picker
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay UGC")

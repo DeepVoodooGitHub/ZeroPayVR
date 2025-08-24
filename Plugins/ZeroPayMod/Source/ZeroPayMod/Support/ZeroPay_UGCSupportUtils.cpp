@@ -30,7 +30,7 @@ void AZeroPay_UGCSupportUtils::Tick(float DeltaTime)
 
 }
 
-void AZeroPay_UGCSupportUtils::CreateAndSaveModDefinitionFile(FString UGCValue)
+void AZeroPay_UGCSupportUtils::CreateAndSaveModDefinitionFile(FString UGCValue, FString Name, FString Description)
 {
 	/* Valid.. create directory */
 	FString UGCPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()) + FString("ZeroPayMods/") + FString::Printf(TEXT("UGC%s"), *UGCValue);
@@ -45,6 +45,8 @@ void AZeroPay_UGCSupportUtils::CreateAndSaveModDefinitionFile(FString UGCValue)
 	UZeroPayMod_DefinitionDataAsset* level_asset = NewObject< UZeroPayMod_DefinitionDataAsset >(package, UZeroPayMod_DefinitionDataAsset::StaticClass(), *sAssetName, RF_Public | RF_Standalone);
 
 	level_asset->Definition.UGCID = UGCValue;
+	level_asset->Definition.Name = Name;
+	level_asset->Definition.Description = Description;
 
 	if (ensure(level_asset != nullptr))
 	{

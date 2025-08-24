@@ -17,6 +17,7 @@
 DECLARE_DYNAMIC_DELEGATE(FOnUnzipSuccess);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnUnzipFailure, const FString&, ErrorMessage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSubscribedModUpdated, UZeroPayMod_SubscribedMod*, Mod);
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnZipComplete, bool, bSuccess, const FString&, ResultPathOrError);
 
 UENUM(BlueprintType)
 enum FZeroPayMod_SubscribedModState
@@ -117,6 +118,10 @@ public:
     static void CleanTempStorage();
 
     /* >>> Upload Operations <<< */
+
+    /** Zips the .pak file for the specified platform. Returns true if successful, outputs the zip path */
+    UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
+    static void MakePlatformPakZip(FModioPlatform Platform, FOnZipComplete OnComplete);
 
     /* >>> Management Operations <<< */
 

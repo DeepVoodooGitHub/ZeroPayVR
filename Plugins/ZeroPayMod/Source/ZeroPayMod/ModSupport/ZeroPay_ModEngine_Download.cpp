@@ -87,7 +87,14 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID 
         });
 
 }
+
+void UZeroPay_ModEngine::MakePlatformPakZip(FModioPlatform Platform, FOnZipComplete OnComplete)
+{
+    /* No supported or needed in Linux */
+}
+
 #else
+
 /* Windows/Android */
 void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure)
 {
@@ -149,9 +156,58 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID 
                 });
         });
 }
+
+void UZeroPay_ModEngine::MakePlatformPakZip(FModioPlatform Platform, FOnZipComplete OnComplete)
+{
+    // Run async on thread pool
+    Async(EAsyncExecution::ThreadPool, [Platform, OnComplete]()
+        {
+            FString PlatformStr;
+            switch (Platform)
+            {
+            case FModioPlatform::ModIOPlatform_Windows:     PlatformStr = TEXT("Windows"); break;
+            case FModioPlatform::ModIOPlatform_Android:     PlatformStr = TEXT("Android"); break;
+            case FModioPlatform::ModIOPlatform_LinuxServer: PlatformStr = TEXT("LinuxServer"); break;
+            default:
+                AsyncTask(ENamedThreads::GameThread, [OnComplete]() {
+                    OnComplete.ExecuteIfBound(false, TEXT("Unknown platform."));
+                    });
+                return;
+            }
+
+            FString BaseDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Workshop"), PlatformStr);
+            FString PakPath = FPaths::Combine(BaseDir, PlatformStr + TEXT(".pak"));
+            FString ZipPath = FPaths::Combine(BaseDir, PlatformStr + TEXT(".zip"));
+
+            IPlatformFile& PF = FPlatformFileManager::Get().GetPlatformFile();
+            if (!PF.FileExists(*PakPath))
+            {
+                AsyncTask(ENamedThreads::GameThread, [OnComplete, PakPath]() {
+                    OnComplete.ExecuteIfBound(false, FString::Printf(TEXT("PAK file not found: %s"), *PakPath));
+                    });
+                return;
+            }
+
+            try
+            {
+                miniz_cpp::zip_file Zip;
+                Zip.write(TCHAR_TO_UTF8(*PakPath), TCHAR_TO_UTF8(*(PlatformStr + TEXT(".pak"))));
+                Zip.save(TCHAR_TO_UTF8(*ZipPath));
+
+                AsyncTask(ENamedThreads::GameThread, [OnComplete, ZipPath]() {
+                    OnComplete.ExecuteIfBound(true, ZipPath);
+                    });
+            }
+            catch (std::exception& e)
+            {
+                FString Err = UTF8_TO_TCHAR(e.what());
+                AsyncTask(ENamedThreads::GameThread, [OnComplete, Err]() {
+                    OnComplete.ExecuteIfBound(false, FString::Printf(TEXT("Zip error: %s"), *Err));
+                    });
+            }
+        });
+}
 #endif
-
-
 
 void UZeroPay_ModEngine::CleanTempStorage()
 {

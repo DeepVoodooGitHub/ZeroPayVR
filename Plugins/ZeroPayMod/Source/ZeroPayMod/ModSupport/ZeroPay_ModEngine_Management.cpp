@@ -4,7 +4,6 @@
 #include "Async/Async.h"
 #include "UObject/UObjectGlobals.h"
 #include "Debug/ZeroPay_InternalDebug.h"
-#include "Misc/Paths.h"
 
 TArray<UZeroPayMod_SubscribedMod*> UZeroPay_ModEngine::InitInstalledMods(UObject* Outer)
 {
