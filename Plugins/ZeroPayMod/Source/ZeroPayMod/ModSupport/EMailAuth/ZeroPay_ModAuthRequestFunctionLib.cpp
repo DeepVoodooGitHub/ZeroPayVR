@@ -106,13 +106,13 @@ static FRequestEmailAuthCodeAction* MakeLatentAction(FLatentActionInfo& LatentIn
 }
 
 // URL-encode (RFC 3986-ish) — used for api_key
-static FString UrlEncodeStrict(const FString& In)
+FString UZeroPay_ModAuthRequestFunctionLib::UrlEncodeStrict(const FString& In)
 {
     return FGenericPlatformHttp::UrlEncode(In); // produces %20 for spaces
 }
 
 // Form-URL-encode for application/x-www-form-urlencoded (space => '+')
-static FString FormUrlEncode(const FString& In)
+FString UZeroPay_ModAuthRequestFunctionLib::FormUrlEncode(const FString& In)
 {
     FString Enc = FGenericPlatformHttp::UrlEncode(In); // first percent-encode everything needed
     Enc.ReplaceInline(TEXT("%20"), TEXT("+"));         // then convert spaces to '+'

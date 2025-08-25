@@ -27,6 +27,11 @@ UCLASS()
 class ZEROPAYMOD_API UZeroPay_ModAuthExchangeFunctionLib : public UBlueprintFunctionLibrary
 {
     GENERATED_BODY()
+private:
+    // URL-encode (RFC 3986-ish) — used for api_key
+    static FString UrlEncodeStrict(const FString& In);
+    static FString FormUrlEncode(const FString& In);
+
 public:
     /**
      * Requests a mod.io email security code.
