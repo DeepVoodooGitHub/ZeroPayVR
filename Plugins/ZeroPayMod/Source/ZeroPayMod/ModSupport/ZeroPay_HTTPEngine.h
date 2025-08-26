@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "ModioSubsystem.h"
 #include "CoreMinimal.h"
 #include "ZeroPay_ModGlobal.h"
 #include "Kismet/BlueprintAsyncActionBase.h"
@@ -106,9 +105,9 @@ public:
 
 	// Get (temporary / dynamic) details on a modIO file for a given platform
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"), Category = "ZeroPay Modio Support")
-	static UZeroPayModAsync_GetModioFile* GetModioFilesAsync(FModioModID ModID, FModioPlatform Platform);
+	static UZeroPayModAsync_GetModioFile* GetModioFilesAsync(int64 ModID, FModioPlatform Platform);
 
-	void StartModioGetFilesRequest(FModioModID ModID, FModioPlatform Platform);
+	void StartModioGetFilesRequest(int64 ModID, FModioPlatform Platform);
 
 	void ParseModioFilesJSON(FString ResponseString) ;
 
@@ -131,9 +130,9 @@ public:
 
 	// Get (temporary / dynamic) details on a modIO file for a given platform
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"), Category = "ZeroPay Modio Support")
-	static UZeroPayModAsync_GetModioModInfo* GetModioModInfoAsync(FModioModID ModID);
+	static UZeroPayModAsync_GetModioModInfo* GetModioModInfoAsync(int64 ModID);
 
-	void StartModioGetModInfoRequest(FModioModID ModID);
+	void StartModioGetModInfoRequest(int64 ModID);
 
 	void ParseModioModInfoJSON(FString ResponseString);
 

@@ -11,7 +11,7 @@
 
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
-#include "HAL/PlatformFilemanager.h"
+#include "HAL/PlatformFileManager.h"
 
 #include "ModSupport/ZeroPay_ModGlobal.h"
 

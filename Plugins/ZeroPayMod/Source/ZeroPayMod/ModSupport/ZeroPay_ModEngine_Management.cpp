@@ -34,7 +34,7 @@ TArray<UZeroPayMod_SubscribedMod*> UZeroPay_ModEngine::InitInstalledMods(UObject
         FString FullPath = ModsBasePath / DirName;
 
         // Assume DirName is numeric (ModID)
-        FModioModID ModID = FModioModID(FCString::Atoi64(*DirName)); 
+        int64 ModID = uint64(FCString::Atoi64(*DirName)); 
 
         int64 OutModFileID = 0;
         int64 OutDateUpdated = 0;
@@ -152,10 +152,10 @@ UZeroPayMod_SubscribedMod* UZeroPay_ModEngine::CreateServerSubscribedMod(int64 M
     return NewMod;
 }
 
-int64 UZeroPay_ModEngine::GetPakFileSize(FModioModID ModID, FModioPlatform Platform)
+int64 UZeroPay_ModEngine::GetPakFileSize(int64 ModID, FModioPlatform Platform)
 {
     FString BasePath = FPaths::ProjectSavedDir();
-    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
     FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
     FString FilePath ;
 
@@ -171,10 +171,10 @@ int64 UZeroPay_ModEngine::GetPakFileSize(FModioModID ModID, FModioPlatform Platf
 }
 
 
-void UZeroPay_ModEngine::WriteModStateFile(FModioModID ModID, FString DisplayName, int64 ModFileID, int64 DateUpdated, int64 UncompressedSize, FString Summary, FString Author, int64 Ratings, int64 Category)
+void UZeroPay_ModEngine::WriteModStateFile(int64 ModID, FString DisplayName, int64 ModFileID, int64 DateUpdated, int64 UncompressedSize, FString Summary, FString Author, int64 Ratings, int64 Category)
 {
     FString BasePath = FPaths::ProjectSavedDir();
-    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
     FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
 
     // Construct the full path to the state.json file
@@ -212,10 +212,10 @@ void UZeroPay_ModEngine::WriteModStateFile(FModioModID ModID, FString DisplayNam
     }
 }
 
-bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, FString& OutDisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory)
+bool UZeroPay_ModEngine::ReadModStateFile(int64 ModID, FString& OutDisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory)
 {
     FString BasePath = FPaths::ProjectSavedDir();
-    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
     FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
 
     // Construct the full path to state.json
@@ -277,10 +277,10 @@ bool UZeroPay_ModEngine::ReadModStateFile(FModioModID ModID, FString& OutDisplay
 }
 
 
-bool UZeroPay_ModEngine::UpdateModStateFile(FModioModID ModID, int64 NewDateUpdated, int64 NewUncompressedSize)
+bool UZeroPay_ModEngine::UpdateModStateFile(int64 ModID, int64 NewDateUpdated, int64 NewUncompressedSize)
 {
     FString BasePath = FPaths::ProjectSavedDir();
-    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
     FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
 
     FString StateFilePath = FPaths::Combine(DestinationPath, TEXT("state.json"));
@@ -327,7 +327,7 @@ bool UZeroPay_ModEngine::UpdateModStateFile(FModioModID ModID, int64 NewDateUpda
     return false;
 }
 
-bool UZeroPay_ModEngine::WriteModStateFileViaModInfo(FModioModID ModID, UZeroPayMod_GetModInfoResult* ModInfo)
+bool UZeroPay_ModEngine::WriteModStateFileViaModInfo(int64 ModID, UZeroPayMod_GetModInfoResult* ModInfo)
 {
     if (!ModInfo)
     {
@@ -336,7 +336,7 @@ bool UZeroPay_ModEngine::WriteModStateFileViaModInfo(FModioModID ModID, UZeroPay
     }
 
     FString BasePath = FPaths::ProjectSavedDir();
-    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
     FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
 
     // Ensure directory exists

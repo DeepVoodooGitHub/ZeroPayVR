@@ -4,7 +4,6 @@
 
 #include "ZeroPayMod_DefinitionDataAsset.h"
 #include "EditorUtilityWidgetBlueprint.h"
-#include "ModioSubsystem.h"
 #include "Modules/ModuleManager.h"
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include <windows.h>
@@ -299,8 +298,6 @@ private:
 	FString LastMessage ;
 	bool bAbortOperation ;
 	bool bPollCompleted ;
-	FModioUnsigned64 currentProgress;
-	FModioUnsigned64 totalProgress;
 	/* >>> Reducer Vars */
 	TArray<FBox> PlayerZoneBounds;
 	TArray<UStaticMeshComponent*> StaticMeshComponentsToMerge;
@@ -386,14 +383,6 @@ public:
 	/* Start the cooking and packaging of all supported targets */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
 	static UZeroPayEditorCookPakOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
-
-	/* Returns the status of any upload.. */
-	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
-	static UZeroPayEditorCookPakOperationHandle* PollUploadStatus();
-
-	/* Cancels the upload */
-	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
-	static void CancelUploadStatus();
 
 	/* Reduces a PCVR level using the supplied settings, to a Quest3 level */
 	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")

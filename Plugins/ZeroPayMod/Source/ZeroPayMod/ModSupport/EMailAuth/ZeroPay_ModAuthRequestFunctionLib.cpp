@@ -125,15 +125,15 @@ void UZeroPay_ModAuthRequestFunctionLib::RequestEMailAuthCode(FLatentActionInfo 
     Message.Empty();
     Branches = EEmailAuthRequestResult::Failure;
 
-    UWorld* World ; 
     /* Silently fail if outside editor */
 #if !WITH_EDITOR
     return;
 #else
+    UWorld* World;
+
     if (!GIsEditor || !GEditor)
         return;
     World = GEditor->GetEditorWorldContext().World();
-#endif
     
     FLatentActionManager& LatentMgr = World->GetLatentActionManager();
     if (LatentMgr.FindExistingAction<FRequestEmailAuthCodeAction>(LatentInfo.CallbackTarget, LatentInfo.UUID))
@@ -155,4 +155,5 @@ void UZeroPay_ModAuthRequestFunctionLib::RequestEMailAuthCode(FLatentActionInfo 
 
     // IMPORTANT: pass the raw pointer, not &Action.Get() and not a shared ref
     LatentMgr.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, Action);
+#endif
 }

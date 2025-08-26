@@ -55,10 +55,10 @@ void UZeroPay_PakEngineLibrary::RegisterAssetRegistryFile(const FString& GamePat
     }
 } 
 
-FString UZeroPay_PakEngineLibrary::GetPakPath(FModioModID ModID, FModioPlatform Platform)
+FString UZeroPay_PakEngineLibrary::GetPakPath(int64 ModID, FModioPlatform Platform)
 {
     FString BasePath = FPaths::ProjectSavedDir();
-    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
     FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
 
     switch (Platform)

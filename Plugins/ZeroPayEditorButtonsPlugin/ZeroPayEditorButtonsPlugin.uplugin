@@ -27,10 +27,6 @@
 			"Enabled": true
 		},
 		{
-			"Name": "Modio",
-			"Enabled": true
-		},
-		{
 			"Name": "EditorScriptingUtilities",
 			"Enabled": true
 		},

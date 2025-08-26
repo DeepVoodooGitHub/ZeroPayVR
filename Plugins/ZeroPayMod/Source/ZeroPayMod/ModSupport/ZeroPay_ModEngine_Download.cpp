@@ -6,7 +6,7 @@
 
 #if PLATFORM_LINUX
 /* Linux implementation*/
-void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure)
+void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, int64 ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure)
 {
     OnFailure.ExecuteIfBound(TEXT("Not supported under Windows"));
     if (!FPaths::FileExists(ZipFilePath))
@@ -20,7 +20,7 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID 
     // Get Saved directory and append "Mods/<ModID>/"
     FString RelativeSavedPath = FPaths::ProjectSavedDir();
     FString BasePath = FPaths::ConvertRelativePathToFull(RelativeSavedPath);
-    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
     FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
 
     // Remove old folder.. 
@@ -74,7 +74,7 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID 
                     {
                         /* If failed, destroy destination */
                         FString BasePath = FPaths::ProjectSavedDir();
-                        FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+                        FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
                         FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
 
                         IFileManager::Get().DeleteDirectory(*DestinationPath, false, false);
@@ -96,7 +96,7 @@ void UZeroPay_ModEngine::MakePlatformPakZip(FModioPlatform Platform, FOnZipCompl
 #else
 
 /* Windows/Android */
-void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure)
+void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, int64 ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure)
 {
     if (!FPaths::FileExists(ZipFilePath))
     {
@@ -108,7 +108,7 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, FModioModID 
 
     // Get Saved directory and append "Mods/<ModID>/"
     FString BasePath = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-    FString ModFolderName = FString::Printf(TEXT("Mods/%s"), *ModID.ToString());
+    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
     FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
 
     // Remove old folder
@@ -188,23 +188,13 @@ void UZeroPay_ModEngine::MakePlatformPakZip(FModioPlatform Platform, FOnZipCompl
                 return;
             }
 
-            try
-            {
-                miniz_cpp::zip_file Zip;
-                Zip.write(TCHAR_TO_UTF8(*PakPath), TCHAR_TO_UTF8(*(PlatformStr + TEXT(".pak"))));
-                Zip.save(TCHAR_TO_UTF8(*ZipPath));
+            miniz_cpp::zip_file Zip;
+            Zip.write(TCHAR_TO_UTF8(*PakPath), TCHAR_TO_UTF8(*(PlatformStr + TEXT(".pak"))));
+            Zip.save(TCHAR_TO_UTF8(*ZipPath));
 
-                AsyncTask(ENamedThreads::GameThread, [OnComplete, ZipPath]() {
-                    OnComplete.ExecuteIfBound(true, ZipPath);
-                    });
-            }
-            catch (std::exception& e)
-            {
-                FString Err = UTF8_TO_TCHAR(e.what());
-                AsyncTask(ENamedThreads::GameThread, [OnComplete, Err]() {
-                    OnComplete.ExecuteIfBound(false, FString::Printf(TEXT("Zip error: %s"), *Err));
-                    });
-            }
+            AsyncTask(ENamedThreads::GameThread, [OnComplete, ZipPath]() {
+                OnComplete.ExecuteIfBound(true, ZipPath);
+                });
         });
 }
 #endif

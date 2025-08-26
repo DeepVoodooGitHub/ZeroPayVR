@@ -66,7 +66,6 @@ public class ZeroPayMod : ModuleRules
                 "ToolWidgets",
                 "AssetRegistry",
 				"ZeroPayModCore",
-                "Modio",
 				"UMG",
                 "AssetRegistry",
 				"PakFile",

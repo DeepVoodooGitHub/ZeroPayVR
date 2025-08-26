@@ -8,8 +8,6 @@
 #include "DesktopPlatformModule.h"
 #include "IDesktopPlatform.h"
 #include "Misc/Paths.h"
-#include "ModioSubsystem.h"
-//#include "Editor.h" 
 #include "Kismet/GameplayStatics.h"
 #include "Misc/OutputDeviceNull.h"
 #include "ZeroPay_UGCSupportUtils.generated.h"
@@ -44,9 +42,9 @@ public:
 	static TArray<FString> GetUGCFoldersAsNumbers();
 
 	UFUNCTION(BlueprintPure, Category = "ZeroPay UGC")
-	static FModioModID MakeModIDFromInt64(int64 ModIDValue)
+	static int64 MakeModIDFromInt64(int64 ModIDValue)
 	{
-		return FModioModID{ ModIDValue };
+		return ModIDValue ;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "ZeroPay UGC")
@@ -55,14 +53,6 @@ public:
 		FString PakFullPath = FPaths::Combine(FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()), TEXT("Workshop/"));
 		return PakFullPath;	
 	}	
-
-	UFUNCTION(BlueprintPure, Category = "ZeroPay UGC")
-	static int GetModUploadProgress()
-	{
-		UModioSubsystem* Subsystem = GEngine->GetEngineSubsystem<UModioSubsystem>() ;
-		TOptional<FModioModProgressInfo> result = Subsystem->QueryCurrentModUpdate();
-		return 0 ;
-	}
 
 
 	UFUNCTION(BlueprintPure, Category = "ZeroPay UGC")
@@ -90,7 +80,7 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, Category = "ZeroPay UGC")
-	static bool IsModCategorySet(EUGCTagCategory ModCategoryFlags, const FModioModInfo& ModInfo)
+	static bool IsModCategorySet(EUGCTagCategory ModCategoryFlags )
 	{
 		UEnum* TagEnum = StaticEnum<EUGCTagCategory>();
 		if (!TagEnum) return false;
@@ -100,6 +90,7 @@ public:
 		FText DisplayName = TagEnum->GetDisplayNameTextByValue(EnumValue);
 		const FString TargetTag = DisplayName.ToString();
 
+#if 0
 		// Compare each tag in the mod
 		for (const FModioModTag& Tag : ModInfo.Tags)
 		{
@@ -109,6 +100,7 @@ public:
 				return true;
 			}
 		}
+#endif
 
 		return false;
 	}

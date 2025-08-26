@@ -4,7 +4,6 @@
 
 #include "IPlatformFilePak.h"
 #include "CoreMinimal.h"
-#include "ModioSubsystem.h"
 #include "ModSupport/ZeroPay_ModGlobal.h"
 #include "ZeroPay_PakEngine.generated.h"
 
@@ -43,7 +42,7 @@ public:
 
     /* Get path to a Pak files location */
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Pak Management")
-    static FString GetPakPath(FModioModID ModID, FModioPlatform Platform);
+    static FString GetPakPath(int64 ModID, FModioPlatform Platform);
 
 	/* Returns all files present in a .pak file (as on disk) */
 	UFUNCTION(BlueprintPure, Category = "ZeroPay Pak Management")

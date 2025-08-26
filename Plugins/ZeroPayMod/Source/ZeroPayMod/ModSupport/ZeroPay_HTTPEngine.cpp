@@ -13,14 +13,14 @@
 /*                                    >>> GetFiles - Pulls the .PAK file information for a mod <<<                             */
 /*******************************************************************************************************************************/
 
-UZeroPayModAsync_GetModioFile* UZeroPayModAsync_GetModioFile::GetModioFilesAsync(FModioModID ModID, FModioPlatform Platform)
+UZeroPayModAsync_GetModioFile* UZeroPayModAsync_GetModioFile::GetModioFilesAsync(int64 ModID, FModioPlatform Platform)
 {
     UZeroPayModAsync_GetModioFile* Node = NewObject<UZeroPayModAsync_GetModioFile>();
     Node->StartModioGetFilesRequest(ModID, Platform);
     return Node;
 }
 
-void UZeroPayModAsync_GetModioFile::StartModioGetFilesRequest(FModioModID ModID, FModioPlatform Platform)
+void UZeroPayModAsync_GetModioFile::StartModioGetFilesRequest(int64 ModID, FModioPlatform Platform)
 {
     FHttpModule* Http = &FHttpModule::Get();
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
@@ -51,8 +51,7 @@ void UZeroPayModAsync_GetModioFile::StartModioGetFilesRequest(FModioModID ModID,
             }
         });
 
-    FString ModIDString = ModID.ToString();
-    FString URL = FString::Printf(TEXT("https://g-%s.modapi.io/v1/games/%s/mods/%s/files?api_key=%s&_limit=1"),*FGameID, *FGameID, *ModIDString, *FAPIKey);
+    FString URL = FString::Printf(TEXT("https://g-%s.modapi.io/v1/games/%s/mods/%lld/files?api_key=%s&_limit=1"),*FGameID, *FGameID, ModID, *FAPIKey);
     Request->SetURL(URL);
     switch (Platform)
     {
@@ -165,14 +164,14 @@ void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const 
 /*                                        >>> GetModInfo - Pulls common info about the mod <<<                                 */
 /*******************************************************************************************************************************/
 
-UZeroPayModAsync_GetModioModInfo* UZeroPayModAsync_GetModioModInfo::GetModioModInfoAsync(FModioModID ModID)
+UZeroPayModAsync_GetModioModInfo* UZeroPayModAsync_GetModioModInfo::GetModioModInfoAsync(int64 ModID)
 {
     UZeroPayModAsync_GetModioModInfo* Node = NewObject<UZeroPayModAsync_GetModioModInfo>();
     Node->StartModioGetModInfoRequest(ModID);
     return Node;
 }
 
-void UZeroPayModAsync_GetModioModInfo::StartModioGetModInfoRequest(FModioModID ModID)
+void UZeroPayModAsync_GetModioModInfo::StartModioGetModInfoRequest(int64 ModID)
 {
     FHttpModule* Http = &FHttpModule::Get();
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
@@ -202,8 +201,7 @@ void UZeroPayModAsync_GetModioModInfo::StartModioGetModInfoRequest(FModioModID M
             }
         });
 
-    FString ModIDString = ModID.ToString();
-    FString URL = FString::Printf(TEXT("https://g-%s.modapi.io/v1/games/%s/mods/%s/?api_key=%s&_limit=1"), *FGameID, *FGameID, *ModIDString, *FAPIKey);
+    FString URL = FString::Printf(TEXT("https://g-%s.modapi.io/v1/games/%s/mods/%lld/?api_key=%s&_limit=1"), *FGameID, *FGameID, ModID, *FAPIKey);
     Request->SetURL(URL);
 
     Request->SetVerb("GET");

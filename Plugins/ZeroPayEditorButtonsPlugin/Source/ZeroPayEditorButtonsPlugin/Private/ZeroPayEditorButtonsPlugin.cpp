@@ -487,24 +487,6 @@ UZeroPayEditorCookPakOperationHandle* UZeroPayEditorButtonsFunctionLibrary::Cook
 	return nullptr;
 }
 
-UZeroPayEditorCookPakOperationHandle* UZeroPayEditorButtonsFunctionLibrary::PollUploadStatus()
-{
-	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
-	{
-		return Plugin->PollUploadStatus();
-	}
-
-	return nullptr;
-}
-
-void UZeroPayEditorButtonsFunctionLibrary::CancelUploadStatus()
-{
-	if (FZeroPayEditorButtonsPluginModule* Plugin = FModuleManager::Get().GetModulePtr<FZeroPayEditorButtonsPluginModule>("ZeroPayEditorButtonsPlugin"))
-	{
-		Plugin->CancelUploadStatus();
-	}
-
-}
 
 FReducerResults UZeroPayEditorButtonsFunctionLibrary::ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings)
 {

@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "ModioSubsystem.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "HAL/PlatformFileManager.h"
@@ -111,7 +110,7 @@ public:
 
     // Async unzip function
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static void UnzipFileAsync(const FString& ZipFilePath, FModioModID ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure);
+    static void UnzipFileAsync(const FString& ZipFilePath, int64 ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure);
 
     // Ensure's temp zip is removed
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
@@ -143,23 +142,23 @@ public:
 
     // Returns the file size of any given mod (for a platform) on the file system
     UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Engine")
-    static int64 GetPakFileSize(FModioModID ModID, FModioPlatform Platform);
+    static int64 GetPakFileSize(int64 ModID, FModioPlatform Platform);
 
     // Writes a mod state file (so we can check for updates)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static void WriteModStateFile(FModioModID ModID, FString DisplayName, int64 ModFileID, int64 DateUpdated, int64 UncompressedSize, FString Summary, FString Author, int64 Ratings, int64 Category);
+    static void WriteModStateFile(int64 ModID, FString DisplayName, int64 ModFileID, int64 DateUpdated, int64 UncompressedSize, FString Summary, FString Author, int64 Ratings, int64 Category);
 
     // Reads a mod state file (so we can check for updates)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static bool ReadModStateFile(FModioModID ModID, FString& DisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory) ;
+    static bool ReadModStateFile(int64 ModID, FString& DisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory) ;
 
     // Changes certain state file information (when updates occur)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static bool UpdateModStateFile(FModioModID ModID, int64 NewDateUpdated, int64 NewUncompressedSize) ;
+    static bool UpdateModStateFile(int64 ModID, int64 NewDateUpdated, int64 NewUncompressedSize) ;
 
     // Writes a mod state file using the mod info, usually used for subscribed modes (creates directory too)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static bool WriteModStateFileViaModInfo(FModioModID ModID, UZeroPayMod_GetModInfoResult* ModInfo) ;
+    static bool WriteModStateFileViaModInfo(int64 ModID, UZeroPayMod_GetModInfoResult* ModInfo) ;
 
     /* >>> <Misc> Operations <<< */
 
@@ -181,10 +180,10 @@ public:
     }
 
     UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Engine")
-    static FString GetModLogoPath(FModioModID ModID)
+    static FString GetModLogoPath(int64 ModID)
     {
         FString BasePath = FPaths::ProjectSavedDir();
-        FString ModFolderName = FString::Printf(TEXT("Mods/%s/Logo.png"), *ModID.ToString());
+        FString ModFolderName = FString::Printf(TEXT("Mods/%lld/Logo.png"), ModID);
         return FPaths::Combine(BasePath, ModFolderName);
     }
 
