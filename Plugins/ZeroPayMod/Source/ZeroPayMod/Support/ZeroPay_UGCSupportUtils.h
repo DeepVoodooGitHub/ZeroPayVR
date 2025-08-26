@@ -79,30 +79,66 @@ public:
 		return CategoryNames;
 	}
 
-	UFUNCTION(BlueprintPure, Category = "ZeroPay UGC")
-	static bool IsModCategorySet(EUGCTagCategory ModCategoryFlags )
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|UGC|Tags") 
+	static bool HasUGCTagCategoryFlag(int32 Flags, EUGCTagCategory Flag)
 	{
-		UEnum* TagEnum = StaticEnum<EUGCTagCategory>();
-		if (!TagEnum) return false;
-
-		// Get the display name string for the enum value
-		const int32 EnumValue = static_cast<int32>(ModCategoryFlags);
-		FText DisplayName = TagEnum->GetDisplayNameTextByValue(EnumValue);
-		const FString TargetTag = DisplayName.ToString();
-
-#if 0
-		// Compare each tag in the mod
-		for (const FModioModTag& Tag : ModInfo.Tags)
-		{
-			const FString TagString = Tag.Tag ;
-			if (TagString.Equals(TargetTag, ESearchCase::IgnoreCase))
-			{
-				return true;
-			}
-		}
-#endif
-
-		return false;
+		return (Flags & static_cast<int32>(Flag)) != 0;
 	}
 
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|UGC|Tags") 
+	static void SetUGCTagCategoryFlag(int32& Flags, EUGCTagCategory Flag, bool bEnable)
+	{
+		if (bEnable)
+			Flags |= static_cast<int32>(Flag);
+		else
+			Flags &= ~static_cast<int32>(Flag);
+	}
+
+	/** Convert an integer into an EUGCTagCategory enum. If invalid, returns the first enum value (FullMod). */
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|UGC|Tags")
+	static EUGCTagCategory IntToUGCTagCategory(int32 Value)
+	{
+		// Clamp to valid range
+		if (UEnum* EnumPtr = StaticEnum<EUGCTagCategory>())
+		{
+			int64 Max = EnumPtr->NumEnums() - 1;
+			if (Value >= 0 && Value <= Max)
+			{
+				return static_cast<EUGCTagCategory>(Value);
+			}
+		}
+		// fallback
+		return EUGCTagCategory::FullMod;
+	}
+
+	/** Convert an integer into an EUGCSupportedGamemodes enum.	If invalid, defaults to Standard. */
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|UGC|Tags")
+	static EUGCSupportedGamemodes IntToUGCSupportedGamemode(int32 Value)
+	{
+		if (UEnum* EnumPtr = StaticEnum<EUGCSupportedGamemodes>())
+		{
+			int64 Max = EnumPtr->NumEnums() - 1;
+			if (Value >= 0 && Value <= Max)
+			{
+				return static_cast<EUGCSupportedGamemodes>(Value);
+			}
+		}
+		return EUGCSupportedGamemodes::AllGameModes;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|UGC|Tags")
+	static bool HasOnlyThisGamemode(int32 Mask, EUGCSupportedGamemodes Gamemode)
+	{
+		// Calculate the bit for this gamemode
+		const int32 Bit = 1 << static_cast<int32>(Gamemode);
+
+		// True if mask equals exactly that bit
+		return Mask == Bit;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|UGC|Tags")
+	static bool HasTagCategory(int32 ModCategoryFlags, EUGCTagCategory InCategory)
+	{
+		return (ModCategoryFlags & (1 << static_cast<uint8>(InCategory))) != 0;
+	}
 };

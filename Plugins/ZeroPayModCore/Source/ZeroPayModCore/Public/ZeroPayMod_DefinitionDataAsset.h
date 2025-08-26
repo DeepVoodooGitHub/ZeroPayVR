@@ -1,4 +1,4 @@
-// Deep Voodoo Games Ltd
+// Ginger Ninja Gaming Ltd
 
 #pragma once
 
@@ -11,6 +11,7 @@ UENUM(BlueprintType)
 enum class EUGCTagCategory : uint8
 {
 	FullMod             UMETA(DisplayName = "Full-Mod"),
+	FullModCustomGM     UMETA(DisplayName = "Full-Mod (with GM override)"),
 	GameMode            UMETA(DisplayName = "Game-Mode"),
 	Level               UMETA(DisplayName = "Level"),
 	Weapons             UMETA(DisplayName = "Weapons"),
@@ -22,6 +23,30 @@ enum class EUGCTagCategory : uint8
 	Vehicles            UMETA(DisplayName = "Vehicles"),
 	AI                  UMETA(DisplayName = "AI"),
 	NPCs                UMETA(DisplayName = "NPCs")
+};
+
+UENUM(BlueprintType)
+enum class EUGCSupportedGamemodes : uint8
+{
+	FullMod             UMETA(DisplayName = "Full-Mod"),
+	AllGameModes        UMETA(DisplayName = "Any game-mode"),
+	Deathmatch          UMETA(DisplayName = "Deathmatch"),
+	TeamDeathmatch      UMETA(DisplayName = "Team Deathmatch"),
+	GunGame             UMETA(DisplayName = "Gun Game"),
+	KingOfTheHill       UMETA(DisplayName = "King of the Hill"),
+	Domination          UMETA(DisplayName = "Domination"),
+	Conquest            UMETA(DisplayName = "Conquest"),
+	Rush                UMETA(DisplayName = "Rush"),
+	Push                UMETA(DisplayName = "Push"),
+	SearchAndDestroy    UMETA(DisplayName = "Search & Destroy"),
+	CaptureTheFlag      UMETA(DisplayName = "Capture the Flag (CTF)"),
+	PayloadEscort       UMETA(DisplayName = "Payload (Escort)"),
+	PropHunt            UMETA(DisplayName = "Prop Hunt"),
+	ZombieHorde         UMETA(DisplayName = "Zombie Horde"),
+	Infection           UMETA(DisplayName = "Infection"),
+	GroundWar           UMETA(DisplayName = "Ground War"),
+	TTT                 UMETA(DisplayName = "TTT"),
+	Hide                UMETA(DisplayName = "Hide"),
 };
 
 USTRUCT(BlueprintType)
@@ -43,8 +68,13 @@ struct FZeroPayMod_Definition
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	FString Description;
 
+	// What is exposed in this "mod"? Can be multiple (unless "full mod")
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mods", meta = (Bitmask, BitmaskEnum = "/Script/ZeroPayModCore.EUGCTagCategory"))
 	int32 ModCategoryFlags;
+
+	// What game-modes are supported by any assets (mostly for maps, rather than in-world assets)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mods", meta = (Bitmask, BitmaskEnum = "/Script/ZeroPayModCore.EUGCSupportedGamemodes"))
+	int32 SupportedGamemodeFlags = (1 << static_cast<int32>(EUGCSupportedGamemodes::AllGameModes));
 
 	// The parent persistent level (REQUIRED) - MUST reference (as sub levels) the other levels
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
@@ -88,4 +118,5 @@ public:
 	{
 		bOwner = true;
 	}
+
 };
