@@ -95,6 +95,16 @@ struct FZeroPayMod_Definition
 	// DO NOT USE - FUTURE
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	TSoftObjectPtr<UWorld> psvrlevel;
+
+	// Always cook the content in these paths, for certain items (such as game-modes) you may not have a level or something that can be
+    // used to detect references that are actually used. If no references exist then the asset is never cooked and packed into your
+	// UGC. A supplied path here (i.e. /Game/ZeroPayMods/UGCxxxxxx/) will ensure everything in that path is included whether referenced
+	// or not. 
+	//
+	// *** DO NOT USE THIS WITHOUT UNDERSTANDING IT CAN BLOAT YOUR UGC - Come talk to us on Discord ***
+	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
+	TArray<FString> AlwaysCookPaths ;
+
 };
 
 UCLASS(BlueprintType)

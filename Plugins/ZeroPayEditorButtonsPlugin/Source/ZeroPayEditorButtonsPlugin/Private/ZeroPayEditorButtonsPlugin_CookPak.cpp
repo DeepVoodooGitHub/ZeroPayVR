@@ -91,6 +91,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_Definitio
 	FString UGCID = dataAsset->Definition.UGCID;
 	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
 	FString neverCookMapName = dataAsset->Definition.quest3level.GetAssetName();
+	TArray<FString> alwaysCookPaths = dataAsset->Definition.AlwaysCookPaths;
 
 	// All build paths, names, etc
 	FString ProjectCookedPath_Windows = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
@@ -106,7 +107,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_Definitio
 	FPlatformProcess::Sleep(1.0f);
 
 	/* Cook Platform */
-	if (!ExecuteCookShellCmd("Windows", UGCID, mapName, neverCookMapName))
+	if (!ExecuteCookShellCmd("Windows", UGCID, mapName, neverCookMapName, alwaysCookPaths))
 	{
 		LastMessage = ">>> ERROR : Cooking of windows failed, see 'Output Log'.";
 		UpdateModManagementUIProgressField();
@@ -205,6 +206,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 	FString UGCID = dataAsset->Definition.UGCID;
 	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
 	FString neverCookMapName = dataAsset->Definition.pcvrlevel.GetAssetName();
+	TArray<FString> alwaysCookPaths = dataAsset->Definition.AlwaysCookPaths;
 
 	// All build paths, names, etc
 	FString ProjectCookedPath_Android = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
@@ -220,7 +222,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 	UpdateModManagementUIProgressField();
 
 	/* Cook Platform */
-	if (!ExecuteCookShellCmd("Android", UGCID, mapName, neverCookMapName))
+	if (!ExecuteCookShellCmd("Android", UGCID, mapName, neverCookMapName, alwaysCookPaths))
 	{
 		LastMessage = ">>> ERROR : Cooking of Android failed, see 'Output Log'.";
 		UpdateModManagementUIProgressField();
@@ -316,6 +318,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
 	// Cook everything (all map 'data' anyway for server)
 	FString neverCookMapName = "" ;
+	TArray<FString> alwaysCookPaths = dataAsset->Definition.AlwaysCookPaths;
 
 	// All build paths, names, etc
 	FString ProjectCookedPath_LinuxServer = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
@@ -331,7 +334,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 	FPlatformProcess::Sleep(1.05f);
 
 	/* Cook Platform */
-	if (!ExecuteCookShellCmd("LinuxServer", UGCID, mapName, neverCookMapName))
+	if (!ExecuteCookShellCmd("LinuxServer", UGCID, mapName, neverCookMapName, alwaysCookPaths))
 	{
 		LastMessage = ">>> ERROR : Cooking of LinuxServer failed, see 'Output Log'.";
 		UpdateModManagementUIProgressField();
@@ -425,7 +428,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 /*                                          SUPPORT FUNCTIONS                                           */
 /********************************************************************************************************/
 
-bool FZeroPayEditorButtonsPluginModule::ExecuteCookShellCmd(FString Platform, FString UGCID, FString MapName, FString NeverCookMapName)
+bool FZeroPayEditorButtonsPluginModule::ExecuteCookShellCmd(FString Platform, FString UGCID, FString MapName, FString NeverCookMapName, const TArray<FString>& AlwaysCookDirs)
 {
 	FString CmdExe = TEXT("cmd.exe");
 
@@ -441,14 +444,45 @@ bool FZeroPayEditorButtonsPluginModule::ExecuteCookShellCmd(FString Platform, FS
 	if (NeverCookMapName.IsEmpty())
 		NeverCookDir = "";
 
+	// Build one or more -CookDir= arguments (always-cook paths)
+	FString AlwaysCookArgs;
+	for (const FString& DirIn : AlwaysCookDirs)
+	{
+		if (DirIn.IsEmpty())
+		{
+			continue;
+		}
+
+		// Accept either "/Game/SomePath" or "SomePath" and normalize to start with /Game
+		FString Normalized = DirIn;
+		if (!Normalized.StartsWith(TEXT("/Game")))
+		{
+			// Allow passing "ZeroPayMods/UGC123/Whatever" and turn it into "/Game/ZeroPayMods/UGC123/Whatever"
+			if (Normalized.StartsWith(TEXT("/")))
+			{
+				Normalized = TEXT("/Game") + Normalized;
+			}
+			else
+			{
+				Normalized = TEXT("/Game/") + Normalized;
+			}
+		}
+
+		// Turn the /Game path into an actual file system directory under Content
+		FString DirOnDisk = FPackageName::LongPackageNameToFilename(Normalized, TEXT(""));
+		AlwaysCookArgs += FString::Printf(TEXT(" -CookDir=%s"), *DirOnDisk);
+	}
+
+
 	// The full quoted command passed to /k (entire command in one quoted string)
 	FString CommandToRun = FString::Printf(
-		TEXT("\"%s\" \"%s\" -run=cook -targetplatform=%s -SkipCookingEditorOnlyData -versioned -map=%s -NeverCookDir=/Game/KJMod %s"),
+		TEXT("\"%s\" \"%s\" -run=cook -targetplatform=%s -SkipCookingEditorOnlyData -versioned -map=%s -NeverCookDir=/Game/KJMod %s %s"),
 		*EditorExePath,  // e.g. X:/UE5-Rel/Engine/Binaries/Win64/UnrealEditor.exe
 		*ProjectPath,    // e.g. I:/GameDev/ZeroPayVR/ZeroPayVR.uproject
 		*Platform,
 		*MapPath,
-		*NeverCookDir
+		*NeverCookDir,
+		*AlwaysCookArgs
 	);
 
 	// Arguments to cmd.exe: /k "full command in quotes"

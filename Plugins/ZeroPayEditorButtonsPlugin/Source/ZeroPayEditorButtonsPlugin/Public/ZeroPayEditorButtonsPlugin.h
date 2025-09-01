@@ -320,7 +320,7 @@ private:
 	bool CookAndPackAndroid(UZeroPayMod_DefinitionDataAsset* dataAsset);
 	bool CookAndPackLinuxServer(UZeroPayMod_DefinitionDataAsset* dataAsset);
 
-	bool ExecuteCookShellCmd(FString Platform, FString UGCID, FString MapName, FString NeverCookMapName);
+	bool ExecuteCookShellCmd(FString Platform, FString UGCID, FString MapName, FString NeverCookMapName, const TArray<FString>& AlwaysCookDirs);
 	bool ReadNextLineFromPipe(HANDLE PipeHandle, FString& OutLine, FString& Remainder);
 	bool ExecutePakShellCmd(FString Platform, FString CookedPakLocation_Windows, FString CookedPakListFilePath);
 
