@@ -15,6 +15,22 @@
 #include "Misc/Paths.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/OutputDeviceNull.h"
+
+#include "Animation/AnimSequence.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/BlendSpace1D.h"
+#include "Animation/AimOffsetBlendSpace.h"
+#include "Animation/AimOffsetBlendSpace1D.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/Skeleton.h"
+
+#include "ContentBrowserModule.h"
+#include "IContentBrowserSingleton.h"
+
+#include "UObject/Package.h"
+#include "Misc/MessageDialog.h"
+#include "FileHelpers.h"
+
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
 UENUM(BlueprintType)
@@ -182,4 +198,77 @@ public:
 	//Exposes Server travel to blueprint
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "ZeroPay Misc Support", meta = (HidePin = "WorldContextObject", DefaultToSelf = "WorldContextObject"))
 	static bool ServerTravel(UObject* WorldContextObject, const FString& FURL, bool bAbsolute, bool bShouldSkipGameNotify) ;
+
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "ZeroPay|Animation")
+	static int32 ReplaceAnimSkeleton(const TArray<UAnimationAsset*>& Assets)
+	{
+		int32 NumChanged = 0;
+
+		// Hard-coded skeleton path
+		static const FString NewSkeletonPath = TEXT("/ZeroPayMod/Characters/Mannequins/Meshes/SK_Mannequin.SK_Mannequin");
+		USkeleton* NewSkeleton = LoadObject<USkeleton>(nullptr, *NewSkeletonPath);
+		if (!NewSkeleton)
+		{
+			FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(FString::Printf(TEXT("Could not load skeleton: %s"), *NewSkeletonPath)));
+			return 0;
+		}
+
+		// Get selected assets from Content Browser
+		TArray<FAssetData> SelectedAssets;
+		IContentBrowserSingleton& ContentBrowser = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser").Get();
+		ContentBrowser.GetSelectedAssets(SelectedAssets);
+
+		if (SelectedAssets.Num() == 0)
+		{
+			FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(TEXT("No assets selected in Content Browser.")));
+			return 0;
+		}
+
+		for (const FAssetData& AssetData : SelectedAssets)
+		{
+			UObject* Asset = AssetData.GetAsset();
+			if (!Asset)
+				continue;
+
+			// Only handle UAnimationAsset (covers AnimSequence, BlendSpaces, AnimMontages, etc.)
+			UAnimationAsset* AnimAsset = Cast<UAnimationAsset>(Asset);
+			if (!AnimAsset)
+				continue;
+
+			USkeleton* OldSkeleton = AnimAsset->GetSkeleton();
+			if (OldSkeleton == NewSkeleton)
+				continue;
+
+			AnimAsset->Modify();
+			AnimAsset->SetSkeleton(NewSkeleton);
+			AnimAsset->MarkPackageDirty();
+
+			NumChanged++;
+		}
+
+#if WITH_EDITOR
+		// Save all modified packages in one go
+		if (NumChanged > 0)
+		{
+			TArray<UPackage*> PackagesToSave;
+			for (const FAssetData& AssetData : SelectedAssets)
+			{
+				if (UAnimationAsset* AnimAsset = Cast<UAnimationAsset>(AssetData.GetAsset()))
+				{
+					if (AnimAsset->GetSkeleton() == NewSkeleton)
+					{
+						UPackage* Pkg = AnimAsset->GetOutermost();
+						if (Pkg && Pkg->IsDirty())
+						{
+							PackagesToSave.AddUnique(Pkg);
+						}
+					}
+				}
+			}
+			FEditorFileUtils::PromptForCheckoutAndSave(PackagesToSave, /*bCheckDirty=*/true, /*bPromptToSave=*/false);
+		}
+#endif
+
+		return NumChanged;
+	}
 };

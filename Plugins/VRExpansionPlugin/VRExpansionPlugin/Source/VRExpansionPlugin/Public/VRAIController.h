@@ -27,7 +27,7 @@ public:
 };
 
 
-UCLASS()
+UCLASS()	
 class AVRDetourCrowdAIController : public AVRAIController
 {
 	GENERATED_BODY()
