@@ -271,4 +271,19 @@ public:
 
 		return NumChanged;
 	}
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	static FRotator StripToYawOnly(const FRotator& InRotator)
+	{
+		// Strip Pitch and Roll, keep only Yaw
+		return FRotator(0.f, InRotator.Yaw, 0.f);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	static double YawDifference(const FRotator& A, const FRotator& B)
+	{
+		// Absolute value of yaw difference
+		return FMath::Abs(FMath::FindDeltaAngleDegrees(A.Yaw, B.Yaw));
+	}
+
 };
