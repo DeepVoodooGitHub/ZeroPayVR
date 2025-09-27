@@ -24,12 +24,14 @@
 #include "Animation/AnimMontage.h"
 #include "Animation/Skeleton.h"
 
+#if WITH_EDITOR
 #include "ContentBrowserModule.h"
 #include "IContentBrowserSingleton.h"
 
 #include "UObject/Package.h"
 #include "Misc/MessageDialog.h"
 #include "FileHelpers.h"
+#endif 
 
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
@@ -199,6 +201,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "ZeroPay Misc Support", meta = (HidePin = "WorldContextObject", DefaultToSelf = "WorldContextObject"))
 	static bool ServerTravel(UObject* WorldContextObject, const FString& FURL, bool bAbsolute, bool bShouldSkipGameNotify) ;
 
+#if WITH_EDITOR
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "ZeroPay|Animation")
 	static int32 ReplaceAnimSkeleton(const TArray<UAnimationAsset*>& Assets)
 	{
@@ -246,7 +249,6 @@ public:
 			NumChanged++;
 		}
 
-#if WITH_EDITOR
 		// Save all modified packages in one go
 		if (NumChanged > 0)
 		{
@@ -267,10 +269,10 @@ public:
 			}
 			FEditorFileUtils::PromptForCheckoutAndSave(PackagesToSave, /*bCheckDirty=*/true, /*bPromptToSave=*/false);
 		}
-#endif
 
 		return NumChanged;
 	}
+#endif
 
 	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
 	static FRotator StripToYawOnly(const FRotator& InRotator)
