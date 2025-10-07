@@ -18,6 +18,8 @@ enum EZeroPay_BodySocket_Location
 	Back
 };
 
+/* The body socket channel is trace channel 5 */
+#define ECC_BodySocket ECC_GameTraceChannel5
 
 /**
  * 
@@ -26,4 +28,7 @@ UCLASS(BlueprintType, Blueprintable, meta = (BlueprintSpawnableComponent))
 class ZEROPAYMOD_API UZeroPay_BodySocket_r1 : public USphereComponent
 {
 	GENERATED_BODY()	
+public:
+	UZeroPay_BodySocket_r1();
+    
 };
