@@ -22,8 +22,8 @@ UZeroPay_BodySocket_r1::UZeroPay_BodySocket_r1()
 }
 
 
-FTransform UZeroPay_BodySocket_r1::ProvideSocketTransform_Implementation(AActor* RequestingActor) const
+FTransform UZeroPay_BodySocket_r1::ProvideSocketTransform_Implementation(const TScriptInterface<class IZeroPay_BodySocket_Interface_r1>& RequestingInterface) const
 {
 	// Default behavior — just return this component's world transform
-	return GetComponentTransform();
+	return FTransform::Identity ;
 }

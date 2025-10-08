@@ -31,11 +31,17 @@ class ZEROPAYMOD_API UZeroPay_BodySocket_r1 : public USphereComponent
 public:
 	UZeroPay_BodySocket_r1();
 
-	/* Allows a body socket to return a transform where the actor will be placed, this can
-	   provide logic to "snap" to center, or scale the actor if required */
+	/* Allows a body socket to return a transform where the actor (via interface) will be placed.
+	   This can provide logic to "snap" to center, or scale the actor if required */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "ZeroPay|Sockets")
-	FTransform ProvideSocketTransform(AActor* RequestingActor) const;    
+	FTransform ProvideSocketTransform(const TScriptInterface<class IZeroPay_BodySocket_Interface_r1>& RequestingInterface) const;
 
 	// Interface Implementation
-	FTransform ProvideSocketTransform_Implementation(AActor* RequestingActor) const ;
+	virtual FTransform ProvideSocketTransform_Implementation(const TScriptInterface<class IZeroPay_BodySocket_Interface_r1>& RequestingInterface) const;
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	AActor* BodySocketInterfaceToActor(const TScriptInterface<class IZeroPay_BodySocket_Interface_r1> RequestingInterface) const
+	{		
+		return Cast<AActor>(RequestingInterface.GetObject());
+	}
 };
