@@ -20,3 +20,10 @@ UZeroPay_BodySocket_r1::UZeroPay_BodySocket_r1()
 	bHiddenInGame = true;          // sensor only
 	SetCanEverAffectNavigation(false);
 }
+
+
+FTransform UZeroPay_BodySocket_r1::ProvideSocketTransform_Implementation(AActor* RequestingActor) const
+{
+	// Default behavior — just return this component's world transform
+	return GetComponentTransform();
+}

@@ -30,5 +30,12 @@ class ZEROPAYMOD_API UZeroPay_BodySocket_r1 : public USphereComponent
 	GENERATED_BODY()	
 public:
 	UZeroPay_BodySocket_r1();
-    
+
+	/* Allows a body socket to return a transform where the actor will be placed, this can
+	   provide logic to "snap" to center, or scale the actor if required */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "ZeroPay|Sockets")
+	FTransform ProvideSocketTransform(AActor* RequestingActor) const;    
+
+	// Interface Implementation
+	FTransform ProvideSocketTransform_Implementation(AActor* RequestingActor) const ;
 };
