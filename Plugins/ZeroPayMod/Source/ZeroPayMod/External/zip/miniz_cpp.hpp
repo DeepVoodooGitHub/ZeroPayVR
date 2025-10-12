@@ -148,10 +148,14 @@
 */
 #pragma once
 
+#if PLATFORM_ANDROID 
+
+#else
 #define MINIZ_X86_OR_X64_CPU 1
 #define MINIZ_USE_UNALIGNED_LOADS_AND_STORES 1
 #define MINIZ_LITTLE_ENDIAN 1
 #define MINIZ_HAS_64BIT_REGISTERS 1
+#endif
 
 /* Defines to completely disable specific portions of miniz.c:
    If all macros here are defined the only functionality remaining will be CRC-32, adler-32, tinfl, and tdefl. */
