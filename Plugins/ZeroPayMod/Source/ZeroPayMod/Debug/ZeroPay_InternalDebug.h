@@ -37,6 +37,7 @@ struct ZEROPAYMOD_API FZeroPayStoredPrintStringParams
 /* Global vars (until we find a better solution) - Reset via ZeroPay_GameInstance_r1 Init (to avoid crashes on multiple PIE plays) */
 static TArray<FZeroPayStoredPrintStringParams> StoredLogEntries;
 static TWeakObjectPtr<AActor> InternalDebugTargetActor = nullptr ;
+static bool bPipeToPrintString = true ;
 
 UCLASS()
 class ZEROPAYMOD_API UZeroPay_InternalDebugFunctionLibrary : public UBlueprintFunctionLibrary
@@ -109,13 +110,25 @@ public:
 					for (const FZeroPayStoredPrintStringParams& Entry : StoredLogEntries)
 					{
 						IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(InternalDebugTargetActor.Get(), Entry.Prefix, Entry.ObjectName, Entry.Value, Entry.DebugConsoleLevel);
+						if (bPipeToPrintString)
+						{
+							if (GEngine)
+							{
+								const FString FullMessage = Entry.Prefix + TEXT(" ") + Entry.Value;
+								GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, FullMessage);
+							}
+						}
 					}
 					StoredLogEntries.Empty();
 				}
 
 				/* Send data */
 				IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(InternalDebugTargetActor.Get(), Prefix, ObjectName, value, debugConsoleLevel);
-						
+				if (GEngine)
+				{
+					const FString FullMessage = Prefix + TEXT(" ") + value;
+					GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, FullMessage);
+				}
 				bOutputSunk = true;
 			}
 		}
