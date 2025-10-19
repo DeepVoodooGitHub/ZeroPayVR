@@ -38,11 +38,53 @@ struct ZEROPAYMOD_API FZeroPayStoredPrintStringParams
 static TArray<FZeroPayStoredPrintStringParams> StoredLogEntries;
 static TWeakObjectPtr<AActor> InternalDebugTargetActor = nullptr ;
 static bool bPipeToPrintString = true ;
+static bool bPipeToLogOutput = true;
 
 UCLASS()
 class ZEROPAYMOD_API UZeroPay_InternalDebugFunctionLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
+
+private:
+	/* Internal helper to push any message to screen or logs.. */
+	static void PipeEntryAsRequired(FString Prefix, FString ObjectName, FString Value,	FDebugConsoleLevel debugConsoleLevel)
+	{
+		/* Echo to screen, if exists? */
+		if (bPipeToPrintString)
+		{
+			if (GEngine)
+			{
+				const FString FullMessage = Prefix + TEXT(" ") + Value;
+				GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, FullMessage);
+			}
+		}
+		/* Echo to logs? */
+		if (bPipeToLogOutput)
+		{
+			const FString FullMessage = Prefix + TEXT(" ") + Value;
+
+			switch (debugConsoleLevel)
+			{
+			case FDebugConsoleLevel::Log:
+				UE_LOG(LogTemp, Log, TEXT("%s"), *FullMessage);
+				break;
+
+			case FDebugConsoleLevel::Warn:
+				UE_LOG(LogTemp, Warning, TEXT("%s"), *FullMessage);
+				break;
+
+			case FDebugConsoleLevel::Error:
+				UE_LOG(LogTemp, Error, TEXT("%s"), *FullMessage);
+				break;
+
+			default:
+				UE_LOG(LogTemp, Log, TEXT("%s"), *FullMessage);
+				break;
+			}
+		}
+
+	}
+
 
 public:
 	// Register an actor to receive debug messages (there can only be one..)
@@ -85,7 +127,7 @@ public:
 			}
 		}
 
-		/* Include name  */
+		/* Include name? */
 		if (bIncludeObjectName)
 		{
 			if (target != nullptr)
@@ -110,25 +152,14 @@ public:
 					for (const FZeroPayStoredPrintStringParams& Entry : StoredLogEntries)
 					{
 						IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(InternalDebugTargetActor.Get(), Entry.Prefix, Entry.ObjectName, Entry.Value, Entry.DebugConsoleLevel);
-						if (bPipeToPrintString)
-						{
-							if (GEngine)
-							{
-								const FString FullMessage = Entry.Prefix + TEXT(" ") + Entry.Value;
-								GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, FullMessage);
-							}
-						}
+						PipeEntryAsRequired(Entry.Prefix, Entry.ObjectName, Entry.Value, Entry.DebugConsoleLevel);
 					}
 					StoredLogEntries.Empty();
 				}
 
 				/* Send data */
 				IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(InternalDebugTargetActor.Get(), Prefix, ObjectName, value, debugConsoleLevel);
-				if (GEngine)
-				{
-					const FString FullMessage = Prefix + TEXT(" ") + value;
-					GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, FullMessage);
-				}
+				PipeEntryAsRequired(Prefix, ObjectName, value, debugConsoleLevel);
 				bOutputSunk = true;
 			}
 		}
@@ -170,3 +201,4 @@ public:
 		}
 	}
 } ;
+

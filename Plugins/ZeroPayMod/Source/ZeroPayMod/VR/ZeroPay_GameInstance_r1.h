@@ -15,5 +15,5 @@ class ZEROPAYMOD_API UZeroPay_GameInstance_r1 : public UAdvancedFriendsGameInsta
 	GENERATED_BODY()
 public:
 	virtual void Init() override;
-	
+
 };

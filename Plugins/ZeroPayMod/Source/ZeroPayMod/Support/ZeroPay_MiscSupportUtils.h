@@ -33,6 +33,10 @@
 #include "FileHelpers.h"
 #endif 
 
+#include "HttpModule.h"
+#include "Interfaces/IHttpResponse.h"
+#include "Http.h"
+
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
 UENUM(BlueprintType)
@@ -50,6 +54,8 @@ enum class EZeroPay_NetControllerStatus : uint8
 	Remote,
 	Local
 };
+
+DECLARE_DYNAMIC_DELEGATE_OneParam(FOnIPResolved, const FString&, PublicIP);
 
 UCLASS()
 class ZEROPAYMOD_API AZeroPay_MiscSupportUtils : public AActor
@@ -286,6 +292,31 @@ public:
 	{
 		// Absolute value of yaw difference
 		return FMath::Abs(FMath::FindDeltaAngleDegrees(A.Yaw, B.Yaw));
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support")
+	static void GetPublicIP(const FOnIPResolved& OnComplete)
+	{
+		if (!OnComplete.IsBound())
+			return ;
+
+		TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
+		Request->SetVerb(TEXT("GET"));
+		Request->SetURL(TEXT("https://api.ipify.org?format=text")); // or ?format=json
+		// Bind a lambda that executes the Blueprint delegate when finished
+		Request->OnProcessRequestComplete().BindLambda([OnComplete](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bWasSuccessful)
+			{
+				if (bWasSuccessful && Resp.IsValid() && EHttpResponseCodes::IsOk(Resp->GetResponseCode()))
+				{
+					FString IP = Resp->GetContentAsString();
+					OnComplete.ExecuteIfBound(IP);
+				}
+				else
+				{
+					OnComplete.ExecuteIfBound(FString()); // empty = error
+				}
+			});
+		Request->ProcessRequest();
 	}
 
 };

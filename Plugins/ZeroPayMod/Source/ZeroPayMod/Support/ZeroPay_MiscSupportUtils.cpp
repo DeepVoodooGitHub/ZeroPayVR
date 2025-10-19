@@ -45,6 +45,7 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 {
 	UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("[Init] InitialiseZeroPayVR() called."));
 
+#ifdef PLATFORM_LINUX
 	/* Server-side only */
 	if (!target->HasAuthority())
 	{
@@ -87,6 +88,9 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 		UZeroPay_DebugSupport::AddDebugConsoleLine(nullptr, TEXT("       failed to spawn server logic, game will be broken!"), FDebugConsoleLevel::Error);
 		return;
 	}
+#else
+	UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       Failed, was called on client (main menu contains incorrect level BP logic?)"), FDebugConsoleLevel::Error);
+#endif
 }
 
 
