@@ -63,8 +63,6 @@ public class ZeroPayMod : ModuleRules
                 "GameplayTags",
                 "OpenXRExpansionPlugin",
                 "VRExpansionPlugin",
-                "ToolMenus",
-                "ToolWidgets",
                 "AssetRegistry",
 				"ZeroPayModCore",
 				"UMG",
@@ -86,7 +84,9 @@ public class ZeroPayMod : ModuleRules
                 "Blutility",
                 "EditorSubsystem",
                 "ZeroPayEditorButtonsPlugin",
-	            }
+                "ToolMenus",
+                "ToolWidgets",
+                }
             );
         }
 

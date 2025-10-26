@@ -11,7 +11,8 @@ public class ZeroPayVRTarget : TargetRules
         DefaultBuildSettings = BuildSettingsVersion.V5;
         IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_5;
         ExtraModuleNames.Add("ZeroPayVR");
-        //ExtraModuleNames.AddRange(new string[] { "ZeroPayVR" });
+
+        bUseLoggingInShipping = true ;
 
         /*
          * This is our Steam App ID.

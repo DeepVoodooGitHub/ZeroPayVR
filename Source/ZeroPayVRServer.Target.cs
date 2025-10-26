@@ -11,7 +11,7 @@ public class ZeroPayVRServerTarget: TargetRules   // Change this line as shown p
             Type = TargetType.Server;
             ExtraModuleNames.Add("ZeroPayVR");    // Change this line as shown previously
 	        bLegacyPublicIncludePaths = false;
-            //bUseLoggingInShipping = true;
+            bUseLoggingInShipping = true;
             DefaultBuildSettings = BuildSettingsVersion.V5;
             IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_5;
 
