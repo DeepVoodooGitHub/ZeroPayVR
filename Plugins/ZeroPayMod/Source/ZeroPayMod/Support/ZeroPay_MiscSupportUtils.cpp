@@ -47,9 +47,9 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 
 #ifdef PLATFORM_LINUX
 	/* Server-side only */
-	if (!target->HasAuthority())
+	if (!target->HasAuthority() || !IsRunningDedicatedServer())
 	{
-		UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       Failed, was not called in authority (on server)."), FDebugConsoleLevel::Error);
+		UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       Failed, was not called in authority (on dedicated server)."));
 		return;
 	}
 

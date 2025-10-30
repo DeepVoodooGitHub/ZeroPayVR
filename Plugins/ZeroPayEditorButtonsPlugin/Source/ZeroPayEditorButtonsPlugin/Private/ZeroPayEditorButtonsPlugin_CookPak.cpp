@@ -222,7 +222,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 	UpdateModManagementUIProgressField();
 
 	/* Cook Platform */
-	if (!ExecuteCookShellCmd("Android", UGCID, mapName, neverCookMapName, alwaysCookPaths))
+	if (!ExecuteCookShellCmd("Android_ASTC", UGCID, mapName, neverCookMapName, alwaysCookPaths))
 	{
 		LastMessage = ">>> ERROR : Cooking of Android failed, see 'Output Log'.";
 		UpdateModManagementUIProgressField();
@@ -302,7 +302,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 	LastMessage = FString::Printf(TEXT("[6/9] Packing Quest3/Android content (%d assets)..."), nTotalFiles);
 	UpdateModManagementUIProgressField();
 
-	if (!ExecutePakShellCmd("Android", CookedPakLocation_Android, CookedPakListFilePath))
+	if (!ExecutePakShellCmd("Android_ASTC", CookedPakLocation_Android, CookedPakListFilePath))
 	{
 		LastMessage = ">>> ERROR : Android Pak failed, see 'output log'";
 		UpdateModManagementUIProgressField();
@@ -688,7 +688,7 @@ bool FZeroPayEditorButtonsPluginModule::ExecutePakShellCmd(FString Platform, FSt
 
 	// The full quoted command passed to /k (entire command in one quoted string)
 	FString CommandToRun = FString::Printf(
-		TEXT("\"%s\" \"%s\" -create=\"%s\" -platform=%s -UTF8Output -multiprocess -patchpaddingalign=2048"),
+		TEXT("\"%s\" \"%s\" -create=\"%s\" -platform=%s -UTF8Output -multiprocess"),
 		*EditorExePath,
 		*CookedPakLocation_Windows,  
 		*CookedPakListFilePath,    

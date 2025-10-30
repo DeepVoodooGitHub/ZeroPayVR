@@ -98,29 +98,39 @@ void UZeroPay_ModEngine::MakePlatformPakZip(FModioPlatform Platform, FOnZipCompl
 /* Windows/Android */
 void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, int64 ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure)
 {
-    if (!FPaths::FileExists(ZipFilePath))
+    // 1) Get saved dir (usually relative on Android)
+    FString SavedDir = FPaths::ProjectSavedDir();
+
+    // 2) Resolve it to absolute ONCE
+    IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+    FString AbsSavedDir = PlatformFile.ConvertToAbsolutePathForExternalAppForRead(*SavedDir);
+
+    // 3) Build your two absolute paths from that absolute dir
+    const FString AbsZipPath = FPaths::Combine(AbsSavedDir, ZipFilePath);   // e.g. "DownloadedFile.zip"
+    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
+    const FString AbsDestinationPath = FPaths::Combine(AbsSavedDir, ModFolderName);
+
+    // 4) Sanity check
+    if (!FPaths::FileExists(AbsZipPath))
     {
-        FString Error = FString::Printf(TEXT("ZIP file does not exist: %s"), *ZipFilePath);
-        UE_LOG(LogTemp, Error, TEXT("%s"), *Error);
-        OnFailure.ExecuteIfBound(Error);
+        UE_LOG(LogTemp, Error, TEXT("ZIP file does not exist: %s"), *AbsZipPath);
+        OnFailure.ExecuteIfBound(FString::Printf(TEXT("ZIP file does not exist: %s"), *AbsZipPath));
         return;
     }
 
-    // Get Saved directory and append "Mods/<ModID>/"
-    FString BasePath = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-    FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
-    FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
+    UE_LOG(LogTemp, Log, TEXT("   ZipPath: %s"), *AbsZipPath);
+    UE_LOG(LogTemp, Log, TEXT("   Unzip Path: %s"), *AbsDestinationPath);
 
     // Remove old folder
-    if (IFileManager::Get().DirectoryExists(*DestinationPath))
+    if (IFileManager::Get().DirectoryExists(*AbsDestinationPath))
     {
         TArray<FString> PakFiles;
-        IFileManager::Get().FindFiles(PakFiles, *(DestinationPath / TEXT("*.pak")), true, false);
+        IFileManager::Get().FindFiles(PakFiles, *(AbsDestinationPath / TEXT("*.pak")), true, false);
 
         bool bAllDeleted = true;
         for (const FString& PakFile : PakFiles)
         {
-            FString FullPakPath = DestinationPath / PakFile;
+            FString FullPakPath = AbsDestinationPath / PakFile;
             if (!IFileManager::Get().Delete(*FullPakPath, false, true))
             {
                 UE_LOG(LogTemp, Error, TEXT("Failed to delete PAK file: %s"), *FullPakPath);
@@ -131,12 +141,12 @@ void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, int64 ModID,
     else
     {
         /* Make folder is not existing.. */
-        IFileManager::Get().MakeDirectory(*DestinationPath, true);
+        IFileManager::Get().MakeDirectory(*AbsDestinationPath, true);
     }
 
     // Copy values to local copies for thread use
-    FString LocalZipFilePath = ZipFilePath;
-    FString LocalDestinationPath = DestinationPath;
+    FString LocalZipFilePath = AbsZipPath;
+    FString LocalDestinationPath = AbsDestinationPath;
 
     Async(EAsyncExecution::ThreadPool, [LocalZipFilePath, LocalDestinationPath, OnSuccess, OnFailure, ModID]()
         {

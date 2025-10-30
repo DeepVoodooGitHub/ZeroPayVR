@@ -149,7 +149,8 @@
 #pragma once
 
 #if PLATFORM_ANDROID 
-
+#define MINIZ_LITTLE_ENDIAN 1
+#define MINIZ_NO_STDIO
 #else
 #define MINIZ_X86_OR_X64_CPU 1
 #define MINIZ_USE_UNALIGNED_LOADS_AND_STORES 1
@@ -9458,6 +9459,12 @@ namespace miniz_cpp
         {
             reset();
             buffer_.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+
+            UE_LOG(LogTemp, Log, TEXT("[miniz debug] Loaded %zu bytes from stream"), buffer_.size());
+            if (buffer_.empty()) 
+            {
+                UE_LOG(LogTemp, Log, TEXT("[miniz debug] ZIP buffer is empty - file may not have been read correctly."));
+            }
             remove_comment();
             start_read();
         }
@@ -9466,6 +9473,13 @@ namespace miniz_cpp
         {
             filename_ = filename;
             std::ifstream stream(filename, std::ios::binary);
+
+            if (!stream.is_open() || !stream.good()) 
+            {
+                UE_LOG(LogTemp, Log, TEXT("[miniz debug] Failed to open ZIP file: %s"), *FString(filename.c_str()));
+                return;
+            }
+
             load(stream);
         }
 
