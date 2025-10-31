@@ -210,7 +210,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 
 	// All build paths, names, etc
 	FString ProjectCookedPath_Android = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectCookedPath_Android += "Cooked/Android/" + FString(FApp::GetProjectName()) + "/Content";
+	ProjectCookedPath_Android += "Cooked/Android_ASTC/" + FString(FApp::GetProjectName()) + "/Content";
 	FString PakFileName_Android = "Android.pak";
 	FString CookedPakLocation_Android = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
 	CookedPakLocation_Android += "Workshop/Android/" + PakFileName_Android;
@@ -285,7 +285,7 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 
 	/* Asset registry */
 	FString ProjectAssetRegistryPath = *FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	ProjectAssetRegistryPath += "Cooked/Android/" + FString(FApp::GetProjectName()) + "/AssetRegistry.bin";
+	ProjectAssetRegistryPath += "Cooked/Android_ASTC/" + FString(FApp::GetProjectName()) + "/AssetRegistry.bin";
 	FString realignedFilePath = ProjectAssetRegistryPath.Replace(TEXT("\\"), TEXT("/"));
 	FString TargetPath = FString::Printf(TEXT("../../../ZeroPayMods/UGC%s/AssetRegistry.bin"), *UGCID);
 	generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + TargetPath + "\" \n";
@@ -688,7 +688,7 @@ bool FZeroPayEditorButtonsPluginModule::ExecutePakShellCmd(FString Platform, FSt
 
 	// The full quoted command passed to /k (entire command in one quoted string)
 	FString CommandToRun = FString::Printf(
-		TEXT("\"%s\" \"%s\" -create=\"%s\" -platform=%s -UTF8Output -multiprocess"),
+		TEXT("\"%s\" \"%s\" -create=\"%s\" -platform=%s -UTF8Output -multiprocess -patchpaddingalign=4096 -alignformemorymapping=4096"),
 		*EditorExePath,
 		*CookedPakLocation_Windows,  
 		*CookedPakListFilePath,    

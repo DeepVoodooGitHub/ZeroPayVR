@@ -45,6 +45,9 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 {
 	UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("[Init] InitialiseZeroPayVR() called."));
 
+	const uint32 RequiredAlignment = FPlatformProperties::GetMemoryMappingAlignment();
+	UE_LOG(LogTemp, Warning, TEXT(">>>>>>>>>>>>>>>>>>> ALIGNMNET : %d"), RequiredAlignment);
+
 #ifdef PLATFORM_LINUX
 	/* Server-side only */
 	if (!target->HasAuthority() || !IsRunningDedicatedServer())
