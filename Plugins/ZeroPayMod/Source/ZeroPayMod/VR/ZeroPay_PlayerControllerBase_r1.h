@@ -13,5 +13,25 @@ UCLASS()
 class ZEROPAYMOD_API AZeroPay_PlayerControllerBase_r1 : public AVRPlayerController
 {
 	GENERATED_BODY()	
-	
+public:
+	/** Standard lifecycle overrides */
+	virtual void BeginPlay() override;
+	virtual void PreClientTravel(const FString& PendingURL, ETravelType TravelType, bool bIsSeamlessTravel) override;
+	virtual void PostSeamlessTravel() override;
+
+	/**
+	 * Called whenever the controller should ensure a valid pawn exists.
+	 * Blueprint must implement this and perform the spawn/possess logic.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "ZeroPayVR|Player Controller")
+	void SpawnAndPossessPawnIfNeeded();
+
+	/* Used to handle Windows / Quest 3 fades using different underlying mechanisms */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "ZeroPayVR|Player Controller")
+	void TriggerVRHeadsetFade(bool fadeDown, float duration);
+
+	/* Used to handle Windows / Quest 3 fades using different underlying mechanisms */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "ZeroPayVR|Player Controller")
+	void SetVRHeadsetBlack();
+
 };

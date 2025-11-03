@@ -8,3 +8,11 @@ void AZeroPay_GameMode_r1::StartPlay()
 
 	ZeroPayStartPlay();
 }
+
+
+void AZeroPay_GameMode_r1::HandleSeamlessTravelPlayer(AController*& C)
+{
+	Super::HandleSeamlessTravelPlayer(C);
+
+	UE_LOG(LogTemp, Log, TEXT(">> AZeroPay_GameMode_r1::HandleSeamlessTravelPlayer called"));
+}

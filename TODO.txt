@@ -1,0 +1,8 @@
+TODO
+
+* Windows pauses for 2 seconds on Steam Init
+* JOining server whilst downloading mod may stop things from working
+* There's no delay in the download retires (i.e. drop connection mid download, immediate retries fail)
+   * If download fails the asset moves to "Installed" as if OK and then is marked as "unpacking" 
+   * AFter removing a mod (unsubscribing) the mod in the browser doesn't show the "subscribe" button again
+* Picking no asset in server lobby causes things to get stuck when launching game

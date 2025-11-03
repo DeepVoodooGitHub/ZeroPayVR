@@ -20,4 +20,6 @@ public:
 	// An event that is called after UWorld BeginPlay() but before any other game logic
 	UFUNCTION(BlueprintImplementableEvent)
 	void ZeroPayStartPlay();
+
+	void HandleSeamlessTravelPlayer(AController*& C) override;
 };
