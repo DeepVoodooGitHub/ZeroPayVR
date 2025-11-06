@@ -19,8 +19,7 @@ public class ZeroPayMod : ModuleRules
         PrivateIncludePaths.AddRange(
 			new string[] {
 				// ... add other private include paths required here ...
-				"ZeroPayMod",
-                "AudioMixer"
+				"ZeroPayMod"
                 }
             );
 			
@@ -36,6 +35,9 @@ public class ZeroPayMod : ModuleRules
 				"Json",
                 "JsonUtilities",
                 "PakFile",
+                "OnlineSubsystem",
+                "OnlineSubsystemUtils",
+                "OnlineSubsystemEIK",
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
@@ -68,7 +70,7 @@ public class ZeroPayMod : ModuleRules
 				"UMG",
                 "AssetRegistry",
 				"PakFile",
-			}
+            }
             );
 
 		// Editor based builds require some editor dependencies..

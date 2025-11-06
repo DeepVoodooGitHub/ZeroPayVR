@@ -36,6 +36,7 @@
 #include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Http.h"
+#include "BlueprintDataDefinitions.h"
 
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
@@ -70,22 +71,22 @@ public:
 	~AZeroPay_MiscSupportUtils();
 
 	// Call from the BeginPlay event in your levels blueprint, this starts the underlying ZeroPay VR subsystems
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support", meta = (DefaultToSelf = "target"))
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "target"))
 	static void InitialiseZeroPayVR(AActor* target);
 
 	// Returns the correct path based on whether the "target" actor is controlled (on the network) locally or remotely
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
 	static void IsLocallyControlled(AActor* target, EZeroPay_NetControllerStatus& Result);
 
 	// Returns the current network version, used to keep mismatches servers and clients apart
-	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
 	static int GetNetVersionNumber()
 	{
 		return 1;
 	}
 
 	// Reads a command line argument 
-	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
 	static FString GetCommandLineOption(FString OptionName)
 	{
 		FString Result = "";
@@ -96,14 +97,14 @@ public:
 
 
 	// Allow audio to continue if the game does not have focus
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
 	static void EnableBackgroundAudio()
 	{
 		FApp::SetUnfocusedVolumeMultiplier(1.0f);
 	}
 
 	// Returns true if on packaged dedicated server build (will return FALSE in editor even if a server) 
-	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
 	static bool isDedicatedServer()
 	{
 #if UE_SERVER
@@ -114,14 +115,14 @@ public:
 	}
 
 	// Gets the project root directory 
-	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
 	static FString GetProjectRootDir()
 	{
 		return FPaths::ProjectDir();
 	}
 
 	// Editor configuration support
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
 	static void SetEditorConfigurationBool(FString field, bool bValue)
 	{
 		GConfig->SetBool(
@@ -135,7 +136,7 @@ public:
 
 
 	// Editor configuration support
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
 	static void SetEditorConfigurationString(FString field, FString Value)
 	{
 		GConfig->SetString(
@@ -148,7 +149,7 @@ public:
 	};
 
 	// Editor configuration support
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
 	static bool GetEditorConfigurationBool(FString field)
 	{
 		bool returnValue = false ;
@@ -163,7 +164,7 @@ public:
 	};
 
 	// Editor configuration support
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
 	static FString GetEditorConfigurationString(FString field)
 	{
 		FString returnValue = "";
@@ -177,13 +178,13 @@ public:
 		return returnValue;
 	};
 
-	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
 	static FString FormatStringWithDelimiters(int32 Number)
 	{
 		return FText::AsNumber(Number).ToString();
 	}
 
-	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
 	static bool PlayInEditor()
 	{
 #if WITH_EDITOR
@@ -200,11 +201,11 @@ public:
 	}
 
 	// Clear and invalidates a timer from a UObject (without world context)
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
 	static void ClearAndInvalidateUObjectTimer(FTimerHandle Handle);
 
 	//Exposes Server travel to blueprint
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "ZeroPay Misc Support", meta = (HidePin = "WorldContextObject", DefaultToSelf = "WorldContextObject"))
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "ZeroPay|Misc Support", meta = (HidePin = "WorldContextObject", DefaultToSelf = "WorldContextObject"))
 	static bool ServerTravel(UObject* WorldContextObject, const FString& FURL, bool bAbsolute, bool bShouldSkipGameNotify) ;
 
 #if WITH_EDITOR
@@ -280,21 +281,21 @@ public:
 	}
 #endif
 
-	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
 	static FRotator StripToYawOnly(const FRotator& InRotator)
 	{
 		// Strip Pitch and Roll, keep only Yaw
 		return FRotator(0.f, InRotator.Yaw, 0.f);
 	}
 
-	UFUNCTION(BlueprintPure, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
 	static double YawDifference(const FRotator& A, const FRotator& B)
 	{
 		// Absolute value of yaw difference
 		return FMath::Abs(FMath::FindDeltaAngleDegrees(A.Yaw, B.Yaw));
 	}
 
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay Misc Support")
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
 	static void GetPublicIP(const FOnIPResolved& OnComplete)
 	{
 		if (!OnComplete.IsBound())
@@ -317,6 +318,56 @@ public:
 				}
 			});
 		Request->ProcessRequest();
+	}
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
+	static void GetSessionID_AsString(const FBlueprintSessionResult& SessionResult, FString& SessionID)
+	{
+		const TSharedPtr<class FOnlineSessionInfo> SessionInfo = SessionResult.OnlineResult.Session.SessionInfo;
+		if (SessionInfo.IsValid() && SessionInfo->IsValid() && SessionInfo->GetSessionId().IsValid())
+		{
+			SessionID = SessionInfo->GetSessionId().ToString();
+			return;
+		}
+
+		// Zero the string out if we didn't have a valid one, in case this is called in c++
+		SessionID.Empty();
+	}
+
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support" )
+	static FString GetCurrentSessionID_AsString()
+	{
+		IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
+		if (!Subsystem)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GetCurrentSessionID: No OnlineSubsystem"));
+			return TEXT("");
+		}
+
+		IOnlineSessionPtr SessionInterface = Subsystem->GetSessionInterface();
+		if (!SessionInterface.IsValid())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GetCurrentSessionID: Invalid Session Interface"));
+			return TEXT("");
+		}
+
+		// Default name for active game sessions is "GameSession"
+		const FNamedOnlineSession* NamedSession = SessionInterface->GetNamedSession(TEXT("ZeroPayVRSession"));
+		if (!NamedSession)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GetCurrentSessionID: No active named session found"));
+			return TEXT("");
+		}
+
+		const FOnlineSessionInfo* Info = NamedSession->SessionInfo.Get();
+		if (!Info)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GetCurrentSessionID: SessionInfo invalid"));
+			return TEXT("");
+		}
+
+		return Info->GetSessionId().ToString();
 	}
 
 };
