@@ -1,4 +1,1 @@
 TODO
-
-* Picking no asset in server lobby causes things to get stuck when launching game
-* Listen server logic

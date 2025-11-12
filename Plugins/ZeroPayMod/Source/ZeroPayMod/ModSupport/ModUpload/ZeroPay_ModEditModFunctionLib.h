@@ -27,7 +27,7 @@ public:
 
     /** Edit an existing mod */
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Upload", meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject"))
-    static UEditModAsync* SubmitModChanges(const FString& InAccessToken, int64 InModId, const FString& InName, const FString& InSummary, const FString& InDescription, const TArray<FString>& InTags);
+    static UEditModAsync* SubmitModChanges(const FString& InAccessToken, int64 InModId, const FString& InName, const FString& InSummary, const FString& InDescription, const TArray<FString>& InTags, const TArray<FString>& InMetaKeys, const TArray<FString>& InMetaValues);
 
     virtual void Activate() override;
 
@@ -38,4 +38,6 @@ private:
     FString Summary;
     FString Description;
     TArray<FString> Tags;
+    TArray<FString> MetaKeys;
+    TArray<FString> MetaValues;
 };

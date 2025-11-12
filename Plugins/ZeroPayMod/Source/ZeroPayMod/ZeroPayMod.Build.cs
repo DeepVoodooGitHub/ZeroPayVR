@@ -28,6 +28,7 @@ public class ZeroPayMod : ModuleRules
 			new string[]
 			{
                 "Core",
+                "Engine",
                 "AdvancedSessions",
                 "OpenXRExpansionPlugin",
                 "VRExpansionPlugin",

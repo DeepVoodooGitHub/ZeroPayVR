@@ -10,9 +10,8 @@ public class ZeroPayModCore : ModuleRules
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
-				// ... add public include paths required here ...
-			}
-			);
+            }
+            );
 				
 		
 		PrivateIncludePaths.AddRange(
@@ -26,9 +25,11 @@ public class ZeroPayModCore : ModuleRules
 			new string[]
 			{
 				"Core",
+			    "CoreUObject",
+				"Engine"
 				// ... add other public dependencies that you statically link with here ...
 			}
-			);
+            );
 			
 		
 		PrivateDependencyModuleNames.AddRange(

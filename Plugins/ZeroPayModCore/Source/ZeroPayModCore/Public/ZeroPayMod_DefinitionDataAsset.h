@@ -5,24 +5,27 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Engine/Texture2D.h"
+#include "Engine/UserDefinedStruct.h"
 #include "ZeroPayMod_DefinitionDataAsset.generated.h"
+
+class UUserDefinedStruct;
 
 UENUM(BlueprintType)
 enum class EUGCTagCategory : uint8
 {
-	FullMod             UMETA(DisplayName = "Full-Mod"),
-	FullModCustomGM     UMETA(DisplayName = "Full-Mod (with GM override)"),
-	GameMode            UMETA(DisplayName = "Game-Mode"),
-	Level               UMETA(DisplayName = "Level"),
-	Weapons             UMETA(DisplayName = "Weapons"),
-	UI                  UMETA(DisplayName = "UI"),
-	Cosmetics           UMETA(DisplayName = "Cosmetics"),
-	Audio               UMETA(DisplayName = "Audio"),
-	Characters          UMETA(DisplayName = "Characters"),
-	CharacterBodyLayout UMETA(DisplayName = "BodyLayout"),
-	Vehicles            UMETA(DisplayName = "Vehicles"),
-	AI                  UMETA(DisplayName = "AI"),
-	NPCs                UMETA(DisplayName = "NPCs")
+	FullMod             UMETA(DisplayName = "Full-Mod", ToolTip = "A complete mod that includes map, game-mode, etc."),
+	FullModCustomGM     UMETA(DisplayName = "Full-Mod (supports GM override)", ToolTip = "Full mod, but it allows the game-mode to be overridden in UI"),
+	GameMode            UMETA(DisplayName = "Game-Mode", ToolTip = "Provides a GameMode, such as TDM, Zombies, Push, etc."),
+	Level               UMETA(DisplayName = "Level", ToolTip = "One or more levels/maps; all will be shown to user if your mod is selected"),
+	Weapons             UMETA(DisplayName = "Weapons", ToolTip = "Adds or modifies weapons, fire modes, projectiles, etc."),
+	UI                  UMETA(DisplayName = "UI", ToolTip = "Widgets, HUD, menus, or UI styling."),
+	Cosmetics           UMETA(DisplayName = "Cosmetics", ToolTip = "Skins, materials, decals, and other visual-only changes."),
+	Audio               UMETA(DisplayName = "Audio", ToolTip = "SFX, music, VO, and audio mixes."),
+	Characters          UMETA(DisplayName = "Characters", ToolTip = "Classes that override build in pawn visual look, etc."),
+	CharacterBodyLayout UMETA(DisplayName = "BodyLayout", ToolTip = "A specific player controller and pawn to be spawned (requires game-mode support)."),
+	Vehicles            UMETA(DisplayName = "Vehicles", ToolTip = "Driveable vehicles, including air, land and water based."),
+	AI                  UMETA(DisplayName = "AI", ToolTip = "AI controllers/behaviors, perception, etc."),
+	NPCs                UMETA(DisplayName = "NPCs", ToolTip = "Non-player characters (with/without AI), requires game-mode support.")
 };
 
 UENUM(BlueprintType)
@@ -95,6 +98,11 @@ struct FZeroPayMod_Definition
 	// DO NOT USE - FUTURE
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	TSoftObjectPtr<UWorld> psvrlevel;
+
+	// Points to a BP Structure that will be used for settings presented to the user when selecting this "mod" 
+	// Assuming the mod is "full-mod", "game-mode", or similar. 
+	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition", meta = (AllowAbstract = false))
+	TObjectPtr<UUserDefinedStruct> ModSettingsStruct;
 
 	// Always cook the content in these paths, for certain items (such as game-modes) you may not have a level or something that can be
     // used to detect references that are actually used. If no references exist then the asset is never cooked and packed into your

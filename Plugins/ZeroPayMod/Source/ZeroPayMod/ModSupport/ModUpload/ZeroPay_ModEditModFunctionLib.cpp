@@ -5,8 +5,25 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "ModSupport/ZeroPay_ModGlobal.h"   
+// --- local helpers (cpp-only) ---
+namespace
+{
+    static bool IsValidMetaKey(const FString& Key)
+    {
+        if (Key.IsEmpty() || Key.Len() > 255) return false;
 
-UEditModAsync* UEditModAsync::SubmitModChanges(const FString& InAccessToken, int64 InModId, const FString& InName, const FString& InSummary, const FString& InDescription, const TArray<FString>& InTags)
+        for (TCHAR C : Key)
+        {
+            if (!(FChar::IsAlnum(C) || C == TEXT('_') || C == TEXT('-')))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+UEditModAsync* UEditModAsync::SubmitModChanges(const FString& InAccessToken, int64 InModId, const FString& InName, const FString& InSummary, const FString& InDescription, const TArray<FString>& InTags,  const TArray<FString>& InMetaKeys,  const TArray<FString>& InMetaValues)   
 {
     UEditModAsync* Node = NewObject<UEditModAsync>();
     Node->AccessToken = InAccessToken;
@@ -15,6 +32,11 @@ UEditModAsync* UEditModAsync::SubmitModChanges(const FString& InAccessToken, int
     Node->Summary = InSummary;
     Node->Description = InDescription;
     Node->Tags = InTags;
+
+    // NEW: capture metadata arrays
+    Node->MetaKeys = InMetaKeys;
+    Node->MetaValues = InMetaValues;
+
     return Node;
 }
 
@@ -57,6 +79,38 @@ void UEditModAsync::Activate()
     {
         AppendField(TEXT("tags[]"), Tag);
     }
+
+    if (MetaKeys.Num() > 0 || MetaValues.Num() > 0)
+    {
+        if (MetaKeys.Num() != MetaValues.Num())
+        {
+            OnFailure.Broadcast(EEditModResult::Failure, TEXT("Metadata arrays have different lengths."));
+            return;
+        }
+
+        for (int32 i = 0; i < MetaKeys.Num(); ++i)
+        {
+            const FString Key = MetaKeys[i].TrimStartAndEnd();
+            const FString Value = MetaValues[i].TrimStartAndEnd();
+
+            if (!IsValidMetaKey(Key))
+            {
+                OnFailure.Broadcast(EEditModResult::Failure,
+                    FString::Printf(TEXT("Invalid metadata key at index %d: '%s' (allowed: A-Z a-z 0-9 _ -; max 255)"), i, *Key));
+                return;
+            }
+            if (Value.Len() > 255)
+            {
+                OnFailure.Broadcast(EEditModResult::Failure,
+                    FString::Printf(TEXT("Metadata value too long at index %d (max 255)."), i));
+                return;
+            }
+
+            const FString Pair = Key + TEXT(":") + Value;
+            AppendField(TEXT("metadata_kvp[]"), Pair);
+        }
+    }
+
 
     AppendString(TEXT("--") + Boundary + TEXT("--") + CRLF);
 
