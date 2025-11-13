@@ -50,6 +50,9 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
 	FString logourl;
+
+	UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+	TArray<FString> metadata_values;
 };
 
 
@@ -138,7 +141,7 @@ public:
 
 private:
 	void HandleRequestCompleted(bool bSuccess, const FString& ErrorMessage, int64 ModID, const FString& Username, const FString& Name, const FString& Summary, const FString& ThumbURL,
-								const TArray<FString>& TagNames, float RatingsPercentage, int64 Filesize, int64 FilesizeUncompressed, const FString& BinaryURL);
+								const TArray<FString>& TagNames, const TArray<FString>& MetaValues, float RatingsPercentage, int64 Filesize, int64 FilesizeUncompressed, const FString& BinaryURL);
 
 };
 

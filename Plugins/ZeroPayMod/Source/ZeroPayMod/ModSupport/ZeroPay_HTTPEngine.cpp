@@ -47,20 +47,20 @@ void UZeroPayModAsync_GetModioFile::StartModioGetFilesRequest(int64 ModID, FModi
             else
             {
                 // Failed
-                HandleRequestCompleted(false, TEXT("HTTP Request to mod.io failed"), TEXT(""), 0, 0, 0, TEXT("") );
+                HandleRequestCompleted(false, TEXT("HTTP Request to mod.io failed"), TEXT(""), 0, 0, 0, TEXT(""));
             }
         });
 
-    FString URL = FString::Printf(TEXT("https://g-%s.modapi.io/v1/games/%s/mods/%lld/files?api_key=%s&_limit=1"),*FGameID, *FGameID, ModID, *FAPIKey);
+    FString URL = FString::Printf(TEXT("https://g-%s.modapi.io/v1/games/%s/mods/%lld/files?api_key=%s&_limit=1"), *FGameID, *FGameID, ModID, *FAPIKey);
     Request->SetURL(URL);
     switch (Platform)
     {
-        case FModioPlatform::ModIOPlatform_Windows : Request->SetHeader(TEXT("X-Modio-Platform"), TEXT("windows")); break;
-        case FModioPlatform::ModIOPlatform_Android: Request->SetHeader(TEXT("X-Modio-Platform"), TEXT("android")); break;
-        case FModioPlatform::ModIOPlatform_LinuxServer : Request->SetHeader(TEXT("X-Modio-Platform"), TEXT("linux")); break;
-       default: break;
+    case FModioPlatform::ModIOPlatform_Windows: Request->SetHeader(TEXT("X-Modio-Platform"), TEXT("windows")); break;
+    case FModioPlatform::ModIOPlatform_Android: Request->SetHeader(TEXT("X-Modio-Platform"), TEXT("android")); break;
+    case FModioPlatform::ModIOPlatform_LinuxServer: Request->SetHeader(TEXT("X-Modio-Platform"), TEXT("linux")); break;
+    default: break;
     }
-    
+
     Request->SetVerb("GET");
     Request->ProcessRequest();
 }
@@ -144,8 +144,8 @@ void UZeroPayModAsync_GetModioFile::HandleRequestCompleted(bool bSuccess, const 
     Result->message = Message;
     Result->filename = Filename;
     Result->file_id = FileID;
-    Result->date_updated = DateUpdated ;
-    Result->UncompressedSize = UncompressedSize ;
+    Result->date_updated = DateUpdated;
+    Result->UncompressedSize = UncompressedSize;
     Result->binaryurl = BinaryURL;
 
     if (bSuccess)
@@ -183,7 +183,7 @@ void UZeroPayModAsync_GetModioModInfo::StartModioGetModInfoRequest(int64 ModID)
             if (IsEngineExitRequested() || GExitPurge)
                 return;
 
-            if (GEditor && !GEditor->PlayWorld) 
+            if (GEditor && !GEditor->PlayWorld)
                 return;
 
             if (!IsValid(this))
@@ -197,7 +197,7 @@ void UZeroPayModAsync_GetModioModInfo::StartModioGetModInfoRequest(int64 ModID)
             else
             {
                 // Failed
-                HandleRequestCompleted(false, TEXT("HTTP Request to mod.io failed"), 0, TEXT(""), TEXT(""), TEXT(""), TEXT(""), TArray<FString>(), 0.0f, 0, 0, TEXT(""));
+                HandleRequestCompleted(false, TEXT("HTTP Request to mod.io failed"), 0, TEXT(""), TEXT(""), TEXT(""), TEXT(""), TArray<FString>(), TArray<FString>(), 0.0f, 0, 0, TEXT(""));
             }
         });
 
@@ -253,6 +253,29 @@ void UZeroPayModAsync_GetModioModInfo::ParseModioModInfoJSON(const FString Respo
             }
         }
 
+        // NEW: metadata_kvp -> collect only "metavalue"
+        TArray<FString> MetaValues;
+        const TArray<TSharedPtr<FJsonValue>>* MetadataArray;
+        if (JsonObject->TryGetArrayField(TEXT("metadata_kvp"), MetadataArray))
+        {
+            for (const TSharedPtr<FJsonValue>& MetaEntry : *MetadataArray)
+            {
+                if (MetaEntry->Type == EJson::Object)
+                {
+                    TSharedPtr<FJsonObject> MetaObj = MetaEntry->AsObject();
+                    if (MetaObj.IsValid())
+                    {
+                        FString Value;
+                        // Only care about "metavalue"
+                        if (MetaObj->TryGetStringField(TEXT("metavalue"), Value))
+                        {
+                            MetaValues.Add(Value);
+                        }
+                    }
+                }
+            }
+        }
+
         // Rating
         float RatingsPercentage = 0.0f;
         if (JsonObject->HasTypedField<EJson::Object>(TEXT("stats")))
@@ -279,20 +302,19 @@ void UZeroPayModAsync_GetModioModInfo::ParseModioModInfoJSON(const FString Respo
             }
         }
 
-        // Now pass everything to your handler
-        HandleRequestCompleted(true, TEXT(""), ModID, Username, Name, Summary, ThumbURL, TagNames, RatingsPercentage, Filesize, FilesizeUncompressed, BinaryURL);
+        // Now pass everything to your handler (added MetaValues)
+        HandleRequestCompleted(true, TEXT(""), ModID, Username, Name, Summary, ThumbURL, TagNames, MetaValues, RatingsPercentage, Filesize, FilesizeUncompressed, BinaryURL);
     }
     else
     {
         HandleRequestCompleted(
             false,
-            TEXT("Received invalid JSON from mod.io server"), 0, TEXT(""), TEXT(""), TEXT(""), TEXT(""), TArray<FString>(), 0.0f, 0, 0, TEXT("")
+            TEXT("Received invalid JSON from mod.io server"), 0, TEXT(""), TEXT(""), TEXT(""), TEXT(""), TArray<FString>(), TArray<FString>(), 0.0f, 0, 0, TEXT("")
         );
     }
 }
 
-void UZeroPayModAsync_GetModioModInfo::HandleRequestCompleted(bool bSuccess, const FString& ErrorMessage, int64 ModID, const FString& Username, const FString& Name, const FString& Summary, const FString& ThumbURL,
-                                                                const TArray<FString>& TagNames, float RatingsPercentage, int64 Filesize, int64 FilesizeUncompressed, const FString& BinaryURL)
+void UZeroPayModAsync_GetModioModInfo::HandleRequestCompleted(bool bSuccess, const FString& ErrorMessage, int64 ModID, const FString& Username, const FString& Name, const FString& Summary, const FString& ThumbURL, const TArray<FString>& TagNames, const TArray<FString>& MetaValues, float RatingsPercentage, int64 Filesize, int64 FilesizeUncompressed, const FString& BinaryURL)
 {
     UZeroPayMod_GetModInfoResult* Result = NewObject<UZeroPayMod_GetModInfoResult>();
     Result->message = ErrorMessage;
@@ -306,9 +328,10 @@ void UZeroPayModAsync_GetModioModInfo::HandleRequestCompleted(bool bSuccess, con
     Result->file_size = Filesize;
     Result->binaryurl = BinaryURL;
     Result->logourl = ThumbURL;
+    Result->metadata_values = MetaValues;
 
     if (!OnSuccess.IsBound() || !OnFailure.IsBound())
-        return ;
+        return;
 
     if (bSuccess)
     {
@@ -337,7 +360,7 @@ void UZeroPayMod_AsyncHttpDownload::StartDownload(FString URL)
 {
     FHttpModule* Http = &FHttpModule::Get();
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
-    TWeakObjectPtr<UBlueprintAsyncActionBase> WeakActor = this ;
+    TWeakObjectPtr<UBlueprintAsyncActionBase> WeakActor = this;
 
     // Bind progress (we'll extract content length in OnHeaderReceived)
     Request->OnRequestProgress64().BindLambda([this, WeakActor](FHttpRequestPtr Request, uint64 BytesSent, uint64 BytesReceived)

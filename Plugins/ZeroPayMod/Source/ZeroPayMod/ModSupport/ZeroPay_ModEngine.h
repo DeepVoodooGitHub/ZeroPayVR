@@ -82,6 +82,10 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
     FString logourl;
 
+    // Encoded meta KV pairs 
+    UPROPERTY(BlueprintReadOnly, Category = "ZeroPay Modio Support")
+    TArray<FString> metadata_values;
+
     // Event for changes to the subscribed item that require re-visualisation / procesrsing
     UPROPERTY(BlueprintAssignable, BlueprintCallable, Category = "ZeroPay|Events")
     FOnSubscribedModUpdated OnInternalsUpdated;
@@ -144,13 +148,14 @@ public:
     UFUNCTION(BlueprintPure, Category = "ZeroPay Mod Engine")
     static int64 GetPakFileSize(int64 ModID, FModioPlatform Platform);
 
-    // Writes a mod state file (so we can check for updates)
+    // SERVER ONLY - Writes a mod state file (so we can check for updates)
+    // This should not be used client side use WriteModStateFileViaModInfo 
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
     static void WriteModStateFile(int64 ModID, FString DisplayName, int64 ModFileID, int64 DateUpdated, int64 UncompressedSize, FString Summary, FString Author, int64 Ratings, int64 Category);
 
     // Reads a mod state file (so we can check for updates)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
-    static bool ReadModStateFile(int64 ModID, FString& DisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory) ;
+    static bool ReadModStateFile(int64 ModID, FString& DisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory, TArray<FString>& OutMetadataValues) ;
 
     // Changes certain state file information (when updates occur)
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")

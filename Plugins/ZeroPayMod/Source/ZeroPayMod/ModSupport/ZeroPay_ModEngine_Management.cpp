@@ -44,8 +44,9 @@ TArray<UZeroPayMod_SubscribedMod*> UZeroPay_ModEngine::InitInstalledMods(UObject
         FString OutAuthor;
         int64 OutRatings = 0;
         int64 OutCategory = 0 ;
+        TArray<FString> OutMetadataValues;
 
-        if (ReadModStateFile(ModID, OutDisplayName, OutModFileID, OutDateUpdated, OutUncompressedSize, OutSummary, OutAuthor, OutRatings, OutCategory))
+        if (ReadModStateFile(ModID, OutDisplayName, OutModFileID, OutDateUpdated, OutUncompressedSize, OutSummary, OutAuthor, OutRatings, OutCategory, OutMetadataValues))
         {
             UZeroPayMod_SubscribedMod* NewMod = NewObject<UZeroPayMod_SubscribedMod>(Outer);
             NewMod->mod_id = FCString::Atoi64(*DirName);
@@ -57,6 +58,7 @@ TArray<UZeroPayMod_SubscribedMod*> UZeroPay_ModEngine::InitInstalledMods(UObject
             NewMod->date_updated = OutDateUpdated;
             NewMod->uncompressed_size = OutUncompressedSize ;
             NewMod->UGCCategory = (EUGCTagCategory) OutCategory ;
+            NewMod->metadata_values = OutMetadataValues ;
 
             // Optionally fill in popularity_today or total_downloads later
             NewMod->popularity_today = 0;
@@ -123,6 +125,7 @@ UZeroPayMod_SubscribedMod* UZeroPay_ModEngine::CreateSubscribedMod(UZeroPayMod_G
     NewMod->retry_count = 0;
     NewMod->progress = 0.0f;
     NewMod->logourl = modinfoResult->logourl ;
+    NewMod->metadata_values = modinfoResult->metadata_values;
 
     return NewMod;
 }
@@ -148,6 +151,7 @@ UZeroPayMod_SubscribedMod* UZeroPay_ModEngine::CreateServerSubscribedMod(int64 M
     NewMod->retry_count = 0;
     NewMod->progress = 0.0f;
     NewMod->logourl = 0;
+    NewMod->metadata_values.Empty();
 
     return NewMod;
 }
@@ -212,7 +216,7 @@ void UZeroPay_ModEngine::WriteModStateFile(int64 ModID, FString DisplayName, int
     }
 }
 
-bool UZeroPay_ModEngine::ReadModStateFile(int64 ModID, FString& OutDisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor, int64& OutRatings, int64& OutCategory)
+bool UZeroPay_ModEngine::ReadModStateFile(int64 ModID, FString& OutDisplayName, int64& OutFileID, int64& OutDateUpdated, int64& OutUncompressedSize, FString& OutSummary, FString& OutAuthor,int64& OutRatings, int64& OutCategory, TArray<FString>& OutMetadataValues) 
 {
     FString BasePath = FPaths::ProjectSavedDir();
     FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
@@ -255,7 +259,7 @@ bool UZeroPay_ModEngine::ReadModStateFile(int64 ModID, FString& OutDisplayName, 
         !JsonObject->TryGetStringField(TEXT("summary"), SummaryStr) ||
         !JsonObject->TryGetStringField(TEXT("author"), AuthorStr) ||
         !JsonObject->TryGetStringField(TEXT("ratings_weighted_aggregate"), RatingsStr) ||
-        !JsonObject->TryGetStringField(TEXT("category"), CategoryStr))        
+        !JsonObject->TryGetStringField(TEXT("category"), CategoryStr))
     {
         UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, FString::Printf(TEXT("Could not parse state.json (missing fields) (%s)"), *StateFilePath), FDebugConsoleLevel::Error);
         return false;
@@ -273,9 +277,23 @@ bool UZeroPay_ModEngine::ReadModStateFile(int64 ModID, FString& OutDisplayName, 
     OutSummary = SummaryStr;
     OutAuthor = AuthorStr;
 
+    // NEW: metadata_values[]
+    OutMetadataValues.Empty();
+    const TArray<TSharedPtr<FJsonValue>>* MetaArrayPtr = nullptr;
+    if (JsonObject->TryGetArrayField(TEXT("metadata_values"), MetaArrayPtr) && MetaArrayPtr)
+    {
+        for (const TSharedPtr<FJsonValue>& Val : *MetaArrayPtr)
+        {
+            if (Val.IsValid() && Val->Type == EJson::String)
+            {
+                OutMetadataValues.Add(Val->AsString());
+            }
+        }
+    }
+    // If absent, OutMetadataValues just stays empty.
+
     return true;
 }
-
 
 bool UZeroPay_ModEngine::UpdateModStateFile(int64 ModID, int64 NewDateUpdated, int64 NewUncompressedSize)
 {
@@ -332,7 +350,7 @@ bool UZeroPay_ModEngine::WriteModStateFileViaModInfo(int64 ModID, UZeroPayMod_Ge
     if (!ModInfo)
     {
         UE_LOG(LogTemp, Error, TEXT("WriteModStateFile: ModInfo is null"));
-        return false ;
+        return false;
     }
 
     FString BasePath = FPaths::ProjectSavedDir();
@@ -345,7 +363,7 @@ bool UZeroPay_ModEngine::WriteModStateFileViaModInfo(int64 ModID, UZeroPayMod_Ge
         if (!IFileManager::Get().MakeDirectory(*DestinationPath, true))
         {
             UE_LOG(LogTemp, Error, TEXT("Failed to create directory: %s"), *DestinationPath);
-            return false ;
+            return false;
         }
     }
 
@@ -363,6 +381,22 @@ bool UZeroPay_ModEngine::WriteModStateFileViaModInfo(int64 ModID, UZeroPayMod_Ge
     JsonObject->SetStringField(TEXT("ratings_weighted_aggregate"), FString::Printf(TEXT("%lld"), ModInfo->ratings));
     JsonObject->SetStringField(TEXT("category"), TEXT("0")); // Not available in ModInfo
 
+    // --- NEW: Write metadata_values as string array ---
+    if (ModInfo->metadata_values.Num() > 0)
+    {
+        TArray<TSharedPtr<FJsonValue>> MetaArray;
+        for (const FString& Value : ModInfo->metadata_values)
+        {
+            MetaArray.Add(MakeShared<FJsonValueString>(Value));
+        }
+        JsonObject->SetArrayField(TEXT("metadata_values"), MetaArray);
+    }
+    else
+    {
+        // Include empty array so file structure stays consistent
+        JsonObject->SetArrayField(TEXT("metadata_values"), TArray<TSharedPtr<FJsonValue>>{});
+    }
+
     // Write JSON to string
     FString OutputString;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
@@ -371,17 +405,26 @@ bool UZeroPay_ModEngine::WriteModStateFileViaModInfo(int64 ModID, UZeroPayMod_Ge
         // Save the string to file
         if (FFileHelper::SaveStringToFile(OutputString, *StateFilePath))
         {
-            UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, FString::Printf(TEXT("Successfully wrote state.json to: %s"), *StateFilePath), FDebugConsoleLevel::Log);
-            return true ;
+            UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(
+                nullptr, nullptr,
+                FString::Printf(TEXT("Successfully wrote state.json to: %s"), *StateFilePath),
+                FDebugConsoleLevel::Log);
+            return true;
         }
         else
         {
-            UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, FString::Printf(TEXT("Failed to write state.json to: %s"), *StateFilePath), FDebugConsoleLevel::Error);
+            UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(
+                nullptr, nullptr,
+                FString::Printf(TEXT("Failed to write state.json to: %s"), *StateFilePath),
+                FDebugConsoleLevel::Error);
         }
     }
     else
     {
-        UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, FString::Printf(TEXT("Failed to write state.json to: %s"), *StateFilePath), FDebugConsoleLevel::Error);
+        UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(
+            nullptr, nullptr,
+            FString::Printf(TEXT("Failed to serialize JSON for: %s"), *StateFilePath),
+            FDebugConsoleLevel::Error);
     }
 
     return false;
