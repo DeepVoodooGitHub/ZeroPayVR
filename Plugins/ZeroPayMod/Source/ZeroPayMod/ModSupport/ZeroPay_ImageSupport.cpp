@@ -100,14 +100,25 @@ void UZeroPay_ImageLoader::CreateTexture(const TArray<uint8>& RawData, int32 Wid
 
 
 
-UZeroPay_DownloadPNGAsync* UZeroPay_DownloadPNGAsync::DownloadPng(UObject* InWorldContextObject, const FString& InUrl, EZeroPay_ImageStorage InStorageMode, const FString& InFileName, const FString& InDirectoryName)
+UZeroPay_DownloadPNGAsync* UZeroPay_DownloadPNGAsync::DownloadPng(const FString& InUrl, EZeroPay_ImageStorage InStorageMode, const FString& InFileName, const FString& InDirectoryName)
 {
 	UZeroPay_DownloadPNGAsync* Node = NewObject<UZeroPay_DownloadPNGAsync>();
-	Node->WorldContextObject = InWorldContextObject;
 	Node->Url = InUrl;
 	Node->StorageMode = InStorageMode;
 	Node->FileName = InFileName;
 	Node->DirectoryName = InDirectoryName;
+
+	if (GEngine)
+	{
+		for (const FWorldContext& Context : GEngine->GetWorldContexts())
+		{
+			if (Context.WorldType == EWorldType::PIE || Context.WorldType == EWorldType::Game )
+			{
+				Node->WorldContextObject = Context.World();
+				break;
+			}
+		}
+	}
 
 	// Keep alive across worlds (nice for PIE/multiplayer)
 	if (Node->WorldContextObject)

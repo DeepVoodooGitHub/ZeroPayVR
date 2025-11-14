@@ -429,3 +429,91 @@ bool UZeroPay_ModEngine::WriteModStateFileViaModInfo(int64 ModID, UZeroPayMod_Ge
 
     return false;
 }
+
+bool UZeroPay_ModEngine::UpdateModStateFileViaModInfo(int64 ModID, UZeroPayMod_GetModInfoResult* ModInfo)
+{
+    if (!ModInfo)
+    {
+        UE_LOG(LogTemp, Error, TEXT("UpdateModStateFileViaModInfo: ModInfo is null"));
+        return false;
+    }
+
+    const FString BasePath = FPaths::ProjectSavedDir();
+    const FString ModFolderName = FString::Printf(TEXT("Mods/%lld"), ModID);
+    const FString DestinationPath = FPaths::Combine(BasePath, ModFolderName);
+    const FString StateFilePath = FPaths::Combine(DestinationPath, TEXT("state.json"));
+
+    // Do NOT create directories or files – must already exist
+    if (!FPaths::FileExists(StateFilePath))
+    {
+        UE_LOG(LogTemp, Error, TEXT("UpdateModStateFileViaModInfo: state.json not found: %s"), *StateFilePath);
+        return false;
+    }
+
+    // Load existing JSON
+    FString JsonString;
+    if (!FFileHelper::LoadFileToString(JsonString, *StateFilePath))
+    {
+        UE_LOG(LogTemp, Error, TEXT("UpdateModStateFileViaModInfo: failed to read %s"), *StateFilePath);
+        return false;
+    }
+
+    // Parse
+    TSharedPtr<FJsonObject> JsonObject;
+    {
+        const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonString);
+        if (!FJsonSerializer::Deserialize(Reader, JsonObject) || !JsonObject.IsValid())
+        {
+            UE_LOG(LogTemp, Error, TEXT("UpdateModStateFileViaModInfo: bad JSON in %s"), *StateFilePath);
+            return false;
+        }
+    }
+
+    // ---- Update only specified fields ----
+
+    // date_updated -> use current UTC unix timestamp
+    const int64 NowUnix = FDateTime::UtcNow().ToUnixTimestamp();
+    JsonObject->SetStringField(TEXT("date_updated"), FString::Printf(TEXT("%lld"), NowUnix));
+
+    // display_name / summary / author
+    JsonObject->SetStringField(TEXT("display_name"), ModInfo->display_name);
+    JsonObject->SetStringField(TEXT("summary"), ModInfo->summary);
+    JsonObject->SetStringField(TEXT("author"), ModInfo->author);
+
+    // ratings_weighted_aggregate (kept as string to match existing schema)
+    JsonObject->SetStringField(TEXT("ratings_weighted_aggregate"), FString::Printf(TEXT("%lld"), ModInfo->ratings));
+
+    // metadata_values (string array)
+    {
+        TArray<TSharedPtr<FJsonValue>> MetaArray;
+        for (const FString& Value : ModInfo->metadata_values)
+        {
+            MetaArray.Add(MakeShared<FJsonValueString>(Value));
+        }
+        JsonObject->SetArrayField(TEXT("metadata_values"), MetaArray);
+    }
+    // ---- end selective updates ----
+
+    // Serialize back
+    FString OutString;
+    const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutString);
+    if (!FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer))
+    {
+        UE_LOG(LogTemp, Error, TEXT("UpdateModStateFileViaModInfo: failed to serialize JSON for %s"), *StateFilePath);
+        return false;
+    }
+
+    // Save in place
+    if (!FFileHelper::SaveStringToFile(OutString, *StateFilePath))
+    {
+        UE_LOG(LogTemp, Error, TEXT("UpdateModStateFileViaModInfo: failed to write %s"), *StateFilePath);
+        return false;
+    }
+
+    UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(
+        nullptr, nullptr,
+        FString::Printf(TEXT("Updated state.json: %s"), *StateFilePath),
+        FDebugConsoleLevel::Log);
+
+    return true;
+}

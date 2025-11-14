@@ -99,7 +99,7 @@ public:
 
 	// Internal print string, useful in editor and game (shown on main menu 'logs', any anything else that implements ZeroPay_InternalDebugConsole_Interface
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", WorldContext = "WorldContextObject", CallableWithoutWorldContext, AdvancedDisplay = "WorldContextObject, debugConsoleLevel, bIncludeObjectName"))
-	static void PrintInternalString(const UObject* WorldContextObject, AActor* target = nullptr, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
+	static void PrintInternalString(const UObject* WorldContextObject, UObject* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
 	{
 		// Note the GameInstance uses a null target, as it's not an AActor so we default to that here
 		FString ObjectName = "[GameInstance]";

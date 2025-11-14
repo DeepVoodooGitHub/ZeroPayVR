@@ -26,7 +26,7 @@ public:
 	// Can be disabled for this entire object by using SetDebugConsoleEnabled()
 	// SERVER: This will always output to the console, with colour coding (Log = Green, Warn = Yellow, Error = Red)
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", AdvancedDisplay = "debugConsoleLevel, bIncludeObjectName"))
-	static void AddDebugConsoleLine(AActor* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
+	static void AddDebugConsoleLine(UObject* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
 	{
 		// Note the GameInstance uses a null target, as it's not an AActor so we default to that here
 		FString ObjectName = "[GameInstance]";
@@ -74,17 +74,20 @@ public:
 
 		if (target)
 		{
-			UZeroPay_DebugConsoleComponent* DebugConsoleComponent = target->FindComponentByClass<UZeroPay_DebugConsoleComponent>();
-
-			if (!DebugConsoleComponent)
+			if (AActor* TargetActor = Cast<AActor>(target))
 			{
-				DebugConsoleComponent = NewObject<UZeroPay_DebugConsoleComponent>(target);
-				DebugConsoleComponent->RegisterComponent(); // Make sure it gets ticking/network support
+				UZeroPay_DebugConsoleComponent* DebugConsoleComponent = TargetActor->FindComponentByClass<UZeroPay_DebugConsoleComponent>();
 
-				UE_LOG(LogZeroPay, Warning, TEXT("AddDebugConsoleLine() called on actor %s with ZeroPay_DebugConsole component. Created component but first output line may not RPC correctly or disconnection will occur!"), *target->GetName());
+				if (!DebugConsoleComponent)
+				{
+					DebugConsoleComponent = NewObject<UZeroPay_DebugConsoleComponent>(TargetActor);
+					DebugConsoleComponent->RegisterComponent(); // Make sure it gets ticking/network support
+
+					UE_LOG(LogZeroPay, Warning, TEXT("AddDebugConsoleLine() called on actor %s with ZeroPay_DebugConsole component. Created component but first output line may not RPC correctly or disconnection will occur!"), *target->GetName());
+				}
+
+				DebugConsoleComponent->AddDebugConsoleLine(debugConsoleLevel, bIncludeObjectName, value);
 			}
-
-			DebugConsoleComponent->AddDebugConsoleLine(debugConsoleLevel, bIncludeObjectName, value);
 		}
 
 	}

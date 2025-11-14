@@ -165,6 +165,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
     static bool WriteModStateFileViaModInfo(int64 ModID, UZeroPayMod_GetModInfoResult* ModInfo) ;
 
+    // Writes to an existing state file, updating only the fields required (such as meta data)
+    UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Engine")
+    static bool UpdateModStateFileViaModInfo(int64 ModID, UZeroPayMod_GetModInfoResult* ModInfo);
+
     /* >>> <Misc> Operations <<< */
 
     // Return the platform we are running on

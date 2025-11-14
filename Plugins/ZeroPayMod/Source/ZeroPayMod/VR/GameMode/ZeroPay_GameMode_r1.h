@@ -16,10 +16,15 @@ class ZEROPAYMOD_API AZeroPay_GameMode_r1 : public AGameMode
 	
 public:
 	void StartPlay() ;
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 
 	// An event that is called after UWorld BeginPlay() but before any other game logic
-	UFUNCTION(BlueprintImplementableEvent)
+	UFUNCTION(BlueprintImplementableEvent, Category = "ZeroPay|GameMode")
 	void ZeroPayStartPlay();
+
+	// An event called at the very start of the game-modes existance
+	UFUNCTION(BlueprintImplementableEvent, Category = "ZeroPay|GameMode")
+	void ZeroPayInitGameMode(const FString& MapName, const FString& Options);
 
 	void HandleSeamlessTravelPlayer(AController*& C) override;
 };

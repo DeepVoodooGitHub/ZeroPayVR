@@ -57,14 +57,8 @@ public:
 	/** Start an async PNG download+save. FileName can be "1824" or "logo" (".png" is auto-added if missing).
 	 *  For Directory mode, DirectoryName is required.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Mods", meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject"))
-	static UZeroPay_DownloadPNGAsync* DownloadPng(
-		UObject* WorldContextObject,
-		const FString& Url,
-		EZeroPay_ImageStorage StorageMode,
-		const FString& FileName,
-		const FString& DirectoryName /* used only when StorageMode == Directory */
-	);
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Mods")
+	static UZeroPay_DownloadPNGAsync* DownloadPng(const FString& Url, EZeroPay_ImageStorage StorageMode, const FString& FileName, const FString& DirectoryName);
 
 	/** Fired with the absolute path of the saved file */
 	UPROPERTY(BlueprintAssignable)

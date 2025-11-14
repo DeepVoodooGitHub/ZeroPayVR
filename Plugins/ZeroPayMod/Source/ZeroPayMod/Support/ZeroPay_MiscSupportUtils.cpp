@@ -24,11 +24,27 @@ void AZeroPay_MiscSupportUtils::BeginPlay()
 
 }
 
-void AZeroPay_MiscSupportUtils::IsLocallyControlled(AActor* target, EZeroPay_NetControllerStatus& Result)
+void AZeroPay_MiscSupportUtils::UnderLocalControl(AActor* target, EZeroPay_NetControllerStatus& Result)
+{
+	AActor* Owner = target->GetOwner();
+
+	if (APlayerController* OwnerPC = Cast<APlayerController>(Owner))
+	{
+		if (OwnerPC->IsLocalController())
+		{
+			Result = EZeroPay_NetControllerStatus::Local;
+		}
+		return;
+	}
+
+	Result = EZeroPay_NetControllerStatus::Remote ;
+}
+
+void AZeroPay_MiscSupportUtils::IsLocallyControlledByPawn(AActor* target, EZeroPay_NetControllerStatus& Result)
 {
 	Result = EZeroPay_NetControllerStatus::Remote;
 
-	AActor* Owner = target->GetOwner() ;
+	AActor* Owner = target->GetOwner();
 	if (Owner)
 	{
 		ACharacter* Character = Cast<ACharacter>(Owner);
@@ -39,7 +55,10 @@ void AZeroPay_MiscSupportUtils::IsLocallyControlled(AActor* target, EZeroPay_Net
 		}
 		return;
 	}
+
+
 }
+
 
 void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 {

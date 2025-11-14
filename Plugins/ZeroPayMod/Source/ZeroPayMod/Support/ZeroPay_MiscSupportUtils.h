@@ -74,9 +74,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "target"))
 	static void InitialiseZeroPayVR(AActor* target);
 
-	// Returns the correct path based on whether the "target" actor is controlled (on the network) locally or remotely
+	// Returns the correct path based on whether the "target" actor is controlled by a Player Controller (on the network) locally or remotely
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
-	static void IsLocallyControlled(AActor* target, EZeroPay_NetControllerStatus& Result);
+	static void UnderLocalControl(AActor* target, EZeroPay_NetControllerStatus& Result);
+
+	// Returns the correct path based on whether the "target" actor is controlled by a PAWN (on the network) locally or remotely
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
+	static void IsLocallyControlledByPawn(AActor* target, EZeroPay_NetControllerStatus& Result);
 
 	// Returns the current network version, used to keep mismatches servers and clients apart
 	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
@@ -369,5 +373,14 @@ public:
 
 		return Info->GetSessionId().ToString();
 	}
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
+	static int32 GetTotalIntegerDigits(int32 N)
+	{
+		if (N == 0) return 1;
+		N = FMath::Abs(N);
+		return static_cast<int32>(FMath::FloorToInt(FMath::LogX(10.0, static_cast<double>(N))) + 1);
+	}
+
 
 };
