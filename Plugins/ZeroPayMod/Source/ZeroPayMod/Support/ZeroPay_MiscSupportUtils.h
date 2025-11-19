@@ -9,6 +9,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "EditorUtilitySubsystem.h"
 #include "EditorUtilityWidgetBlueprint.h"
+#include "Engine/World.h"
 #endif
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -382,5 +383,28 @@ public:
 		return static_cast<int32>(FMath::FloorToInt(FMath::LogX(10.0, static_cast<double>(N))) + 1);
 	}
 
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support", meta = (HidePin = "WorldContextObject", DefaultToSelf = "WorldContextObject") )
+	static int32 GetPIEInstanceID(const UObject* WorldContextObject)
+	{
+#if WITH_EDITOR
+		const UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+		if (!World)
+		{
+			return -1;
+		}
+
+		// Only meaningful in editor PIE worlds
+		if (World->WorldType == EWorldType::PIE)
+		{
+			if (FWorldContext* WC = GEngine->GetWorldContextFromWorld(World))
+			{
+				return WC->PIEInstance;   // 0 = first client, 1 = second, etc.
+			}
+		}
+#endif
+
+		return -1; // Not PIE / not editor
+	}
 
 };
