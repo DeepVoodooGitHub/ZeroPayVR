@@ -13,8 +13,4 @@ UCLASS()
 class ZEROPAYMOD_API AZeroPay_PlayerState_r1 : public APlayerState
 {
 	GENERATED_BODY()
-	
-	
-	
-	
 };

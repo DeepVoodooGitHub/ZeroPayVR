@@ -2,13 +2,6 @@
 
 #include "VR/GameMode/ZeroPay_GameMode_r1.h"
 
-void AZeroPay_GameMode_r1::StartPlay()
-{
-	Super::StartPlay();
-
-	ZeroPayStartPlay();
-}
-
 void AZeroPay_GameMode_r1::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
     // Default C++ behaviour: Super + config + (optional) logging
