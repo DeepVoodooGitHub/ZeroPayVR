@@ -39,6 +39,8 @@
 #include "Http.h"
 #include "BlueprintDataDefinitions.h"
 
+#include "Components/WidgetComponent.h"
+
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
 UENUM(BlueprintType)
@@ -405,6 +407,15 @@ public:
 #endif
 
 		return -1; // Not PIE / not editor
+	}
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
+	static TSubclassOf<UUserWidget> GetWidgetClassFromWidgetComponent(const UWidgetComponent* WidgetComp)
+	{
+		if (!WidgetComp)
+			return nullptr;
+
+		return WidgetComp->GetWidgetClass();
 	}
 
 };

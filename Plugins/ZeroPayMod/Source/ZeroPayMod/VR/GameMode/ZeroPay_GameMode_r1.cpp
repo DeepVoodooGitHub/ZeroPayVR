@@ -11,7 +11,6 @@ void AZeroPay_GameMode_r1::InitGame(const FString& MapName, const FString& Optio
     ZeroPayInitGameMode(MapName, Options);
 }
 
-
 void AZeroPay_GameMode_r1::HandleSeamlessTravelPlayer(AController*& C)
 {
     // Base wires PlayerState and some session bits.
