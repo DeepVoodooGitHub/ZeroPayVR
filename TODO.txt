@@ -1,1 +1,37 @@
 TODO
+
++ Server should return to lobby after X seconds of no users (defined somewhere?)
++ more guns
++ TDM rounds completed
++ Final score board (large, shown in front of player) - disable on wrist whilst appearing
++ Test players joining
++ 
+
+
+
+Gun Changes
+
+OnChamberStateChangedEvent - Empty, Liveround, Empty shell
+"old state", "new state"
+
+	
+On bullet taken
+on bullet put
+
+on fire mode changed - semi, auto, single, burst
+
+on magazine changed
+
+
+VR Gun Anim required to support generic variables:
+
+1. Loaeded - bool
+2. Fire mode (as above)
+3. Hammer operation
+4. 
+
+
+Pistol pull back not working
+Fire logic for various modes need implemented.. 
+Change ejected bullets for pistol to match smaller rounds
+Ejected bullets don't go very far (need more force)
