@@ -31,7 +31,5 @@ VR Gun Anim required to support generic variables:
 4. 
 
 
-Pistol pull back not working
 Fire logic for various modes need implemented.. 
-Change ejected bullets for pistol to match smaller rounds
-Ejected bullets don't go very far (need more force)
+Test fire mode switching logic
