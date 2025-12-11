@@ -31,5 +31,6 @@ VR Gun Anim required to support generic variables:
 4. 
 
 
-Fire logic for various modes need implemented.. 
-Test fire mode switching logic
+Fire mode needs "sound" when switching
+Need to add "empty" click via spawning sounds code (handle burst mode only one click, probably on Onused)
+Add more guns?
