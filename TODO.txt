@@ -31,8 +31,11 @@ VR Gun Anim required to support generic variables:
 4. 
 
 
+Overlap on AK47 respans (must be due to spline - try setting to see if it fixes it)
+Add mode to magazine to disable grabbing at all for pistols
+Charge logic!
+Spawn with magazine
+
 Fire mode needs "sound" when switching
 Need to add "empty" click via spawning sounds code (handle burst mode only one click, probably on Onused)
 Add more guns?
-Charge logic!
-Spawn with magazine
