@@ -125,6 +125,15 @@ public:
 					break;
 				}
 			}
+
+			/* If we have a world, get the time.. */
+			FString TimeString = FString::Printf(TEXT("%08.3f "), World->GetTimeSeconds());
+			/* Standard UE logs.. */
+			Prefix = FString::Printf(TEXT("%s %s"), *TimeString, *Prefix);
+		}
+		else
+		{
+			Prefix = FString::Printf(TEXT("----.--- %s"), *Prefix);
 		}
 
 		/* Include name? */
