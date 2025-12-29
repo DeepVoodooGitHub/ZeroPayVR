@@ -31,8 +31,6 @@ VR Gun Anim required to support generic variables:
 4. 
 
 
-Spawn with magazine
-
 Fire mode needs "sound" when switching
 Need to add "empty" click via spawning sounds code (handle burst mode only one click, probably on Onused)
 Add more guns?
