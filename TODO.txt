@@ -34,3 +34,9 @@ VR Gun Anim required to support generic variables:
 Fire mode needs "sound" when switching
 Need to add "empty" click via spawning sounds code (handle burst mode only one click, probably on Onused)
 Add more guns?
+
+
+Check guns can be picked up correctly, etc..
+Set magazines to be "trigger" gripped
+Set charge handle to be "trigger" gripped
+Fix KA74 slider pull back distance, etc.
