@@ -78,6 +78,7 @@ public:
 	static void InitialiseZeroPayVR(AActor* target);
 
 	// Returns the correct path based on whether the "target" actor is controlled by a Player Controller (on the network) locally or remotely
+	// Recommended to use "IsLocallyControlledByPawn" for most grabbable in-world actors
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
 	static void UnderLocalControl(AActor* target, EZeroPay_NetControllerStatus& Result);
 

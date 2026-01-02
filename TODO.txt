@@ -31,6 +31,12 @@ VR Gun Anim required to support generic variables:
 4. 
 
 
+Authorative
+1. The grabbing of charge handle doesn't stop things
+2. The changing of fire mode doesn't take affect for a while (lag)
+3. firing is laggy
+
+
 Fire mode needs "sound" when switching
 Need to add "empty" click via spawning sounds code (handle burst mode only one click, probably on Onused)
 Add more guns?
