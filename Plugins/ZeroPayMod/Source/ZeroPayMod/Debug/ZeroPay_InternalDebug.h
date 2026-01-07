@@ -3,6 +3,8 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Support/ZeroPay_MiscSupportUtils.h"
 #include "EngineUtils.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
+#include "ZeroPayMod.h"
 #include "ZeroPay_InternalDebug.generated.h"
 
 // Forward declaration so UE generates boilerplate
@@ -122,6 +124,7 @@ public:
 					Prefix = FString::Printf(TEXT("Server: "));
 					break;
 				case NM_Standalone:
+					Prefix = FString::Printf(TEXT("Client -: "));
 					break;
 				}
 			}
@@ -178,23 +181,68 @@ public:
 			/* Standard UE logs.. */
 			FString FinalLog = FString::Printf(TEXT("%s(%s): %s"), *Prefix, *ObjectName, *value);
 
-			switch (debugConsoleLevel)
+			// No dedicated server, write to UE_LOG
+			if (!IsRunningDedicatedServer())
 			{
-			case FDebugConsoleLevel::Log:
-				UE_LOG(LogTemp, Log, TEXT("%s"), *FinalLog);
-				break;
+				switch (debugConsoleLevel)
+				{
+				case FDebugConsoleLevel::Log:
+					UE_LOG(LogTemp, Log, TEXT("%s"), *FinalLog);
+					break;
 
-			case FDebugConsoleLevel::Warn:
-				UE_LOG(LogTemp, Warning, TEXT("%s"), *FinalLog);
-				break;
+				case FDebugConsoleLevel::Warn:
+					UE_LOG(LogTemp, Warning, TEXT("%s"), *FinalLog);
+					break;
 
-			case FDebugConsoleLevel::Error:
-				UE_LOG(LogTemp, Error, TEXT("%s"), *FinalLog);
-				break;
+				case FDebugConsoleLevel::Error:
+					UE_LOG(LogTemp, Error, TEXT("%s"), *FinalLog);
+					break;
 
-			default:
-				UE_LOG(LogTemp, Log, TEXT("%s"), *FinalLog);
-				break;
+				default:
+					UE_LOG(LogTemp, Log, TEXT("%s"), *FinalLog);
+					break;
+				}
+			}
+			else
+			{
+				// Dedicated server's just log to standard UE5 output
+
+				/* Include name  */
+				if (bIncludeObjectName)
+				{
+					if (target != nullptr)
+					{
+						ObjectName = target->GetFName().ToString();
+
+						/* Strip UAID */
+						int32 Index = ObjectName.Find(TEXT("_UAID_"), ESearchCase::IgnoreCase, ESearchDir::FromStart);
+						if (Index != INDEX_NONE)
+							ObjectName = ObjectName.Left(Index); // Keep everything before _UAID_
+					}
+				}
+
+				switch (debugConsoleLevel)
+				{
+				case None:
+				case Log:
+				{
+					/* Output in Green the message */
+					UE_LOG(LogZeroPay, Log, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName, *value);
+					break;
+				}
+				case Warn:
+				{
+					/* Yellow warnings */
+					UE_LOG(LogZeroPay, Warning, TEXT("\x1b[93m(%s)\x1b[0m \x1b[33m%s\x1b[0m"), *ObjectName, *value);
+					break;
+				}
+				case Error:
+				{
+					/* Red errors */
+					UE_LOG(LogZeroPay, Error, TEXT("\x1b[93m(%s)\x1b[0m \x1b[31m%s\x1b[0m"), *ObjectName, *value);
+					break;
+				}
+				}
 			}
 
 			// Create a new log entry struct

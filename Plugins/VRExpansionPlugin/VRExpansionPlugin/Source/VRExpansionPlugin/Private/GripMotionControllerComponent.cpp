@@ -2837,6 +2837,9 @@ bool UGripMotionControllerComponent::NotifyGrip(FBPActorGripInformation &NewGrip
 				// Only doing this for actor grips
 				if (NewGrip.AdvancedGripSettings.bSetOwnerOnGrip)
 				{
+					/* JBH - Assign this immediately, for local clients can perform "is owning client" logic.. */
+					pActor->SetOwner(OwningPawn);
+
 					if (IsServer())
 					{
 						pActor->SetOwner(OwningPawn);
