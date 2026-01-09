@@ -81,7 +81,7 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 	UGameplayStatics::GetAllActorsOfClass(target->GetWorld(), ZeroPayVRBPClass, Found);
 	if (Found.Num() != 0)
 	{
-		UZeroPay_DebugSupport::AddDebugConsoleLine(nullptr, TEXT("       Warning, InitialiseZeroPayVR() was called twice, ignoring secondary call."), FDebugConsoleLevel::Warn);
+		UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       Warning, InitialiseZeroPayVR() was called twice, ignoring secondary call."), FDebugConsoleLevel::Warn);
 		return;
 	}
 
@@ -98,13 +98,13 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 		ServerLogicBP->CallFunctionByNameWithArguments(TEXT("InitialiseServer"), ar, NULL, true);
 
 		if (ServerLogicBP != nullptr)
-			UZeroPay_DebugSupport::AddDebugConsoleLine(nullptr, TEXT("       Completed."));
+			UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       Completed."));
 		else
-			UZeroPay_DebugSupport::AddDebugConsoleLine(nullptr, TEXT("       failed to spawn BP actor."), FDebugConsoleLevel::Error);
+			UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       failed to spawn BP actor."), FDebugConsoleLevel::Error);
 	}
 	else
 	{
-		UZeroPay_DebugSupport::AddDebugConsoleLine(nullptr, TEXT("       failed to spawn server logic, game will be broken!"), FDebugConsoleLevel::Error);
+		UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr,  TEXT("       failed to spawn server logic, game will be broken!"), FDebugConsoleLevel::Error);
 		return;
 	}
 #else

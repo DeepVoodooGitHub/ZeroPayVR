@@ -79,6 +79,7 @@ namespace
 
 	static FText PropToolTip(const FProperty* P)
 	{
+#if WITH_METADATA
 		if (!P) return FText::GetEmpty();
 		if (P->HasMetaData(TEXT("ToolTip")))
 		{
@@ -94,12 +95,16 @@ namespace
 			return FText::FromString(P->GetMetaData(TEXT("DisplayName")));
 		}
 		return FText::FromName(P->GetFName());
+#else
+		return FText();
+#endif
 	}
 
 	// Pull min/max for numeric properties using common UE meta keys.
 	// Precedence: ClampMin/ClampMax -> UIMin/UIMax -> SliderMin/SliderMax.
 	static void GetNumericMinMaxStrings(const FProperty* P, FString& OutMin, FString& OutMax)
 	{
+#if WITH_METADATA
 		OutMin.Reset();
 		OutMax.Reset();
 
@@ -129,6 +134,7 @@ namespace
 		// For ints, authors might write "0.0"; that's fine, we keep strings verbatim.
 		OutMin = MoveTemp(MinS);
 		OutMax = MoveTemp(MaxS);
+#endif
 	}
 
 	// RAII default instance for a given UScriptStruct type
@@ -160,6 +166,7 @@ namespace
 
 	static FString GetDisplayOrCleanName(const FProperty* Prop)
 	{
+#if WITH_METADATA
 		if (!Prop)
 			return TEXT("");
 
@@ -180,6 +187,9 @@ namespace
 			}
 		}
 		return Name;
+#else
+		return TEXT("");
+#endif
 	}
 
 	static TArray<FStructPropertyReportRow> Inspect_Internal(const UScriptStruct* Type, const void* InstanceData)

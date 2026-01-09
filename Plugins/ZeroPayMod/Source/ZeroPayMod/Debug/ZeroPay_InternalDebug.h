@@ -23,21 +23,23 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "ZeroPay Internal PrintString")
 	bool IsPrintInternalReady();
 
-	/* Log a message to the somewhere (can be implemented in BP) */
+	/* Implemented in debug console (or other if you desire) */
 	UFUNCTION(BlueprintNativeEvent, Category = "ZeroPay Internal PrintString")
-	void PrintInternalString(const FString& Prefix, const FString& ObjectName, const FString& LogText, FDebugConsoleLevel Level);
+	void PrintInternalStringImpl(const FString& ExecutionZone, const FString& ClientID, FDebugConsoleLevel DebugLevel, const FString& Timestamp, const FString& ObjectName, const FString& LogText);
 };
 
-struct ZEROPAYMOD_API FZeroPayStoredPrintStringParams
+struct ZEROPAYMOD_API FZeroPayStoredPrintInternalStringParams
 {
-	FString Prefix;
+	FString ExecutionZone;
+	FString ClientID;
+	FDebugConsoleLevel DebugLevel = FDebugConsoleLevel::Log;
+	FString Timestamp;
 	FString ObjectName;
-	FString Value;
-	FDebugConsoleLevel DebugConsoleLevel = FDebugConsoleLevel::Log;
+	FString LogText;
 };
 
 /* Global vars (until we find a better solution) - Reset via ZeroPay_GameInstance_r1 Init (to avoid crashes on multiple PIE plays) */
-static TArray<FZeroPayStoredPrintStringParams> StoredLogEntries;
+static TArray<FZeroPayStoredPrintInternalStringParams> StoredLogEntries;
 static TWeakObjectPtr<AActor> InternalDebugTargetActor = nullptr ;
 static bool bPipeToPrintString = true ;
 static bool bPipeToLogOutput = true;
@@ -49,44 +51,44 @@ class ZEROPAYMOD_API UZeroPay_InternalDebugFunctionLibrary : public UBlueprintFu
 
 private:
 	/* Internal helper to push any message to screen or logs.. */
-	static void PipeEntryAsRequired(FString Prefix, FString ObjectName, FString Value,	FDebugConsoleLevel debugConsoleLevel)
+	static void PipeEntryAsRequired(const FString& ExecutionZone, const FString& ClientID, FDebugConsoleLevel DebugLevel, const FString& Timestamp, const FString& ObjectName, const FString& LogText)
 	{
+		if (!bPipeToPrintString && !bPipeToLogOutput)
+			return ;
+
+		const FString FullMessage = TEXT("[") + Timestamp + TEXT("] (") + ExecutionZone + TEXT(" ") + ClientID + TEXT(") [") + UEnum::GetValueAsString(DebugLevel) + TEXT("] (") + ObjectName + TEXT(") ") + LogText ;
+
 		/* Echo to screen, if exists? */
 		if (bPipeToPrintString)
 		{
 			if (GEngine)
 			{
-				const FString FullMessage = Prefix + TEXT(" ") + Value;
 				GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, FullMessage);
 			}
 		}
 		/* Echo to logs? */
 		if (bPipeToLogOutput)
 		{
-			const FString FullMessage = Prefix + TEXT(" ") + Value;
-
-			switch (debugConsoleLevel)
+			switch (DebugLevel)
 			{
-			case FDebugConsoleLevel::Log:
-				UE_LOG(LogTemp, Log, TEXT("%s"), *FullMessage);
-				break;
+				case FDebugConsoleLevel::Log:
+					UE_LOG(LogTemp, Log, TEXT("%s"), *FullMessage);
+					break;
 
-			case FDebugConsoleLevel::Warn:
-				UE_LOG(LogTemp, Warning, TEXT("%s"), *FullMessage);
-				break;
+				case FDebugConsoleLevel::Warn:
+					UE_LOG(LogTemp, Warning, TEXT("%s"), *FullMessage);
+					break;
 
-			case FDebugConsoleLevel::Error:
-				UE_LOG(LogTemp, Error, TEXT("%s"), *FullMessage);
-				break;
+				case FDebugConsoleLevel::Error:
+					UE_LOG(LogTemp, Error, TEXT("%s"), *FullMessage);
+					break;
 
-			default:
-				UE_LOG(LogTemp, Log, TEXT("%s"), *FullMessage);
-				break;
+				default:
+					UE_LOG(LogTemp, Log, TEXT("%s"), *FullMessage);
+					break;
 			}
 		}
-
 	}
-
 
 public:
 	// Register an actor to receive debug messages (there can only be one..)
@@ -104,39 +106,46 @@ public:
 	static void PrintInternalString(const UObject* WorldContextObject, UObject* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
 	{
 		// Note the GameInstance uses a null target, as it's not an AActor so we default to that here
-		FString ObjectName = "[GameInstance]";
+		FString ExecutionZone = "Local";  // or Server
+		FString ClientID = "-"; // Single digit ID
+		FString Timestamp = "----.---";
+		FString ObjectName = "[GameInstance]";		// We assume null = target is game instance
+		FString LogText = value;
 
 		UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
 		FString Prefix;
 		if (World)
 		{
-			if (World->WorldType == EWorldType::PIE)
-			{
-				switch (World->GetNetMode())
+			switch (World->GetNetMode())
 				{
 				case NM_Client:
-					// GPlayInEditorID 0 is always the server, so 1 will be first client.
-					// You want to keep this logic in sync with GeneratePIEViewportWindowTitle and UpdatePlayInEditorWorldDebugString
-					Prefix = FString::Printf(TEXT("Client %d: "), UE::GetPlayInEditorID());
+				{
+					ExecutionZone = "Clnt:";
+					ClientID = FString::Printf(TEXT("%d"), UE::GetPlayInEditorID());
 					break;
+				}
 				case NM_DedicatedServer:
-				case NM_ListenServer:
-					Prefix = FString::Printf(TEXT("Server: "));
+				{
+					ExecutionZone = "DSver";
+					ClientID = " ";
 					break;
+				}
+				case NM_ListenServer:
+				{
+					ExecutionZone = "LSver";
+					ClientID = " ";
+					break;
+				}
 				case NM_Standalone:
-					Prefix = FString::Printf(TEXT("Client -: "));
+				{
+					ExecutionZone = "Alone";
+					ClientID = " ";
 					break;
 				}
 			}
-
+		
 			/* If we have a world, get the time.. */
-			FString TimeString = FString::Printf(TEXT("%08.3f "), World->GetTimeSeconds());
-			/* Standard UE logs.. */
-			Prefix = FString::Printf(TEXT("%s %s"), *TimeString, *Prefix);
-		}
-		else
-		{
-			Prefix = FString::Printf(TEXT("----.--- %s"), *Prefix);
+			Timestamp = FString::Printf(TEXT("%08.3f"), World->GetTimeSeconds());
 		}
 
 		/* Include name? */
@@ -153,7 +162,7 @@ public:
 			}
 		}
 
-		bool bOutputSunk = false ;
+		bool bOutputSunk = false;
 		if (InternalDebugTargetActor.IsValid())
 		{
 			if (IZeroPay_PrintInternalString_Interface::Execute_IsPrintInternalReady(InternalDebugTargetActor.Get()))
@@ -161,100 +170,65 @@ public:
 				/* Any stored data for when we had no actor to sink the logs? */
 				if (StoredLogEntries.Num() > 0)
 				{
-					for (const FZeroPayStoredPrintStringParams& Entry : StoredLogEntries)
+					for (const FZeroPayStoredPrintInternalStringParams& Entry : StoredLogEntries)
 					{
-						IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(InternalDebugTargetActor.Get(), Entry.Prefix, Entry.ObjectName, Entry.Value, Entry.DebugConsoleLevel);
-						PipeEntryAsRequired(Entry.Prefix, Entry.ObjectName, Entry.Value, Entry.DebugConsoleLevel);
+						IZeroPay_PrintInternalString_Interface::Execute_PrintInternalStringImpl(InternalDebugTargetActor.Get(), Entry.ExecutionZone, Entry.ClientID, Entry.DebugLevel, Entry.Timestamp, Entry.ObjectName, Entry.LogText);
+						PipeEntryAsRequired(Entry.ExecutionZone, Entry.ClientID, Entry.DebugLevel, Entry.Timestamp, Entry.ObjectName, Entry.LogText);
 					}
 					StoredLogEntries.Empty();
 				}
 
-				/* Send data */
-				IZeroPay_PrintInternalString_Interface::Execute_PrintInternalString(InternalDebugTargetActor.Get(), Prefix, ObjectName, value, debugConsoleLevel);
-				PipeEntryAsRequired(Prefix, ObjectName, value, debugConsoleLevel);
+				/* Debug target is active, send directly to it  */
+				IZeroPay_PrintInternalString_Interface::Execute_PrintInternalStringImpl(InternalDebugTargetActor.Get(), ExecutionZone, ClientID, debugConsoleLevel, Timestamp, ObjectName, LogText);
+				PipeEntryAsRequired(ExecutionZone, ClientID, debugConsoleLevel, Timestamp, ObjectName, LogText);
 				bOutputSunk = true;
 			}
 		}
-
-		if (!bOutputSunk)
+		else
 		{
-			/* Standard UE logs.. */
-			FString FinalLog = FString::Printf(TEXT("%s(%s): %s"), *Prefix, *ObjectName, *value);
-
-			// No dedicated server, write to UE_LOG
-			if (!IsRunningDedicatedServer())
-			{
-				switch (debugConsoleLevel)
-				{
-				case FDebugConsoleLevel::Log:
-					UE_LOG(LogTemp, Log, TEXT("%s"), *FinalLog);
-					break;
-
-				case FDebugConsoleLevel::Warn:
-					UE_LOG(LogTemp, Warning, TEXT("%s"), *FinalLog);
-					break;
-
-				case FDebugConsoleLevel::Error:
-					UE_LOG(LogTemp, Error, TEXT("%s"), *FinalLog);
-					break;
-
-				default:
-					UE_LOG(LogTemp, Log, TEXT("%s"), *FinalLog);
-					break;
-				}
-			}
-			else
-			{
-				// Dedicated server's just log to standard UE5 output
-
-				/* Include name  */
-				if (bIncludeObjectName)
-				{
-					if (target != nullptr)
-					{
-						ObjectName = target->GetFName().ToString();
-
-						/* Strip UAID */
-						int32 Index = ObjectName.Find(TEXT("_UAID_"), ESearchCase::IgnoreCase, ESearchDir::FromStart);
-						if (Index != INDEX_NONE)
-							ObjectName = ObjectName.Left(Index); // Keep everything before _UAID_
-					}
-				}
-
-				switch (debugConsoleLevel)
-				{
-				case None:
-				case Log:
-				{
-					/* Output in Green the message */
-					UE_LOG(LogZeroPay, Log, TEXT("\x1b[93m(%s)\x1b[0m \x1b[32m%s\x1b[0m"), *ObjectName, *value);
-					break;
-				}
-				case Warn:
-				{
-					/* Yellow warnings */
-					UE_LOG(LogZeroPay, Warning, TEXT("\x1b[93m(%s)\x1b[0m \x1b[33m%s\x1b[0m"), *ObjectName, *value);
-					break;
-				}
-				case Error:
-				{
-					/* Red errors */
-					UE_LOG(LogZeroPay, Error, TEXT("\x1b[93m(%s)\x1b[0m \x1b[31m%s\x1b[0m"), *ObjectName, *value);
-					break;
-				}
-				}
-			}
-
 			// Create a new log entry struct
-			FZeroPayStoredPrintStringParams NewEntry;
-			NewEntry.Prefix = Prefix;
+			FZeroPayStoredPrintInternalStringParams NewEntry;
+			NewEntry.ExecutionZone = ExecutionZone;
+			NewEntry.ClientID = ClientID;
+			NewEntry.DebugLevel = debugConsoleLevel;
+			NewEntry.Timestamp = Timestamp;
 			NewEntry.ObjectName = ObjectName;
-			NewEntry.Value = value;
-			NewEntry.DebugConsoleLevel = debugConsoleLevel;
+			NewEntry.LogText = LogText;
 
-			// Add it to the array
-			StoredLogEntries.Add(NewEntry);
+			// Add it to the array (but don't grow if we're too big; they may not have any debug enabled and/or don't care...)
+			if (StoredLogEntries.Num() < 256)
+				StoredLogEntries.Add(NewEntry);
 			return;
+		}
+
+		// Dedicated server's just log to standard UE5 output
+		if (IsRunningDedicatedServer())
+		{
+			const FString FullMessage = TEXT("[") + Timestamp + TEXT("] (") + ExecutionZone + TEXT(" ") + ClientID + TEXT(") (") + ObjectName + TEXT(") ") + LogText;
+			switch (debugConsoleLevel)
+			{
+			case FDebugConsoleLevel::None:
+			case FDebugConsoleLevel::Log:
+			{
+				// Green text
+				UE_LOG(LogZeroPay, Log, TEXT("\x1b[32m%s\x1b[0m"), *FullMessage);
+				break;
+			}
+
+			case FDebugConsoleLevel::Warn:
+			{
+				// Yellow warnings
+				UE_LOG(LogZeroPay, Warning, TEXT("\x1b[33m%s\x1b[0m"), *FullMessage);
+				break;
+			}
+
+			case FDebugConsoleLevel::Error:
+			{
+				// Red errors
+				UE_LOG(LogZeroPay, Error, TEXT("\x1b[31m%s\x1b[0m"), *FullMessage);
+				break;
+			}
+			}
 		}
 	}
 } ;
