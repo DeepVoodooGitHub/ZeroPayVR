@@ -36,7 +36,7 @@ Change underlying debug system to pass
 	Message Type (log, warn)
 	Time value
 	Object name
-	Data value
+	Data valueint 
 	
 
 Authorative
@@ -52,3 +52,4 @@ Check guns can be picked up correctly, etc..
 Set magazines to be "trigger" gripped
 Set charge handle to be "trigger" gripped
 Fix KA74 slider pull back distance, etc.
+Prevent game from travelling to server that has out of date mods (should check all required mods against mod.io, and any downloading)

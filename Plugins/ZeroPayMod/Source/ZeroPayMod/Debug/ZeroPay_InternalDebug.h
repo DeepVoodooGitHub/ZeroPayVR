@@ -120,8 +120,18 @@ public:
 				{
 				case NM_Client:
 				{
-					ExecutionZone = "Clnt:";
-					ClientID = FString::Printf(TEXT("%d"), UE::GetPlayInEditorID());
+					/* PIE includes a client ID we can use to know "who" we are when multiple windows are open for multi-user PIE testing */
+					if (World->WorldType == EWorldType::PIE)
+					{
+						ExecutionZone = "Clnt:";
+						ClientID = FString::Printf(TEXT("%d"), UE::GetPlayInEditorID());
+					}
+					else
+					{
+						/* Just use "client" */
+						ExecutionZone = "Clien";
+						ClientID = "t";
+					}
 					break;
 				}
 				case NM_DedicatedServer:

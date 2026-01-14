@@ -32,6 +32,9 @@
 #include "UObject/Package.h"
 #include "Misc/MessageDialog.h"
 #include "FileHelpers.h"
+
+#include "Engine/LevelStreaming.h"
+#include "Engine/LevelStreamingAlwaysLoaded.h"
 #endif 
 
 #include "HttpModule.h"
@@ -417,6 +420,65 @@ public:
 			return nullptr;
 
 		return WidgetComp->GetWidgetClass();
+	}
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support", meta = (DevelopmentOnly))
+	static bool ValidateEditorSubLevelsAlwaysLoaded(TArray<FString>& OutFailures)
+	{
+		OutFailures.Reset();
+
+#if !WITH_EDITOR
+		return true;
+#else
+		if (!GEditor)
+		{
+			OutFailures.Add(TEXT("GEditor is null (unexpected in editor)."));
+			return false;
+		}
+
+		// Choose which world to validate.
+		UWorld* TargetWorld = GEditor->GetEditorWorldContext().World();
+
+		if (!TargetWorld)
+		{
+			OutFailures.Add(TEXT("No target world found (Editor world not available)."));
+			return false;
+		}
+
+		const TArray<ULevelStreaming*>& StreamingLevels = TargetWorld->GetStreamingLevels();
+
+		bool bAllOk = true;
+
+		for (ULevelStreaming* LS : StreamingLevels)
+		{
+			if (!LS)
+			{
+				bAllOk = false;
+				OutFailures.Add(TEXT("Encountered null ULevelStreaming entry."));
+				continue;
+			}
+
+			const bool bIsAlwaysLoaded = LS->IsA(ULevelStreamingAlwaysLoaded::StaticClass());
+			if (!bIsAlwaysLoaded)
+			{
+				bAllOk = false;
+
+				const FString LevelPackage = LS->GetWorldAssetPackageName();
+				const FString ClassName = LS->GetClass()->GetName();
+
+				OutFailures.Add(FString::Printf(
+					TEXT("Sub-level is NOT Always Loaded: Package='%s' StreamingClass='%s'"),
+					*LevelPackage, *ClassName
+				));
+			}
+		}
+
+		// Optional: if there are *no* sub-levels, you may want to treat that as OK.
+		// If you want to flag it:
+		// if (StreamingLevels.Num() == 0) { OutFailures.Add(TEXT("No streaming sub-levels found.")); }
+
+		return bAllOk;
+#endif
 	}
 
 };
