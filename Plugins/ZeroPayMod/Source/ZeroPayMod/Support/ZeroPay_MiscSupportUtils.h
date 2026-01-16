@@ -43,6 +43,7 @@
 #include "BlueprintDataDefinitions.h"
 
 #include "Components/WidgetComponent.h"
+#include "HAL/PlatformStackWalk.h"
 
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
@@ -478,6 +479,23 @@ public:
 		// if (StreamingLevels.Num() == 0) { OutFailures.Add(TEXT("No streaming sub-levels found.")); }
 
 		return bAllOk;
+#endif
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
+	static void DumpBlueprintCallstack()
+	{
+#if !UE_BUILD_SHIPPING
+		const FString ScriptStack = FFrame::GetScriptCallstack();
+
+		if (ScriptStack.IsEmpty())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Blueprint Callstack: <none available - not executing inside BP VM>"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("==== Blueprint Callstack ====\n%s\n==== End Blueprint Callstack ===="), *ScriptStack);
+		}
 #endif
 	}
 

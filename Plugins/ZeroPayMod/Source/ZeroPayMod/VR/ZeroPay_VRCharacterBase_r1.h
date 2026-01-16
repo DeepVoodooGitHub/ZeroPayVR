@@ -12,9 +12,10 @@
 UCLASS()
 class ZEROPAYMOD_API AZeroPay_VRCharacterBase_r1 : public AVRCharacter
 {
-	GENERATED_BODY()
+	GENERATED_BODY()	
 	
-	
-	
-	
+public:
+	/* Implemented in any "pawn" that want's to allow debug messages to be sent to other clients / server */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "ZeroPay|DebugConsole")
+	void OnEscalateDebugLineToServer_OWNER(const FString& Value, APawn* Sender);	
 };

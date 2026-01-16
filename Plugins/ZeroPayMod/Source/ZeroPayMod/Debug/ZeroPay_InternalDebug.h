@@ -41,8 +41,10 @@ struct ZEROPAYMOD_API FZeroPayStoredPrintInternalStringParams
 /* Global vars (until we find a better solution) - Reset via ZeroPay_GameInstance_r1 Init (to avoid crashes on multiple PIE plays) */
 static TArray<FZeroPayStoredPrintInternalStringParams> StoredLogEntries;
 static TWeakObjectPtr<AActor> InternalDebugTargetActor = nullptr ;
-static bool bPipeToPrintString = true ;
-static bool bPipeToLogOutput = true;
+static bool bPipeToClientPrintString = true;
+	/* If set, on client, print string the message (so user can see in PIE or debug client build) */
+static bool bPipeToClientLogOutput = true;
+	/* If set, on client, write to LogZeroPay log output */
 
 UCLASS()
 class ZEROPAYMOD_API UZeroPay_InternalDebugFunctionLibrary : public UBlueprintFunctionLibrary
@@ -53,13 +55,17 @@ private:
 	/* Internal helper to push any message to screen or logs.. */
 	static void PipeEntryAsRequired(const FString& ExecutionZone, const FString& ClientID, FDebugConsoleLevel DebugLevel, const FString& Timestamp, const FString& ObjectName, const FString& LogText)
 	{
-		if (!bPipeToPrintString && !bPipeToLogOutput)
+		/* Dedicated server pumps directly on PrintInternalString to log */
+		if (IsRunningDedicatedServer())
+			return;
+
+		if (!bPipeToClientPrintString && !bPipeToClientLogOutput)
 			return ;
 
 		const FString FullMessage = TEXT("[") + Timestamp + TEXT("] (") + ExecutionZone + TEXT(" ") + ClientID + TEXT(") [") + UEnum::GetValueAsString(DebugLevel) + TEXT("] (") + ObjectName + TEXT(") ") + LogText ;
 
 		/* Echo to screen, if exists? */
-		if (bPipeToPrintString)
+		if (bPipeToClientPrintString)
 		{
 			if (GEngine)
 			{
@@ -67,7 +73,7 @@ private:
 			}
 		}
 		/* Echo to logs? */
-		if (bPipeToLogOutput)
+		if (bPipeToClientLogOutput)
 		{
 			switch (DebugLevel)
 			{
@@ -194,7 +200,9 @@ public:
 				bOutputSunk = true;
 			}
 		}
-		else
+		
+		/* Did we fail to write? Record it.. */
+		if (!bOutputSunk)
 		{
 			// Create a new log entry struct
 			FZeroPayStoredPrintInternalStringParams NewEntry;
@@ -208,7 +216,6 @@ public:
 			// Add it to the array (but don't grow if we're too big; they may not have any debug enabled and/or don't care...)
 			if (StoredLogEntries.Num() < 256)
 				StoredLogEntries.Add(NewEntry);
-			return;
 		}
 
 		// Dedicated server's just log to standard UE5 output
