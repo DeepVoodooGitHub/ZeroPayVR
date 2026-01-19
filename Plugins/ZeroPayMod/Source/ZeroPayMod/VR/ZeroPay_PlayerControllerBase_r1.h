@@ -23,7 +23,7 @@ public:
 	 * Called whenever the controller should ensure a valid pawn exists.
 	 * Blueprint must implement this and perform the spawn/possess logic.
 	 */
-	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "ZeroPayVR|Player Controller")
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, BlueprintAuthorityOnly, Category = "ZeroPayVR|Player Controller")
 	void SpawnAndPossessPawnIfNeeded();
 
 	/* Used to handle Windows / Quest 3 fades using different underlying mechanisms */

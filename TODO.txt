@@ -53,3 +53,6 @@ Set magazines to be "trigger" gripped
 Set charge handle to be "trigger" gripped
 Fix KA74 slider pull back distance, etc.
 Prevent game from travelling to server that has out of date mods (should check all required mods against mod.io, and any downloading)
+
+++ The bots are reloading, but sometimes they sttop visualising the firing (maybe the "reload" needs to "stop" the firing, before restarting it?
+++ Gun fires after drop too
