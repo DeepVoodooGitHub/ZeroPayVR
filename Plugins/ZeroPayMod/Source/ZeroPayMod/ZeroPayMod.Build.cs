@@ -39,7 +39,8 @@ public class ZeroPayMod : ModuleRules
                 "OnlineSubsystem",
                 "OnlineSubsystemUtils",
                 "OnlineSubsystemEIK",
-                "NetCore" 
+                "NetCore",
+                "Niagara"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
@@ -72,6 +73,7 @@ public class ZeroPayMod : ModuleRules
 				"UMG",
                 "AssetRegistry",
 				"PakFile",
+                "PhysicsCore"
             }
             );
 

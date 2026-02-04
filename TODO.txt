@@ -58,3 +58,7 @@ Prevent game from travelling to server that has out of date mods (should check a
 ++ Gun fires after drop too
 
 * MOVE TO BULLET PROJECTILE MODEL *
+
++ adding in particles (fixing each one / change names)
++ then add in data table for particles and impact sounds
++ backt o bullets

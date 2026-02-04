@@ -130,6 +130,10 @@
 				"Win64",
 				"Android"
 			]
+		},
+		{
+			"Name": "CascadeToNiagaraConverter",
+			"Enabled": true
 		}
 	]
 }
