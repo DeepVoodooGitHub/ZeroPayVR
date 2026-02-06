@@ -32,6 +32,9 @@ public:
 	UPhysicalMaterial* ConcretePhysicalMaterial;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Materials")
+	UPhysicalMaterial* AsphaltPhysicalMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Materials")
 	UPhysicalMaterial* MetalPhysicalMaterial;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics Materials")
@@ -55,7 +58,7 @@ public:
 	/** Impact Sounds **/
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Sound")
-	USoundCue* DefaultSound ;
+	USoundCue* DefaultSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Sound")
 	USoundCue* FleshBodySound;
@@ -64,7 +67,10 @@ public:
 	USoundCue* DirtSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Sound")
-	USoundCue* ConcreteSound ;
+	USoundCue* ConcreteSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Sound")
+	USoundCue* AsphaltSound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Sound")
 	USoundCue* MetalSound;
@@ -102,6 +108,9 @@ public:
 	UNiagaraSystem* ConcreteParticle;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Particle")
+	UNiagaraSystem* AsphaltParticle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Particle")
 	UNiagaraSystem* MetalParticle;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Particle")
@@ -121,6 +130,58 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Particle")
 	UNiagaraSystem* VehicleParticle;
+
+	/** Impact Decal Textures (Decal “stamps” / masks / albedo etc.) **/
+
+
+	/** Impact Decal Materials (Deferred decal materials, etc.) **/
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> DefaultDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> FleshBodyDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> DirtDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> ConcreteDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> AsphaltDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> MetalDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> WoodDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> GlassDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> FabricDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> WaterDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> SnowDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Impact Decals")
+	TArray<UMaterialInterface*> VehicleDecals;
+
+private:
+	/** Helper: pick a random decal from Preferred; fallback to DefaultDecals; may return nullptr. */
+	UMaterialInterface* PickRandomDecal(const TArray<UMaterialInterface*>& Preferred) const
+	{
+		const TArray<UMaterialInterface*>& Source = (Preferred.Num() > 0) ? Preferred : DefaultDecals;
+		if (Source.Num() == 0) return nullptr;
+
+		const int32 Index = FMath::RandRange(0, Source.Num() - 1);
+		return Source.IsValidIndex(Index) ? Source[Index] : nullptr;
+	}
 
 public:
 
@@ -153,6 +214,11 @@ public:
 		if (ConcretePhysicalMaterial && InPhysicalMaterial == ConcretePhysicalMaterial)
 		{
 			return ConcreteSound ? ConcreteSound : DefaultSound;
+		}
+
+		if (AsphaltPhysicalMaterial && InPhysicalMaterial == AsphaltPhysicalMaterial)
+		{
+			return AsphaltSound ? AsphaltSound : DefaultSound;
 		}
 
 		if (MetalPhysicalMaterial && InPhysicalMaterial == MetalPhysicalMaterial)
@@ -223,6 +289,11 @@ public:
 			return ConcreteParticle ? ConcreteParticle : DefaultParticle;
 		}
 
+		if (AsphaltPhysicalMaterial && InPhysicalMaterial == AsphaltPhysicalMaterial)
+		{
+			return AsphaltParticle ? AsphaltParticle : DefaultParticle;
+		}
+
 		if (MetalPhysicalMaterial && InPhysicalMaterial == MetalPhysicalMaterial)
 		{
 			return MetalParticle ? MetalParticle : DefaultParticle;
@@ -260,4 +331,34 @@ public:
 
 		return DefaultParticle;
 	};
+
+
+	/** Returns a random decal material for the given PhysicalMaterial (falls back to DefaultDecals). */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Impact")
+	UMaterialInterface* GetDecalMaterial(const UPhysicalMaterial* InPhysicalMaterial) const
+	{
+		if (!InPhysicalMaterial)
+		{
+			return PickRandomDecal(DefaultDecals);
+		}
+
+		if (DefaultPhysicalMaterial && InPhysicalMaterial == DefaultPhysicalMaterial)
+		{
+			return PickRandomDecal(DefaultDecals);
+		}
+
+		if (FleshBodyPhysicalMaterial && InPhysicalMaterial == FleshBodyPhysicalMaterial) return PickRandomDecal(FleshBodyDecals);
+		if (DirtPhysicalMaterial && InPhysicalMaterial == DirtPhysicalMaterial) return PickRandomDecal(DirtDecals);
+		if (ConcretePhysicalMaterial && InPhysicalMaterial == ConcretePhysicalMaterial) return PickRandomDecal(ConcreteDecals);
+		if (AsphaltPhysicalMaterial && InPhysicalMaterial == AsphaltPhysicalMaterial) return PickRandomDecal(AsphaltDecals);
+		if (MetalPhysicalMaterial && InPhysicalMaterial == MetalPhysicalMaterial) return PickRandomDecal(MetalDecals);
+		if (WoodPhysicalMaterial && InPhysicalMaterial == WoodPhysicalMaterial) return PickRandomDecal(WoodDecals);
+		if (GlassPhysicalMaterial && InPhysicalMaterial == GlassPhysicalMaterial) return PickRandomDecal(GlassDecals);
+		if (FabricPhysicalMaterial && InPhysicalMaterial == FabricPhysicalMaterial) return PickRandomDecal(FabricDecals);
+		if (WaterPhysicalMaterial && InPhysicalMaterial == WaterPhysicalMaterial) return PickRandomDecal(WaterDecals);
+		if (SnowPhysicalMaterial && InPhysicalMaterial == SnowPhysicalMaterial) return PickRandomDecal(SnowDecals);
+		if (VehiclePhysicalMaterial && InPhysicalMaterial == VehiclePhysicalMaterial) return PickRandomDecal(VehicleDecals);
+
+		return PickRandomDecal(DefaultDecals);
+	}
 };

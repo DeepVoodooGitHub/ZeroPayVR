@@ -499,4 +499,22 @@ public:
 #endif
 	}
 
+	/** Returns TRUE if this is executing in a Client world (NM_Client). This is machine NetMode, not actor authority. */
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Networking", meta = (DefaultToSelf = "Actor", HidePin = "Actor"))
+	static bool IsClientNetMode(const AActor* Actor)
+	{
+		if (!Actor)
+		{
+			return false;
+		}
+
+		const UWorld* World = Actor->GetWorld();
+		if (!World)
+		{
+			return false;
+		}
+
+		return World->GetNetMode() == NM_Client;
+	}
+
 };
