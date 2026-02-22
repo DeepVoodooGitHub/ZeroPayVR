@@ -517,4 +517,16 @@ public:
 		return World->GetNetMode() == NM_Client;
 	}
 
+
+	// Used to force skeletal meshes that are not "refreshing bones" during a tick to update
+	// Handy to update hidden bones, etc.
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
+	static void ForceSkeletalMeshRefresh(USkeletalMeshComponent* SkelComp)
+	{
+		if (!SkelComp) return;
+		SkelComp->RefreshBoneTransforms();
+		SkelComp->MarkRenderStateDirty();
+		SkelComp->UpdateBounds();
+	}
+
 };
