@@ -70,6 +70,10 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, meta = (DisplayName = "Slider Progress"))
 		void ReceiveSliderProgressEvent(float CurrentProgress);
 
+	// Disable the slider; used in weapons that want to reimplement the slider (bolt action for example)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VRSliderComponent")
+		bool bDisableSliderAndChildren ;
+
 	// If true then this slider will only update in its tick event instead of normally using the controllers update event
 	// Keep in mind that you then must adjust the tick group in order to make sure it happens after the gripping controller
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VRSliderComponent")
