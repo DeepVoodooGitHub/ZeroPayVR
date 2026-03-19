@@ -7,7 +7,27 @@
 #include "ZeroPayGunAttachmentPoint_r1.generated.h"
 
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UENUM(BlueprintType)
+enum class EZeroPayGunAttachmentSlotType : uint8
+{
+	None,
+	TopRail,
+	SideRailLeft,
+	SideRailRight,
+	BottomRail,
+	Muzzle,
+	Stock,
+	Magazine,
+	Optic,
+	Underbarrel,
+	Custom
+};
+
+class USphereComponent;
+class UStaticMeshComponent;
+
+
+UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
 class ZEROPAYMOD_API UZeroPayGunAttachmentPoint_r1 : public USceneComponent
 {
 	GENERATED_BODY()
@@ -15,6 +35,19 @@ class ZEROPAYMOD_API UZeroPayGunAttachmentPoint_r1 : public USceneComponent
 public:	
 	// Sets default values for this component's properties
 	UZeroPayGunAttachmentPoint_r1();
+
+	// =========================
+	// Core State
+	// =========================
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachment Point")
+	EZeroPayGunAttachmentSlotType SlotType;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Attachment Point")
+	AActor* CurrentAttachment;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachment Point")
+	bool bLocked;
 
 protected:
 	// Called when the game starts
