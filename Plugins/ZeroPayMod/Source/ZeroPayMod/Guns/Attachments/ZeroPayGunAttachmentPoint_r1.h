@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/SceneComponent.h"
+#include "Components/BoxComponent.h"
 #include "ZeroPayGunAttachmentPoint_r1.generated.h"
 
 
@@ -28,7 +28,7 @@ class UStaticMeshComponent;
 
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable)
-class ZEROPAYMOD_API UZeroPayGunAttachmentPoint_r1 : public USceneComponent
+class ZEROPAYMOD_API UZeroPayGunAttachmentPoint_r1 : public UBoxComponent
 {
 	GENERATED_BODY()
 
