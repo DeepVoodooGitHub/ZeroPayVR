@@ -40,14 +40,21 @@ public:
 	// Core State
 	// =========================
 
+	// What sort of attachment slot is this?
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachment Point")
 	EZeroPayGunAttachmentSlotType SlotType;
 
+	// What current actor is living here (if any)
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Attachment Point")
 	AActor* CurrentAttachment;
 
+	// Is it locked? I.e. can't change or modify?
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachment Point")
 	bool bLocked;
+
+	// In use?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attachment Point")
+	bool bInUse ;
 
 protected:
 	// Called when the game starts
