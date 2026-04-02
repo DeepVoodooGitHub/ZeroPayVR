@@ -2837,8 +2837,11 @@ bool UGripMotionControllerComponent::NotifyGrip(FBPActorGripInformation &NewGrip
 				// Only doing this for actor grips
 				if (NewGrip.AdvancedGripSettings.bSetOwnerOnGrip)
 				{
+#if 0
 					/* JBH - Assign this immediately, for local clients can perform "is owning client" logic.. */
+					/* Disabled this again as it was causing issues grabbing a magazine of a previously grabbed gun (which was lying on the ground) - NM, not the issue - still leaving it off until I remember why I did it */
 					pActor->SetOwner(OwningPawn);
+#endif
 
 					if (IsServer())
 					{

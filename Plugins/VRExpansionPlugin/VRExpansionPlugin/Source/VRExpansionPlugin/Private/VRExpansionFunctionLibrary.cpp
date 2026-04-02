@@ -226,6 +226,9 @@ void UVRExpansionFunctionLibrary::GetGripSlotInRangeByTypeName_Component(FName S
 		}
 	}
 
+	//TArray<USceneComponent*> AttachChildren;
+	//Component->GetChildrenComponents(true, AttachChildren);
+	
 	TArray<USceneComponent*> AttachChildren = Component->GetAttachChildren();
 
 	TArray<UHandSocketComponent*> RotationallyMatchingHandSockets;
