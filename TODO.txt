@@ -58,3 +58,9 @@ Prevent game from travelling to server that has out of date mods (should check a
 ++ Gun fires after drop too
 
 + AWP - using bullets fast, still see bullet bolt when out of ammo
+
++ Bullets are moving too slowly
++ Attachments all need "B" to release them
++ Left slide rail doesn't work
++ initial laser needs to be Off
++ Torch light needs replicated on/off
