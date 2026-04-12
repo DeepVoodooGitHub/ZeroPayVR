@@ -529,4 +529,14 @@ public:
 		SkelComp->UpdateBounds();
 	}
 
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
+	static bool IsListenServer() 
+	{
+		if (GEngine != nullptr && GWorld != nullptr) 
+		{ 
+			return GEngine->GetNetMode(GWorld) == NM_ListenServer;
+		} 
+		return false ; 
+	}
+
 };

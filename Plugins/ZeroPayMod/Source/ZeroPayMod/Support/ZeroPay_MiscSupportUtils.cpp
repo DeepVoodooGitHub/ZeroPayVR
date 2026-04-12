@@ -64,17 +64,15 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 {
 	UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("[Init] InitialiseZeroPayVR() called."));
 
-#ifdef PLATFORM_LINUX
 	/* Server-side only */
 	if (!target->HasAuthority())
 	{
-		UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       Failed, was not called in authority (on dedicated server)."));
+		UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       Ignored, we are a client (i.e. no standalone or dedicated server instance)."));
 		return;
 	}
 
 	FString BPClassPath = FString("Blueprint'/ZeroPayMod/Blueprints/GameLogic/Server/BP_ZP_DedicatedServerLogic.BP_ZP_DedicatedServerLogic_C'");
 	TSubclassOf<AActor> ZeroPayVRBPClass = Cast<UClass>(StaticLoadObject(UObject::StaticClass(), nullptr, *BPClassPath));
-
 
 	/* Find out if they've already created one.. */
 	TArray<AActor*> Found;
@@ -107,9 +105,6 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 		UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr,  TEXT("       failed to spawn server logic, game will be broken!"), FDebugConsoleLevel::Error);
 		return;
 	}
-#else
-	UZeroPay_InternalDebugFunctionLibrary::PrintInternalString(nullptr, nullptr, TEXT("       Failed, was called on client (main menu contains incorrect level BP logic?)"), FDebugConsoleLevel::Error);
-#endif
 }
 
 
