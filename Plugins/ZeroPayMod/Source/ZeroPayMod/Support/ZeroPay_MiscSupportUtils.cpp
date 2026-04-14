@@ -71,7 +71,7 @@ void AZeroPay_MiscSupportUtils::InitialiseZeroPayVR(AActor* target)
 		return;
 	}
 
-	FString BPClassPath = FString("Blueprint'/ZeroPayMod/Blueprints/GameLogic/Server/BP_ZP_DedicatedServerLogic.BP_ZP_DedicatedServerLogic_C'");
+	FString BPClassPath = FString("Blueprint'/ZeroPayMod/Blueprints/GameLogic/Server/BP_ZP_ServerLogic.BP_ZP_ServerLogic_C'");
 	TSubclassOf<AActor> ZeroPayVRBPClass = Cast<UClass>(StaticLoadObject(UObject::StaticClass(), nullptr, *BPClassPath));
 
 	/* Find out if they've already created one.. */
