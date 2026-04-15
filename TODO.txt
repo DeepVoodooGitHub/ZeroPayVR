@@ -61,7 +61,4 @@ Prevent game from travelling to server that has out of date mods (should check a
 + AWP sounds
 
 + Bullets are moving too slowly
-+ Listen server master shows no dedicated server widget
-+ Stop others from being the "master" on listen server lobbies
 + MainMenu should disable "start game" and "multiplayer" until network login is finished
-+ lots of "attempting to find level to load" when in listen server leaving lobby to network game
