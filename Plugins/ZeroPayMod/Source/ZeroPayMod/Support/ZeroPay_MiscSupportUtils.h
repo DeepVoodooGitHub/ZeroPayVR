@@ -529,6 +529,7 @@ public:
 		SkelComp->UpdateBounds();
 	}
 
+	// Returns TRUE if the BP node executes on a listen server
 	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
 	static bool IsListenServer() 
 	{
@@ -539,4 +540,164 @@ public:
 		return false ; 
 	}
 
-};
+
+	// Optional helper: normalize a level identifier for comparison.
+	// Supports:
+	//   - full package name: /Game/Maps/MySubLevel
+	//   - mounted pak path:  /ZeroPayMods/UGC5199871/Maps/MySubLevel
+	//   - short name:        MySubLevel
+	static FString ZP_NormalizeLevelIdentifier(const FString& InName)
+	{
+		FString Name = InName;
+		Name.TrimStartAndEndInline();
+
+		// Convert any object path -> package name (also handles PIE prefixes correctly)
+		Name = FPackageName::ObjectPathToPackageName(Name);
+
+		return Name;
+	}
+
+	static bool ZP_LevelMatchesIdentifier(const ULevelStreaming* StreamingLevel, const FString& Identifier)
+	{
+		if (!StreamingLevel)
+		{
+			return false;
+		}
+
+		const FString Wanted = ZP_NormalizeLevelIdentifier(Identifier);
+
+		const FString FullPackageName = StreamingLevel->GetWorldAssetPackageFName().ToString();
+		const FString ShortPackageName = FPackageName::GetShortName(FullPackageName);
+
+		// Match either exact full package path or short package name.
+		// Full package path is the preferred match for mounted-PAK travel.
+		return Wanted.Equals(FullPackageName, ESearchCase::IgnoreCase)
+			|| Wanted.Equals(ShortPackageName, ESearchCase::IgnoreCase);
+	}
+
+	static bool ZP_DoesLevelExistInRuntime(const FString& PackageName)
+	{
+		FString DummyFilename;
+		return FPackageName::DoesPackageExist(PackageName, nullptr, &DummyFilename);
+	}
+
+	// Returns all levels that ZeroPayVR expects to be loaded by the world.
+	// IMPORTANT: returns FULL package names, not short names.
+	// Example:
+	//   /Game/Maps/MySubLevel
+	//   /ZeroPayMods/UGC5199871/Maps/MySubLevel
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support", meta = (HidePin = "WorldContextObject", DefaultToSelf = "WorldContextObject"))
+	static TArray<FString> GetLevelsThatShouldBeLoaded(UObject* WorldContextObject)
+	{
+		TArray<FString> Result;
+
+		if (!WorldContextObject)
+		{
+			return Result;
+		}
+
+		UWorld* World = WorldContextObject->GetWorld();
+		if (!World)
+		{
+			return Result;
+		}
+
+		const TArray<ULevelStreaming*>& StreamingLevels = World->GetStreamingLevels();
+
+		for (ULevelStreaming* StreamingLevel : StreamingLevels)
+		{
+			if (!StreamingLevel)
+			{
+				continue;
+			}
+
+			// Skip levels that are being removed/unloaded permanently
+			if (StreamingLevel->GetIsRequestingUnloadAndRemoval())
+			{
+				continue;
+			}
+
+			// These are the levels the world currently expects to have loaded.
+			if (!StreamingLevel->ShouldBeLoaded())
+			{
+				continue;
+			}
+
+			const FString FullPackageName = StreamingLevel->GetWorldAssetPackageFName().ToString();
+
+			// Skip levels not present in this runtime (e.g. wrong platform PAK)
+			if (!ZP_DoesLevelExistInRuntime(FullPackageName))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Skipping level not present in runtime: %s (probably not valid on this platform)"), *FullPackageName);
+				continue;
+			}
+
+
+			if (!FullPackageName.IsEmpty())
+			{
+				Result.AddUnique(FullPackageName);
+			}
+		}
+
+		return Result;
+	}
+
+	// Reports if the world and any required streaming sub-levels are loaded and ready (to spawn pawns).
+	// RequiredStreamingLevelNames can contain either:
+	//   - full package names (preferred)
+	//   - short map names (legacy/fallback)
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support", meta = (HidePin = "WorldContextObject", DefaultToSelf = "WorldContextObject"))
+	static bool IsWorldReadyForPawnSpawn(UObject* WorldContextObject, const TArray<FString>& RequiredStreamingLevelNames)
+	{
+		UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+		if (!World || !World->PersistentLevel)
+		{
+			return false;
+		}
+
+		const TArray<ULevelStreaming*>& StreamingLevels = World->GetStreamingLevels();
+
+		for (const FString& RequiredName : RequiredStreamingLevelNames)
+		{
+			ULevelStreaming* MatchedStreaming = nullptr;
+
+			for (ULevelStreaming* Streaming : StreamingLevels)
+			{
+				if (!Streaming)
+				{
+					continue;
+				}
+
+				if (Streaming->GetIsRequestingUnloadAndRemoval())
+				{
+					continue;
+				}
+
+				if (ZP_LevelMatchesIdentifier(Streaming, RequiredName))
+				{
+					MatchedStreaming = Streaming;
+					break;
+				}
+			}
+
+			if (!MatchedStreaming)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("IsWorldReadyForPawnSpawn: Could not find streaming level '%s' in current world"), *RequiredName);
+				return false;
+			}
+
+			// If the world expects this level to be loaded, but it isn't yet, not ready.
+			if (MatchedStreaming->ShouldBeLoaded() && !MatchedStreaming->IsLevelLoaded())
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("IsWorldReadyForPawnSpawn: Level not loaded yet. Required='%s' Package='%s' Short='%s'"),
+					*RequiredName,
+					*MatchedStreaming->GetWorldAssetPackageFName().ToString(),
+					*FPackageName::GetShortName(MatchedStreaming->GetWorldAssetPackageFName().ToString()));
+
+				return false;
+			}
+		}
+
+		return true;
+	}};
