@@ -1,64 +1,15 @@
 TODO
 
 + Server should return to lobby after X seconds of no users (defined somewhere?)
-+ more guns
-+ TDM rounds completed
-+ Final score board (large, shown in front of player) - disable on wrist whilst appearing
-+ Test players joining
-+ 
-
-
-
-Gun Changes
-
-OnChamberStateChangedEvent - Empty, Liveround, Empty shell
-"old state", "new state"
-
-	
-On bullet taken
-on bullet put
-
-on fire mode changed - semi, auto, single, burst
-
-on magazine changed
-
-
-VR Gun Anim required to support generic variables:
-
-1. Loaeded - bool
-2. Fire mode (as above)
-3. Hammer operation
-4. 
-
-
-Change underlying debug system to pass
-	Client ID (client X, server)
-	Message Type (log, warn)
-	Time value
-	Object name
-	Data valueint 
-	
-
-Authorative
-2. The changing of fire mode doesn't take affect for a while (lag)
-
-
-Fire mode needs "sound" when switching
-Need to add "empty" click via spawning sounds code (handle burst mode only one click, probably on Onused)
-Add more guns?
-
-
-Check guns can be picked up correctly, etc..
-Set magazines to be "trigger" gripped
-Set charge handle to be "trigger" gripped
-Fix KA74 slider pull back distance, etc.
-Prevent game from travelling to server that has out of date mods (should check all required mods against mod.io, and any downloading)
-
-++ The bots are reloading, but sometimes they sttop visualising the firing (maybe the "reload" needs to "stop" the firing, before restarting it?
-++ Gun fires after drop too
 
 + AWP - using bullets fast, still see bullet bolt when out of ammo
 + AWP sounds
 
 + Bullets are moving too slowly
 + MainMenu should disable "start game" and "multiplayer" until network login is finished
++ When gun's are destroyed and attached magazines (and attachments) should be deleted too
++ Voice room needs linked to server ID
++ Add all paths in information panel for login success
++ add in "update" path for information, so that the panel animation continues rather than restarts..
++ Flesh out the rest of the lobby settings (replication)
+  + Disable other players from "touching" any aspect of this, view only - make all panels and stuff replicate
