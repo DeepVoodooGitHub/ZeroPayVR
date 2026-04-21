@@ -9,7 +9,6 @@ TODO
 + MainMenu should disable "start game" and "multiplayer" until network login is finished
 + When gun's are destroyed and attached magazines (and attachments) should be deleted too
 + Voice room needs linked to server ID
-+ Add all paths in information panel for login success
 + add in "update" path for information, so that the panel animation continues rather than restarts..
-+ Flesh out the rest of the lobby settings (replication)
+>>> + Flesh out the rest of the lobby settings (replication)
   + Disable other players from "touching" any aspect of this, view only - make all panels and stuff replicate
