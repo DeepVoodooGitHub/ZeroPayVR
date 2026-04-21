@@ -63,6 +63,19 @@ enum class EZeroPay_NetControllerStatus : uint8
 	Local
 };
 
+UENUM(BlueprintType)
+enum class EZeroPay_PlatformType : uint8
+{
+	LinuxServer,
+	PCVR,
+	Quest3,
+	Quest4,
+	PSVR,
+	OtherA,
+	OtherB,
+	OtherC
+};
+
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnIPResolved, const FString&, PublicIP);
 
 UCLASS()
@@ -700,4 +713,22 @@ public:
 		}
 
 		return true;
-	}};
+	}
+
+	// Return the platform we are running on
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
+	static EZeroPay_PlatformType GetPlatformType()
+	{
+#if PLATFORM_WINDOWS
+		return EZeroPay_PlatformType::PCVR;
+#endif
+
+#if PLATFORM_LINUX
+		return EZeroPay_PlatformType::LinuxServer;
+#endif
+
+#if PLATFORM_ANDROID
+		return EZeroPay_PlatformType::Quest3;
+#endif
+	}
+};
