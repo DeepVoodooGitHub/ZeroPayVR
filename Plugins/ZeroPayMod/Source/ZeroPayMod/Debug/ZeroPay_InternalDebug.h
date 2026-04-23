@@ -39,8 +39,10 @@ struct ZEROPAYMOD_API FZeroPayStoredPrintInternalStringParams
 };
 
 /* Global vars (until we find a better solution) - Reset via ZeroPay_GameInstance_r1 Init (to avoid crashes on multiple PIE plays) */
-static TArray<FZeroPayStoredPrintInternalStringParams> StoredLogEntries;
+static TArray<FZeroPayStoredPrintInternalStringParams> InternalStoredLogEntries;
 static TWeakObjectPtr<AActor> InternalDebugTargetActor = nullptr ;
+static TArray<FZeroPayStoredPrintInternalStringParams> StandardDebugLogEntries;
+static TWeakObjectPtr<AActor> StandardDebugTargetActor = nullptr;
 static bool bPipeToClientPrintString = true;
 	/* If set, on client, print string the message (so user can see in PIE or debug client build) */
 static bool bPipeToClientLogOutput = true;
@@ -107,7 +109,28 @@ public:
 			UE_LOG(LogTemp, Error, TEXT("Actor %s is not a valid target, does not implement ZeroPay_PrintInternalString_Interface"), *target->GetName());
 	}
 
-	// Internal print string, useful in editor and game (shown on main menu 'logs', any anything else that implements ZeroPay_InternalDebugConsole_Interface
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target"))
+	static void RegisterDebugStringTarget(AActor* target = nullptr)
+	{
+		if (target->GetClass()->ImplementsInterface(UZeroPay_PrintInternalString_Interface::StaticClass()))
+		{
+			StandardDebugTargetActor = target;
+			/* Any stored data for when we had no actor to sink the logs? */
+			if (StandardDebugLogEntries.Num() > 0)
+			{
+				for (const FZeroPayStoredPrintInternalStringParams& Entry : StandardDebugLogEntries)
+				{
+					IZeroPay_PrintInternalString_Interface::Execute_PrintInternalStringImpl(StandardDebugTargetActor.Get(), Entry.ExecutionZone, Entry.ClientID, Entry.DebugLevel, Entry.Timestamp, Entry.ObjectName, Entry.LogText);
+					PipeEntryAsRequired(Entry.ExecutionZone, Entry.ClientID, Entry.DebugLevel, Entry.Timestamp, Entry.ObjectName, Entry.LogText);
+				}
+				StandardDebugLogEntries.Empty();
+			}
+		}
+		else
+			UE_LOG(LogTemp, Error, TEXT("Actor %s is not a valid target, does not implement ZeroPay_PrintInternalString_Interface"), *target->GetName());
+	}	
+
+	// BASE GAME LOGIC ONLY - Internal print string, useful in internal game-logic NOT your mods - Use PrintDebugString for your mods (shown on main menu 'logs', any anything else that implements ZeroPay_InternalDebugConsole_Interface)
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", WorldContext = "WorldContextObject", CallableWithoutWorldContext, AdvancedDisplay = "WorldContextObject, debugConsoleLevel, bIncludeObjectName"))
 	static void PrintInternalString(const UObject* WorldContextObject, UObject* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
 	{
@@ -184,14 +207,14 @@ public:
 			if (IZeroPay_PrintInternalString_Interface::Execute_IsPrintInternalReady(InternalDebugTargetActor.Get()))
 			{
 				/* Any stored data for when we had no actor to sink the logs? */
-				if (StoredLogEntries.Num() > 0)
+				if (InternalStoredLogEntries.Num() > 0)
 				{
-					for (const FZeroPayStoredPrintInternalStringParams& Entry : StoredLogEntries)
+					for (const FZeroPayStoredPrintInternalStringParams& Entry : InternalStoredLogEntries)
 					{
 						IZeroPay_PrintInternalString_Interface::Execute_PrintInternalStringImpl(InternalDebugTargetActor.Get(), Entry.ExecutionZone, Entry.ClientID, Entry.DebugLevel, Entry.Timestamp, Entry.ObjectName, Entry.LogText);
 						PipeEntryAsRequired(Entry.ExecutionZone, Entry.ClientID, Entry.DebugLevel, Entry.Timestamp, Entry.ObjectName, Entry.LogText);
 					}
-					StoredLogEntries.Empty();
+					InternalStoredLogEntries.Empty();
 				}
 
 				/* Debug target is active, send directly to it  */
@@ -214,8 +237,8 @@ public:
 			NewEntry.LogText = LogText;
 
 			// Add it to the array (but don't grow if we're too big; they may not have any debug enabled and/or don't care...)
-			if (StoredLogEntries.Num() < 256)
-				StoredLogEntries.Add(NewEntry);
+			if (InternalStoredLogEntries.Num() < 256)
+				InternalStoredLogEntries.Add(NewEntry);
 		}
 
 		// Dedicated server's just log to standard UE5 output
@@ -248,5 +271,148 @@ public:
 			}
 		}
 	}
+
+	// Debug print string, useful in custom game logic (Shows in any anything that implements ZeroPay_InternalDebugConsole_Interface)
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Mod Debug", meta = (DefaultToSelf = "target", WorldContext = "WorldContextObject", CallableWithoutWorldContext, AdvancedDisplay = "WorldContextObject, debugConsoleLevel, bIncludeObjectName"))
+	static void PrintDebugString(const UObject* WorldContextObject, UObject* target, const FString& value = "", FDebugConsoleLevel debugConsoleLevel = Log, bool bIncludeObjectName = true)
+	{
+		// Note the GameInstance uses a null target, as it's not an AActor so we default to that here
+		FString ExecutionZone = "Local";  // or Server
+		FString ClientID = "-"; // Single digit ID
+		FString Timestamp = "----.---";
+		FString ObjectName = "[GameInstance]";		// We assume null = target is game instance
+		FString LogText = value;
+
+		UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
+		FString Prefix;
+		if (World)
+		{
+			switch (World->GetNetMode())
+			{
+			case NM_Client:
+			{
+				/* PIE includes a client ID we can use to know "who" we are when multiple windows are open for multi-user PIE testing */
+				if (World->WorldType == EWorldType::PIE)
+				{
+					ExecutionZone = "Clnt:";
+					ClientID = FString::Printf(TEXT("%d"), UE::GetPlayInEditorID());
+				}
+				else
+				{
+					/* Just use "client" */
+					ExecutionZone = "Clien";
+					ClientID = "t";
+				}
+				break;
+			}
+			case NM_DedicatedServer:
+			{
+				ExecutionZone = "DSver";
+				ClientID = " ";
+				break;
+			}
+			case NM_ListenServer:
+			{
+				ExecutionZone = "LSver";
+				ClientID = " ";
+				break;
+			}
+			case NM_Standalone:
+			{
+				ExecutionZone = "Alone";
+				ClientID = " ";
+				break;
+			}
+			}
+
+			/* If we have a world, get the time.. */
+			Timestamp = FString::Printf(TEXT("%08.3f"), World->GetTimeSeconds());
+		}
+
+		/* Include name? */
+		if (bIncludeObjectName)
+		{
+			if (target != nullptr)
+			{
+				ObjectName = target->GetFName().ToString();
+
+				/* Strip UAID */
+				int32 Index = ObjectName.Find(TEXT("_UAID_"), ESearchCase::IgnoreCase, ESearchDir::FromStart);
+				if (Index != INDEX_NONE)
+					ObjectName = ObjectName.Left(Index); // Keep everything before _UAID_
+			}
+		}
+
+		bool bOutputSunk = false;
+		if (StandardDebugTargetActor.IsValid())
+		{
+			if (IZeroPay_PrintInternalString_Interface::Execute_IsPrintInternalReady(StandardDebugTargetActor.Get()))
+			{
+				/* Any stored data for when we had no actor to sink the logs? */
+				if (StandardDebugLogEntries.Num() > 0)
+				{
+					for (const FZeroPayStoredPrintInternalStringParams& Entry : StandardDebugLogEntries)
+					{
+						IZeroPay_PrintInternalString_Interface::Execute_PrintInternalStringImpl(StandardDebugTargetActor.Get(), Entry.ExecutionZone, Entry.ClientID, Entry.DebugLevel, Entry.Timestamp, Entry.ObjectName, Entry.LogText);
+						PipeEntryAsRequired(Entry.ExecutionZone, Entry.ClientID, Entry.DebugLevel, Entry.Timestamp, Entry.ObjectName, Entry.LogText);
+					}
+					StandardDebugLogEntries.Empty();
+				}
+
+				/* Debug target is active, send directly to it  */
+				IZeroPay_PrintInternalString_Interface::Execute_PrintInternalStringImpl(StandardDebugTargetActor.Get(), ExecutionZone, ClientID, debugConsoleLevel, Timestamp, ObjectName, LogText);
+				PipeEntryAsRequired(ExecutionZone, ClientID, debugConsoleLevel, Timestamp, ObjectName, LogText);
+				bOutputSunk = true;
+			}
+		}
+
+		/* Did we fail to write? Record it.. */
+		if (!bOutputSunk)
+		{
+			// Create a new log entry struct
+			FZeroPayStoredPrintInternalStringParams NewEntry;
+			NewEntry.ExecutionZone = ExecutionZone;
+			NewEntry.ClientID = ClientID;
+			NewEntry.DebugLevel = debugConsoleLevel;
+			NewEntry.Timestamp = Timestamp;
+			NewEntry.ObjectName = ObjectName;
+			NewEntry.LogText = LogText;
+
+			// Add it to the array (but don't grow if we're too big; they may not have any debug enabled and/or don't care...)
+			if (StandardDebugLogEntries.Num() < 256)
+				StandardDebugLogEntries.Add(NewEntry);
+		}
+
+		// Dedicated server's just log to standard UE5 output
+		if (IsRunningDedicatedServer())
+		{
+			const FString FullMessage = TEXT("[") + Timestamp + TEXT("] (") + ExecutionZone + TEXT(" ") + ClientID + TEXT(") (") + ObjectName + TEXT(") ") + LogText;
+			switch (debugConsoleLevel)
+			{
+			case FDebugConsoleLevel::None:
+			case FDebugConsoleLevel::Log:
+			{
+				// Green text
+				UE_LOG(LogZeroPay, Log, TEXT("\x1b[32m%s\x1b[0m"), *FullMessage);
+				break;
+			}
+
+			case FDebugConsoleLevel::Warn:
+			{
+				// Yellow warnings
+				UE_LOG(LogZeroPay, Warning, TEXT("\x1b[33m%s\x1b[0m"), *FullMessage);
+				break;
+			}
+
+			case FDebugConsoleLevel::Error:
+			{
+				// Red errors
+				UE_LOG(LogZeroPay, Error, TEXT("\x1b[31m%s\x1b[0m"), *FullMessage);
+				break;
+			}
+			}
+		}
+	}
+
 } ;
 
