@@ -731,4 +731,24 @@ public:
 		return EZeroPay_PlatformType::Quest3;
 #endif
 	}
+
+	// Return the platform we are running on
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
+	static bool IsQuest3()
+	{
+#if PLATFORM_ANDROID
+		return true ;
+#else
+		return false ;
+#endif
+	}
+
+	// Return the platform we are running on
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
+	static void SetSpectatorPlayerState(APlayerState* playerState, bool isSpectator)
+	{
+		if (playerState != nullptr)
+			playerState->SetIsSpectator(isSpectator);
+	}
+
 };
