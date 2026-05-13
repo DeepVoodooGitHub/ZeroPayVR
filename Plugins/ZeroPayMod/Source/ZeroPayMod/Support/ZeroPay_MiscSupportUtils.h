@@ -45,6 +45,9 @@
 #include "Components/WidgetComponent.h"
 #include "HAL/PlatformStackWalk.h"
 
+#include "GripMotionControllerComponent.h"
+#include "Grippables/HandSocketComponent.h"
+
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
 UENUM(BlueprintType)
@@ -749,6 +752,18 @@ public:
 	{
 		if (playerState != nullptr)
 			playerState->SetIsSpectator(isSpectator);
+	}
+
+	// Return the platform we are running on
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
+	static FTransform GetHandSocketTransform(UHandSocketComponent* HandSocketComponent, UGripMotionControllerComponent* QueryController, bool bIgnoreOnlySnapMesh)
+	{
+		if (!HandSocketComponent)
+		{
+			return FTransform::Identity;
+		}
+
+		return HandSocketComponent->GetHandSocketTransform(QueryController, bIgnoreOnlySnapMesh);
 	}
 
 };

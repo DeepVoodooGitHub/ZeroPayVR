@@ -4,7 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
+#include "Items/Interfaces/ZeroPay_VRItem_Interface_r1.h"
+#include "VR/ZeroPay_VRCharacterBase_r1.h"
 #include "ZeroPay_GameMode_r1.generated.h"
+
+class AZeroPay_VRCharacter_r1;
+class UGripMotionControllerComponent;
 
 /**
  * 
@@ -30,4 +35,13 @@ public:
 	void ZeroPayStartPlay();
 
 	void HandleSeamlessTravelPlayer(AController*& C) override;
+
+	// INTERNAL - Used for Item Spawn Logic
+	UFUNCTION(BlueprintImplementableEvent, Category = "ZeroPay|GameMode")
+	AActor* Internal_SpawnActor(const FString& ItemID, AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision);
+
+	// INTERNAL - Used for Item Spawn Logic
+	UFUNCTION(BlueprintImplementableEvent, Category = "ZeroPay|GameMode")
+	bool Internal_GrabActor(const FString& ItemID, AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision, AActor* SpawnedActor);
+
 };

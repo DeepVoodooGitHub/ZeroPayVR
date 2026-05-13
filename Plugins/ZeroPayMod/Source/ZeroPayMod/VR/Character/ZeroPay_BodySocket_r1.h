@@ -7,15 +7,15 @@
 #include "ZeroPay_BodySocket_r1.generated.h"
 
 UENUM(BlueprintType)
-enum EZeroPay_BodySocket_Location
+enum class EZeroPayBodySocketLocation : uint8
 {
-	LeftLeg,
-	RightLeg,
-	Waist,
-	Chest,
-	LeftArm,
-	RightArm,
-	Back
+	LeftLeg  UMETA(DisplayName = "Left Leg"),
+	RightLeg UMETA(DisplayName = "Right Leg"),
+	Waist    UMETA(DisplayName = "Waist"),
+	Chest    UMETA(DisplayName = "Chest"),
+	LeftArm  UMETA(DisplayName = "Left Arm"),
+	RightArm UMETA(DisplayName = "Right Arm"),
+	Back     UMETA(DisplayName = "Back")
 };
 
 /* The body socket channel is trace channel 5 */
