@@ -22,6 +22,8 @@ public:
 	/**
 	 * Called whenever the controller should ensure a valid pawn exists.
 	 * Blueprint must implement this and perform the spawn/possess logic.
+	 * InitialSpawn - Set to true when the first pawn is spawned by the controller, useful for Spectator "first" spawns..
+	 * AuxData - Used as required by your own GameMode / Controllers
 	 */
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, BlueprintAuthorityOnly, Category = "ZeroPayVR|Player Controller")
 	void SpawnAndPossessPawnIfNeeded();
