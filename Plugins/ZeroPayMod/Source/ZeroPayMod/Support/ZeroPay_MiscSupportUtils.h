@@ -48,6 +48,8 @@
 #include "GripMotionControllerComponent.h"
 #include "Grippables/HandSocketComponent.h"
 
+#include "NavLinkCustomComponent.h"
+
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
 UENUM(BlueprintType)
@@ -764,6 +766,33 @@ public:
 		}
 
 		return HandSocketComponent->GetHandSocketTransform(QueryController, bIgnoreOnlySnapMesh);
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "TargetActor"))
+	static bool GetSmartLinkRelativeStartAndEnd(AActor* TargetActor, FVector& RelativeStart, FVector& RelativeEnd, TEnumAsByte<ENavLinkDirection::Type>& Direction)
+	{
+		RelativeStart = FVector::ZeroVector;
+		RelativeEnd = FVector::ZeroVector;
+		Direction = ENavLinkDirection::BothWays;
+
+		if (!IsValid(TargetActor))
+		{
+			return false;
+		}
+
+		UNavLinkCustomComponent* SmartLinkComponent = TargetActor->FindComponentByClass<UNavLinkCustomComponent>();
+
+		if (!IsValid(SmartLinkComponent))
+		{
+			return false;
+		}
+
+		ENavLinkDirection::Type NativeDirection = ENavLinkDirection::BothWays;
+		SmartLinkComponent->GetLinkData(RelativeStart, RelativeEnd, NativeDirection);
+
+		Direction = NativeDirection;
+
+		return true;
 	}
 
 };

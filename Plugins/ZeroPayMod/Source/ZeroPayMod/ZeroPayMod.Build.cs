@@ -40,7 +40,8 @@ public class ZeroPayMod : ModuleRules
                 "OnlineSubsystemUtils",
                 "OnlineSubsystemEIK",
                 "NetCore",
-                "Niagara"
+                "Niagara",
+                "NavigationSystem"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
