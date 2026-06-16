@@ -41,7 +41,9 @@ public class ZeroPayMod : ModuleRules
                 "OnlineSubsystemEIK",
                 "NetCore",
                 "Niagara",
-                "NavigationSystem"
+                "NavigationSystem",
+                "HeadMountedDisplay",
+                "XRBase"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
