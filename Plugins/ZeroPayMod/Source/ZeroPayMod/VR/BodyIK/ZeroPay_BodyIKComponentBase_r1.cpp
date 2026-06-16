@@ -140,45 +140,21 @@ void UZeroPay_BodyIKComponentBase_r1::Initialize(USceneComponent* InHead, UScene
 void UZeroPay_BodyIKComponentBase_r1::UpdateBody()
 {
 	if (!Initialized)
-	{
 		return;
-	}
 
 	const EBodyIKDetailTier Tier = ComputeDetailTier();
 	CurrentDetailTier = Tier;
 
 	if (Tier == EBodyIKDetailTier::Culled)
-	{
-		// Leave the last solved pose in place; the mesh isn't being rendered.
 		return;
-	}
-
-	// Per-tier rate gate. Hero solves every frame (interval 0); others accumulate
-	// delta time and only solve once the tier's interval has elapsed. On skipped
-	// frames the last pose is reused (Update Rate Optimization / anim interpolation
-	// smooths the visual gap).
-	const float Interval = GetSolveIntervalForTier(Tier);
-	if (Interval > 0.0f)
-	{
-		TimeSinceLastSolve += GetWorldDeltaSecondsSafe();
-		if (TimeSinceLastSolve < Interval)
-		{
-			return;
-		}
-		TimeSinceLastSolve = 0.0f;
-	}
 
 	switch (Tier)
 	{
-	case EBodyIKDetailTier::Hero:
-	case EBodyIKDetailTier::Near:
-		SolveFull();
+	case EBodyIKDetailTier::PCVR:
+		SolvePCVR();
 		break;
-	case EBodyIKDetailTier::Mid:
-		SolveReduced();
-		break;
-	case EBodyIKDetailTier::Far:
-		SolveMinimal();
+	case EBodyIKDetailTier::Quest3:
+		SolveQuest3();
 		break;
 	default:
 		break;
@@ -190,50 +166,32 @@ void UZeroPay_BodyIKComponentBase_r1::UpdateBody()
 // =============================================================================
 EBodyIKDetailTier UZeroPay_BodyIKComponentBase_r1::ComputeDetailTier() const
 {
-	if (!bEnableDetailScaling || bIsLocalPlayer)
-	{
-		return EBodyIKDetailTier::Hero;
-	}
-
 	// Off-screen / occluded avatars are the cheapest, highest-value cull.
-	if (IsValid(CharacterMesh) && !CharacterMesh->WasRecentlyRendered(RenderedTolerance))
+	if (IsValid(CharacterMesh) && !CharacterMesh->WasRecentlyRendered(0.1f))
 	{
 		return EBodyIKDetailTier::Culled;
 	}
 
+	// Too Far?
 	const AActor* Owner = GetOwner();
-	const FVector BodyLoc = Owner
-		? Owner->GetActorLocation()
-		: (IsValid(CharacterMesh) ? CharacterMesh->GetComponentLocation() : FVector::ZeroVector);
-
+	const FVector BodyLoc = Owner ? Owner->GetActorLocation() : (IsValid(CharacterMesh) ? CharacterMesh->GetComponentLocation() : FVector::ZeroVector);
 	const float Dist = FVector::Dist(GetCachedViewLocation(GetWorld()), BodyLoc);
-
-	if (Dist <= NearTierDistance) { return EBodyIKDetailTier::Near; }
-	if (Dist <= MidTierDistance) { return EBodyIKDetailTier::Mid; }
-	if (Dist <= FarTierDistance) { return EBodyIKDetailTier::Far; }
-	return EBodyIKDetailTier::Culled;
-}
-
-// =============================================================================
-// GetSolveIntervalForTier
-// =============================================================================
-float UZeroPay_BodyIKComponentBase_r1::GetSolveIntervalForTier(EBodyIKDetailTier Tier) const
-{
-	switch (Tier)
-	{
-	case EBodyIKDetailTier::Near: return 1.0f / FMath::Max(NearTierRateHz, 1.0f);
-	case EBodyIKDetailTier::Mid:  return 1.0f / FMath::Max(MidTierRateHz, 1.0f);
-	case EBodyIKDetailTier::Far:  return 1.0f / FMath::Max(FarTierRateHz, 1.0f);
-	case EBodyIKDetailTier::Hero:
-	default:
-		return 0.0f; // every frame
+	if (Dist >= FarTierDistance) 
+	{ 
+		return EBodyIKDetailTier::Culled; 
 	}
+
+
+#if 1 //PLATFORM_ANDROID
+	return EBodyIKDetailTier::Quest3;
+#else
+	return EBodyIKDetailTier::PCVR;
+#endif
+
+
 }
 
-// =============================================================================
-// SolveFull  -  full fidelity (original UpdateBody body)
-// =============================================================================
-void UZeroPay_BodyIKComponentBase_r1::SolveFull()
+void UZeroPay_BodyIKComponentBase_r1::SolvePCVR()
 {
 	// then_0
 	CalculateCharacterScale();
@@ -258,22 +216,17 @@ void UZeroPay_BodyIKComponentBase_r1::SolveFull()
 	// Legs are driven by animation now; only the jump-blend state is still needed.
 	CalculateJumpState();
 
-	// then_3  (hand poses)
+	// then_2  (hand poses)
 	{
 		UpdateHandPose(ESide::Left);
 		UpdateHandPose(ESide::Right);
 	}
 
-	// then_4
+	// then_3
 	DrawDebugBodyIK();
 }
 
-// =============================================================================
-// SolveReduced  -  Mid tier: full torso + arms, cheap feet (NO line traces),
-//                  no per-bone finger pose, no debug draw.
-// The dropped pair of LineTraceSingleByProfile calls is the dominant saving.
-// =============================================================================
-void UZeroPay_BodyIKComponentBase_r1::SolveReduced()
+void UZeroPay_BodyIKComponentBase_r1::SolveQuest3()
 {
 	CalculateCharacterScale();
 	ProcessInputs();
@@ -281,35 +234,18 @@ void UZeroPay_BodyIKComponentBase_r1::SolveReduced()
 	CalculateShoulderCenterAndNeck();
 	CalculateDependentTransforms();
 
+	// Full arm solve — shoulders + upper arms now match PCVR.
 	CalculateClavicleOffset(ESide::Left);
-	const float LeftHandElbowInfluence = CalculateShoulderTransform(ESide::Left);
-	SolveArm(ESide::Left, LeftHandElbowInfluence);
+	const float LeftInfluence = CalculateShoulderTransform(ESide::Left);
+	SolveArm(ESide::Left, LeftInfluence);
 	ClampHandPosition(ESide::Left);
 
 	CalculateClavicleOffset(ESide::Right);
-	const float RightHandElbowInfluence = CalculateShoulderTransform(ESide::Right);
-	SolveArm(ESide::Right, RightHandElbowInfluence);
+	const float RightInfluence = CalculateShoulderTransform(ESide::Right);
+	SolveArm(ESide::Right, RightInfluence);
 	ClampHandPosition(ESide::Right);
 
-	CalculateJumpState();
-}
-
-// =============================================================================
-// SolveMinimal  -  Far tier: full torso, straight-line arms (no twist/interp),
-//                  cheap feet, no finger pose, no debug draw.
-// =============================================================================
-void UZeroPay_BodyIKComponentBase_r1::SolveMinimal()
-{
-	CalculateCharacterScale();
-	ProcessInputs();
-	CalculateBodyPrerequisites();
-	CalculateShoulderCenterAndNeck();
-	CalculateDependentTransforms();
-
-	SolveArmCheap(ESide::Left);
-	SolveArmCheap(ESide::Right);
-
-	CalculateJumpState();
+	CalculateJumpState();	
 }
 
 // =============================================================================

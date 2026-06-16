@@ -26,11 +26,9 @@ enum class ESide : uint8
 UENUM(BlueprintType)
 enum class EBodyIKDetailTier : uint8
 {
-	Hero  UMETA(DisplayName = "Hero (local, full rate)"),       // full solve, every frame
-	Near  UMETA(DisplayName = "Near (full, rate-limited)"),     // full solve, throttled rate
-	Mid   UMETA(DisplayName = "Mid (no foot traces)"),          // torso + arms, cheap feet, no traces
-	Far   UMETA(DisplayName = "Far (cheap arms)"),              // torso + cheap arms, cheap feet, low rate
-	Culled UMETA(DisplayName = "Culled (skipped)")              // off-screen / beyond cutoff - not solved
+	PCVR  UMETA(DisplayName = "PCVR (Rendering on PC)"),    
+	Quest3 UMETA(DisplayName = "Quest 3 (Cheap Arms)"),     
+	Culled UMETA(DisplayName = "Culled (skipped)")     
 };
 
 USTRUCT(BlueprintType)
@@ -151,7 +149,6 @@ protected:
 	// Runtime
 	// -------------------------------------------------------------------------
 
-	// [BP-FIX] was bool; the Blueprint stores the body yaw in degrees here.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Runtime", meta = (AllowPrivateAccess = "true"))
 	float LastBodyYaw = 0.0f;
 
@@ -207,7 +204,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Runtime", meta = (AllowPrivateAccess = "true"))
 	float BodyYawDueToVelocity = 0.0f;
 
-	// [BP-FIX] was bool; the Blueprint stores the body pitch in degrees here.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Runtime", meta = (AllowPrivateAccess = "true"))
 	float LastBodyPitch = 0.0f;
 
@@ -244,7 +240,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Runtime", meta = (AllowPrivateAccess = "true"))
 	float CurrentHMDHeight = 0.0f;
 
-	// Blueprint variable name "SpeedAlphaNoOverdrive".
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Runtime", meta = (AllowPrivateAccess = "true"))
 	float SpeedAlphaNoOverride = 0.0f;
 
@@ -402,63 +397,20 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Sounds", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USoundBase> ChangeCharacterSound = nullptr;
 
-
 	// -------------------------------------------------------------------------
 	// Settings - Detail Scaling (LOD)
-	//
-	// Drives how UpdateBody degrades for non-local avatars. The local player
-	// (bIsLocalPlayer) is always solved at full rate. Everyone else is gated
-	// first by whether their mesh was recently rendered, then tiered by distance
-	// from the viewer's camera. Each tier below Hero also throttles its solve
-	// rate, so distant players solve a few times a second instead of every frame.
 	// -------------------------------------------------------------------------
-
-	// Master switch. When false, every avatar solves at full rate (original behaviour).
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true"))
-	bool bEnableDetailScaling = true;
-
-	// Set true on the locally-controlled avatar so it never degrades.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true"))
-	bool bIsLocalPlayer = false;
-
-	// Distance (cm) from the viewer camera at/under which a visible avatar uses the full solve.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float NearTierDistance = 900.0f;
-
-	// Distance (cm) up to which the avatar keeps full arms but drops foot traces.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float MidTierDistance = 1500.0f;
 
 	// Distance (cm) beyond which the avatar is culled (not solved) unless still rendered closer.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float FarTierDistance = 2500.0f;
 
-	// Solve rates (Hz) per tier. Hero is always every frame and ignores these.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true", ClampMin = "1.0"))
-	float NearTierRateHz = 45.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true", ClampMin = "1.0"))
-	float MidTierRateHz = 20.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true", ClampMin = "1.0"))
-	float FarTierRateHz = 8.0f;
-
-	// How recently (seconds) the mesh must have been rendered to avoid being culled.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float RenderedTolerance = 0.5f;
-
 	// Runtime: tier chosen on the last UpdateBody call (read-only, for debugging/inspection).
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true"))
-	EBodyIKDetailTier CurrentDetailTier = EBodyIKDetailTier::Hero;
-
-	// Runtime: accumulates delta time to drive the per-tier rate gate.
-	float TimeSinceLastSolve = 0.0f;
+	EBodyIKDetailTier CurrentDetailTier = EBodyIKDetailTier::PCVR ;
 
 public:
-	// Call once on the locally-controlled avatar (e.g. on possession) so it is treated as Hero.
-	UFUNCTION(BlueprintCallable, Category = "ZeroPay|BodyIK")
-	void SetIsLocalPlayer(bool bInIsLocalPlayer) { bIsLocalPlayer = bInIsLocalPlayer; }
-
+	
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|BodyIK")
 	void Initialize(USceneComponent* InHead, USceneComponent* InLeftWrist, USceneComponent* InRightWrist, USceneComponent* InCapsuleBase, USkeletalMeshComponent* InCharacterMesh, UCharacterMovementComponent* InCharacterMovementComponent);
 
@@ -471,8 +423,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|BodyIK")
 	void ChangeCharacter(FName InCharacterName);
 
-	// [BP-FIX] CycleCharacters drives ChangeCharacterAsync in the Blueprint. The async
-	// graph itself is not part of the supplied export; here it forwards to ChangeCharacter.
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|BodyIK")
 	void ChangeCharacterAsync(FName InCharacterName);
 
@@ -485,11 +435,9 @@ public:
 protected:
 	// ---- Detail scaling (LOD) ----
 	EBodyIKDetailTier ComputeDetailTier() const;
-	float GetSolveIntervalForTier(EBodyIKDetailTier Tier) const;
-	void SolveFull();      // full fidelity (torso + arms + hand poses + debug)
-	void SolveReduced();   // torso + full arms, no finger pose, no debug
-	void SolveMinimal();   // torso + cheap arms, no finger pose, no debug
-	void SolveArmCheap(ESide Side); // shoulder + straight-line elbow, no twist/interp
+	void SolvePCVR();
+	void SolveQuest3(); 
+	void SolveArmCheap(ESide Side); 
 
 	void ProcessInputs();
 	FTransform ProcessHandInput(const FTransform& HandInput, ESide Hand) const;
@@ -516,8 +464,8 @@ protected:
 
 	float GetWorldDeltaSecondsSafe() const;
 
-	static FRotator GetHMDYaw(const FRotator& Rotation);                  // [BP-FIX] returns FRotator (PureYaw)
-	static float AddPastThreshold(float Value, float Threshold, float Scalar); // [BP-FIX] gains Scalar
+	static FRotator GetHMDYaw(const FRotator& Rotation);                
+	static float AddPastThreshold(float Value, float Threshold, float Scalar); 
 	static FTransform TransformInLS(const FTransform& LocalSpace, const FVector& Transform);
 	static float Deadzone(float Value, float RangeMin, float RangeMax);
 	static FTransform AddRotation(const FTransform& Transform, const FRotator& Rotation);
