@@ -20,15 +20,12 @@ enum class ESide : uint8
 	None UMETA(DisplayName = "None")
 };
 
-// Level-of-detail tier chosen each frame for the body IK solve. Higher tiers are
-// cheaper. The local player is always Hero; everyone else is selected by whether
-// their mesh is on-screen and how far they are from the viewer.
 UENUM(BlueprintType)
 enum class EBodyIKDetailTier : uint8
 {
-	PCVR  UMETA(DisplayName = "PCVR (Rendering on PC)"),    
-	Quest3 UMETA(DisplayName = "Quest 3 (Cheap Arms)"),     
-	Culled UMETA(DisplayName = "Culled (skipped)")     
+	Full		UMETA(DisplayName = "Full (all IK)"),    
+	IgnoreHands UMETA(DisplayName = "Ingore hands"),
+	Culled		 UMETA(DisplayName = "Culled (skipped)")     
 };
 
 USTRUCT(BlueprintType)
@@ -401,13 +398,20 @@ protected:
 	// Settings - Detail Scaling (LOD)
 	// -------------------------------------------------------------------------
 
+	// Distance (cm) beyond which the avatar hands are not updated
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float HandUpdateTierDistance = 1000.0f;
+
 	// Distance (cm) beyond which the avatar is culled (not solved) unless still rendered closer.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float FarTierDistance = 2500.0f;
 
 	// Runtime: tier chosen on the last UpdateBody call (read-only, for debugging/inspection).
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Settings|DetailScaling", meta = (AllowPrivateAccess = "true"))
-	EBodyIKDetailTier CurrentDetailTier = EBodyIKDetailTier::PCVR ;
+	EBodyIKDetailTier CurrentDetailTier = EBodyIKDetailTier::Full ;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Settings|DetailScaling")
+	float CharacterDist;
 
 public:
 	
@@ -434,9 +438,8 @@ public:
 
 protected:
 	// ---- Detail scaling (LOD) ----
-	EBodyIKDetailTier ComputeDetailTier() const;
-	void SolvePCVR();
-	void SolveQuest3(); 
+	EBodyIKDetailTier ComputeDetailTier() ;
+	void SolveIK();
 	void SolveArmCheap(ESide Side); 
 
 	void ProcessInputs();

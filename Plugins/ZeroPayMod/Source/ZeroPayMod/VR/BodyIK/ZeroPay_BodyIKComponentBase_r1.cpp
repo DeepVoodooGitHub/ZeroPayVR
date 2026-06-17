@@ -142,29 +142,27 @@ void UZeroPay_BodyIKComponentBase_r1::UpdateBody()
 	if (!Initialized)
 		return;
 
-	const EBodyIKDetailTier Tier = ComputeDetailTier();
-	CurrentDetailTier = Tier;
+	CurrentDetailTier = ComputeDetailTier();
 
-	if (Tier == EBodyIKDetailTier::Culled)
+//	const UEnum* DetailTierEnum = StaticEnum<EBodyIKDetailTier>();
+//	const FString DetailTierString = DetailTierEnum
+		//? DetailTierEnum->GetDisplayNameTextByValue(static_cast<int64>(CurrentDetailTier)).ToString()
+		//: FString::Printf(TEXT("Unknown(%d)"), static_cast<int32>(CurrentDetailTier));
+
+	//UE_LOG(LogTemp, Warning, TEXT("C++ CharacterDist=%f | CurrentDetailTier=%s"),
+//		CharacterDist,
+		//*DetailTierString);
+
+	if (CurrentDetailTier == EBodyIKDetailTier::Culled)
 		return;
 
-	switch (Tier)
-	{
-	case EBodyIKDetailTier::PCVR:
-		SolvePCVR();
-		break;
-	case EBodyIKDetailTier::Quest3:
-		SolveQuest3();
-		break;
-	default:
-		break;
-	}
+	SolveIK();
 }
 
 // =============================================================================
 // ComputeDetailTier
 // =============================================================================
-EBodyIKDetailTier UZeroPay_BodyIKComponentBase_r1::ComputeDetailTier() const
+EBodyIKDetailTier UZeroPay_BodyIKComponentBase_r1::ComputeDetailTier() 
 {
 	// Off-screen / occluded avatars are the cheapest, highest-value cull.
 	if (IsValid(CharacterMesh) && !CharacterMesh->WasRecentlyRendered(0.1f))
@@ -175,23 +173,22 @@ EBodyIKDetailTier UZeroPay_BodyIKComponentBase_r1::ComputeDetailTier() const
 	// Too Far?
 	const AActor* Owner = GetOwner();
 	const FVector BodyLoc = Owner ? Owner->GetActorLocation() : (IsValid(CharacterMesh) ? CharacterMesh->GetComponentLocation() : FVector::ZeroVector);
-	const float Dist = FVector::Dist(GetCachedViewLocation(GetWorld()), BodyLoc);
-	if (Dist >= FarTierDistance) 
+	CharacterDist = FVector::Dist(GetCachedViewLocation(GetWorld()), BodyLoc);
+
+	// Hand poses (if close enough)
+	if (CharacterDist >= HandUpdateTierDistance)
+	{
+		return EBodyIKDetailTier::IgnoreHands;
+	}
+	if (CharacterDist >= FarTierDistance)
 	{ 
 		return EBodyIKDetailTier::Culled; 
 	}
 
-
-#if 1 //PLATFORM_ANDROID
-	return EBodyIKDetailTier::Quest3;
-#else
-	return EBodyIKDetailTier::PCVR;
-#endif
-
-
+	return EBodyIKDetailTier::Full;
 }
 
-void UZeroPay_BodyIKComponentBase_r1::SolvePCVR()
+void UZeroPay_BodyIKComponentBase_r1::SolveIK()
 {
 	// then_0
 	CalculateCharacterScale();
@@ -216,7 +213,7 @@ void UZeroPay_BodyIKComponentBase_r1::SolvePCVR()
 	// Legs are driven by animation now; only the jump-blend state is still needed.
 	CalculateJumpState();
 
-	// then_2  (hand poses)
+	if (CurrentDetailTier == EBodyIKDetailTier::Full)
 	{
 		UpdateHandPose(ESide::Left);
 		UpdateHandPose(ESide::Right);
@@ -226,27 +223,6 @@ void UZeroPay_BodyIKComponentBase_r1::SolvePCVR()
 	DrawDebugBodyIK();
 }
 
-void UZeroPay_BodyIKComponentBase_r1::SolveQuest3()
-{
-	CalculateCharacterScale();
-	ProcessInputs();
-	CalculateBodyPrerequisites();
-	CalculateShoulderCenterAndNeck();
-	CalculateDependentTransforms();
-
-	// Full arm solve — shoulders + upper arms now match PCVR.
-	CalculateClavicleOffset(ESide::Left);
-	const float LeftInfluence = CalculateShoulderTransform(ESide::Left);
-	SolveArm(ESide::Left, LeftInfluence);
-	ClampHandPosition(ESide::Left);
-
-	CalculateClavicleOffset(ESide::Right);
-	const float RightInfluence = CalculateShoulderTransform(ESide::Right);
-	SolveArm(ESide::Right, RightInfluence);
-	ClampHandPosition(ESide::Right);
-
-	CalculateJumpState();	
-}
 
 // =============================================================================
 // SolveArmCheap  -  shoulder transform + straight midpoint elbow, no hand twist,
