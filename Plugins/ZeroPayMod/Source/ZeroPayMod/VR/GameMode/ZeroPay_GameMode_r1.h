@@ -42,6 +42,9 @@ public:
 
 	// INTERNAL - Used for Item Spawn Logic
 	UFUNCTION(BlueprintImplementableEvent, Category = "ZeroPay|GameMode")
-	bool Internal_GrabActor(const FString& ItemID, AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision, AActor* SpawnedActor);
+	AActor* Internal_SpawnItem(const FString& ItemID, AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision);
 
+	// INTERNAL - Used within main code base to grab a specific actor cleanly
+	UFUNCTION(BlueprintImplementableEvent, Category = "ZeroPay|GameMode")
+	bool Internal_GrabActor( AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision, AActor* SpawnedActor);
 };

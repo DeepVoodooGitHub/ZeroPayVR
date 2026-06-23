@@ -6,7 +6,7 @@
 #include "GripMotionControllerComponent.h"
 #include "VR/GameMode/ZeroPay_GameMode_r1.h"
 
-class FZeroPay_SpawnActor_LatentAction : public FPendingLatentAction
+class FZeroPay_SpawnItem_LatentAction : public FPendingLatentAction
 {
 public:
 
@@ -29,7 +29,7 @@ public:
 
 	bool bHasWaitedOneTick = false;
 
-	FZeroPay_SpawnActor_LatentAction(AZeroPay_GameMode_r1* InTargetGameMode, const FString& InItemID, AZeroPay_VRCharacterBase_r1* InOwningCharacter, UGripMotionControllerComponent* InGripMotionController, EZeroPayVRItemDefaultSpawnLocation InSpawnLocation, int InSpawnLocationIndex, EZeroPayVRItemSpawnCollision InSpawnCollision, AActor* InSpawnedActor, AActor*& InSpawnedActorOutput, bool& InAttachedCorrectlyOutput, const FLatentActionInfo& InLatentInfo)
+	FZeroPay_SpawnItem_LatentAction(AZeroPay_GameMode_r1* InTargetGameMode, const FString& InItemID, AZeroPay_VRCharacterBase_r1* InOwningCharacter, UGripMotionControllerComponent* InGripMotionController, EZeroPayVRItemDefaultSpawnLocation InSpawnLocation, int InSpawnLocationIndex, EZeroPayVRItemSpawnCollision InSpawnCollision, AActor* InSpawnedActor, AActor*& InSpawnedActorOutput, bool& InAttachedCorrectlyOutput, const FLatentActionInfo& InLatentInfo)
 		: TargetGameModePtr(InTargetGameMode)
 		, ItemID(InItemID)
 		, OwningCharacterPtr(InOwningCharacter)
@@ -64,7 +64,7 @@ public:
 
 		if (TargetGameMode && SpawnedActor)
 		{
-			bAttachedCorrectly = TargetGameMode->Internal_GrabActor(ItemID, OwningCharacter, GripMotionController, SpawnLocation, SpawnLocationIndex, SpawnCollision, SpawnedActor);
+			bAttachedCorrectly = TargetGameMode->Internal_GrabActor(OwningCharacter, GripMotionController, SpawnLocation, SpawnLocationIndex, SpawnCollision, SpawnedActor);
 		}
 
 		SpawnedActorOutput = SpawnedActor;
@@ -76,17 +76,18 @@ public:
 #if WITH_EDITOR
 	virtual FString GetDescription() const override
 	{
-		return TEXT("ZeroPay latent action: SpawnActor");
+		return TEXT("ZeroPay latent action: SpawnItem");
 	}
 #endif
 };
 
-void UZeroPay_LatentFunctionLibrary::SpawnActor(UObject* WorldContextObject, AZeroPay_GameMode_r1* TargetGameMode, const FString& ItemID, AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision, AActor*& SpawnedActor, bool& AttachedCorrectly, FLatentActionInfo LatentInfo)
+void UZeroPay_LatentFunctionLibrary::SpawnItem(UObject* WorldContextObject, AZeroPay_GameMode_r1* TargetGameMode, const FString& ItemID, AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision, AActor*& SpawnedActor, bool& AttachedCorrectly, EZeroPaySpawnItemLatentStartResult& StartResult, FLatentActionInfo LatentInfo)
 {
 	SpawnedActor = nullptr;
 	AttachedCorrectly = false;
+	StartResult = EZeroPaySpawnItemLatentStartResult::Failure;
 
-	if (!WorldContextObject || !TargetGameMode)
+	if (!WorldContextObject)
 	{
 		return;
 	}
@@ -98,14 +99,68 @@ void UZeroPay_LatentFunctionLibrary::SpawnActor(UObject* WorldContextObject, AZe
 		return;
 	}
 
-	FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
-
-	if (LatentActionManager.FindExistingAction<FZeroPay_SpawnActor_LatentAction>(LatentInfo.CallbackTarget, LatentInfo.UUID))
+	// GameMode only exists on the server, but this makes the authority check explicit.
+	if (World->GetNetMode() == NM_Client)
 	{
 		return;
 	}
 
-	SpawnedActor = TargetGameMode->Internal_SpawnActor(ItemID, OwningCharacter, GripMotionController, SpawnLocation, SpawnLocationIndex, SpawnCollision);
+	if (TargetGameMode == nullptr)
+	{
+		AGameModeBase* AuthGameMode = World->GetAuthGameMode();
+		if (!AuthGameMode)
+		{
+			return;
+		}
 
-	LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FZeroPay_SpawnActor_LatentAction(TargetGameMode, ItemID, OwningCharacter, GripMotionController, SpawnLocation, SpawnLocationIndex, SpawnCollision, SpawnedActor, SpawnedActor, AttachedCorrectly, LatentInfo));
+		// This succeeds for AZeroPay_GameMode_r1 AND any class derived from it.
+		TargetGameMode = Cast<AZeroPay_GameMode_r1>(AuthGameMode);
+		if (!TargetGameMode)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Current GameMode is not based on AZeroPay_GameMode_r1. Found: %s"), *GetNameSafe(AuthGameMode));
+			return;
+		}
+	}
+
+	if (!LatentInfo.CallbackTarget)
+	{
+		return;
+	}
+
+	FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
+
+	if (LatentActionManager.FindExistingAction<FZeroPay_SpawnItem_LatentAction>(LatentInfo.CallbackTarget, LatentInfo.UUID))
+	{
+		// A latent action for this node is already pending.
+		// Treat this as success because the latent Completed pin should still fire later.
+		StartResult = EZeroPaySpawnItemLatentStartResult::Success;
+		return;
+	}
+
+	SpawnedActor = TargetGameMode->Internal_SpawnItem(ItemID, OwningCharacter, GripMotionController, SpawnLocation, SpawnLocationIndex, SpawnCollision);
+
+	if (!SpawnedActor)
+	{
+		return;
+	}
+
+	LatentActionManager.AddNewAction(
+		LatentInfo.CallbackTarget,
+		LatentInfo.UUID,
+		new FZeroPay_SpawnItem_LatentAction(
+			TargetGameMode,
+			ItemID,
+			OwningCharacter,
+			GripMotionController,
+			SpawnLocation,
+			SpawnLocationIndex,
+			SpawnCollision,
+			SpawnedActor,
+			SpawnedActor,
+			AttachedCorrectly,
+			LatentInfo
+		)
+	);
+
+	StartResult = EZeroPaySpawnItemLatentStartResult::Success;
 }

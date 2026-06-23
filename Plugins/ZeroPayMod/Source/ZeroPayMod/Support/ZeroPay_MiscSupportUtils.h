@@ -49,8 +49,12 @@
 #include "Grippables/HandSocketComponent.h"
 
 #include "NavLinkCustomComponent.h"
+#include "VR/ZeroPay_VRCharacterBase_r1.h"
+#include "VR/GameMode/ZeroPay_GameMode_r1.h"
 
 #include "ZeroPay_MiscSupportUtils.generated.h"
+
+class UGripMotionControllerComponent;
 
 UENUM(BlueprintType)
 enum FDebugConsoleLevel
@@ -793,6 +797,42 @@ public:
 		Direction = NativeDirection;
 
 		return true;
+	}
+
+	// SERVER - Attempts to grab an actor with a particular grip motion controller
+	//          OwningCharacter must be valid, SpawnLocation defines where on the character it is "grabbed"
+	//          SpawnLocationIndex is for locations that have multiple points (like chest, etc.)
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "ZeroPay|Misc Support", meta = (WorldContext = "WorldContextObject"))
+	static bool GrabActor(UObject* WorldContextObject, AActor* ActorToGrab, AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision)
+	{
+
+		if (!WorldContextObject)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GrabActor() failed: WorldContextObject is null."));
+			return false;
+		}
+
+		if (!ActorToGrab)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GrabActor() failed: ActorToGrab is null."));
+			return false;
+		}
+
+		AGameModeBase* GameModeBase = UGameplayStatics::GetGameMode(WorldContextObject);
+		if (!GameModeBase)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GrabActor() failed: no GameMode found. This will return null on clients because GameMode only exists on the server."));
+			return false;
+		}
+
+		AZeroPay_GameMode_r1* ZeroPayGameMode = Cast<AZeroPay_GameMode_r1>(GameModeBase);
+		if (!ZeroPayGameMode)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("GrabActor() failed: GameMode is not AZeroPay_GameMode_r1. Actual class: %s"), *GameModeBase->GetClass()->GetName());
+			return false;
+		}
+
+		return ZeroPayGameMode->Internal_GrabActor(OwningCharacter, GripMotionController, SpawnLocation, SpawnLocationIndex, SpawnCollision, ActorToGrab);
 	}
 
 };
