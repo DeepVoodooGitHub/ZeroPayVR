@@ -19,3 +19,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay|Gun Anim Instance")
 	float indexFingerCurl = 0.0f ;	
 };
+
+
+UCLASS()
+class ZEROPAYMOD_API UZeroPayGunBase_Revolver_AnimInstance : public UZeroPayGunBase_AnimInstance
+{
+	GENERATED_BODY()
+
+public:
+
+	// Flag to "hold open" the barrel of the revolver
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay|Gun Anim Revolver Instance")
+	bool HoldOpen = false;
+};
