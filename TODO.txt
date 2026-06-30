@@ -14,3 +14,4 @@ TODO
   + Disable other players from "touching" any aspect of this, view only - make all panels and stuff replicate
   
 + Working on WaW Gun, the magazine needs switched over to bolt action and position checked.. then handle users
++ Sort out P movement, and P grips (i.e. trigger to charge, etc.)
