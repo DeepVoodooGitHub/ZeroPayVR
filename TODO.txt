@@ -16,3 +16,4 @@ TODO
 + Working on WaW Gun, the magazine needs switched over to bolt action and position checked.. then handle users
 + Sort out P movement, and P grips (i.e. trigger to charge, etc.)
 + Do "last few bullets" sounds
++ Arisaka bolt has hole
