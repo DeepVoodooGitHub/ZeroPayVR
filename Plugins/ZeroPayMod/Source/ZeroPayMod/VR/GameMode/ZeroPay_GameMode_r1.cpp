@@ -2,6 +2,34 @@
 
 #include "VR/GameMode/ZeroPay_GameMode_r1.h"
 
+
+void AZeroPay_GameMode_r1::PostInitializeComponents()
+{
+    Super::PostInitializeComponents();
+
+    PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+        this, &AZeroPay_GameMode_r1::HandlePostLoadMap);
+}
+
+void AZeroPay_GameMode_r1::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+    PostLoadMapHandle.Reset();
+
+    Super::EndPlay(EndPlayReason);
+}
+
+void AZeroPay_GameMode_r1::HandlePostLoadMap(UWorld* LoadedWorld)
+{
+    // Ignore broadcasts for other worlds (PIE instances, transition map).
+    if (LoadedWorld != GetWorld())
+    {
+        return;
+    }
+
+    OnPostLoadMap();
+}
+
 void AZeroPay_GameMode_r1::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
     // Default C++ behaviour: Super + config + (optional) logging

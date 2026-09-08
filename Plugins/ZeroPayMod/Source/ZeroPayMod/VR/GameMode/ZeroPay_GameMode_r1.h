@@ -20,6 +20,9 @@ class ZEROPAYMOD_API AZeroPay_GameMode_r1 : public AGameMode
 	GENERATED_BODY()
 	
 public:
+	virtual void PostInitializeComponents() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	
 	virtual void StartPlay() override;
@@ -47,4 +50,13 @@ public:
 	// INTERNAL - Used within main code base to grab a specific actor cleanly
 	UFUNCTION(BlueprintImplementableEvent, Category = "ZeroPay|GameMode")
 	bool Internal_GrabActor( AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision, AActor* SpawnedActor);
+
+protected:
+	// SERVER ONLY - Fired once the map this GameMode lives in has finished loading
+	UFUNCTION(BlueprintImplementableEvent, Category = "ZeroPay|GameMode", meta = (DisplayName = "On Post Load Map"))
+	void OnPostLoadMap();
+private:
+	void HandlePostLoadMap(UWorld* LoadedWorld);
+
+	FDelegateHandle PostLoadMapHandle;
 };

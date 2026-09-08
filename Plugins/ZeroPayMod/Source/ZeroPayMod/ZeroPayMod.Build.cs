@@ -43,7 +43,8 @@ public class ZeroPayMod : ModuleRules
                 "Niagara",
                 "NavigationSystem",
                 "HeadMountedDisplay",
-                "XRBase"
+                "XRBase",
+                "EngineSettings"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );

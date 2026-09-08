@@ -73,7 +73,7 @@ struct FZeroPayMod_Definition
 
 	// What is exposed in this "mod"? Can be multiple (unless "full mod")
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mods", meta = (Bitmask, BitmaskEnum = "/Script/ZeroPayModCore.EUGCTagCategory"))
-	int32 ModCategoryFlags;
+	int32 ModCategoryFlags = 0 ;
 
 	// What game-modes are supported by any assets (mostly for maps, rather than in-world assets)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mods", meta = (Bitmask, BitmaskEnum = "/Script/ZeroPayModCore.EUGCSupportedGamemodes"))
@@ -103,6 +103,11 @@ struct FZeroPayMod_Definition
 	// Assuming the mod is "full-mod", "game-mode", or similar. 
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition", meta = (AllowAbstract = false))
 	TObjectPtr<UUserDefinedStruct> ModSettingsStruct;
+
+	// (Optional) Points to an object in the /Game/ZeroPayMods/UGCxxxxxx/ path that may be used to initialise the mod
+	// this is useful for register guns, items, menus, etc. with ZeroPay when the mod loads into the client
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPayMod Definition")
+	TSoftClassPtr<UObject> InitUGCObject;
 
 	// Always cook the content in these paths, for certain items (such as game-modes) you may not have a level or something that can be
     // used to detect references that are actually used. If no references exist then the asset is never cooked and packed into your

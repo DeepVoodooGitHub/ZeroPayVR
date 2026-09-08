@@ -835,4 +835,31 @@ public:
 		return ZeroPayGameMode->Internal_GrabActor(OwningCharacter, GripMotionController, SpawnLocation, SpawnLocationIndex, SpawnCollision, ActorToGrab);
 	}
 
+	// Provides a boolean based on whether a data table uses a particular row structure, needed as DataTables are "anonymous" and we may want to 
+	// process random data tables (i.e. Data Tables To Mount in UGC's)
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support", meta = (DisplayName = "Does Data Table Use Row Struct?"))
+	static bool DoesDataTableUseRowStruct(const UDataTable* Table, UScriptStruct* RowStruct)
+	{
+		if (!Table || !RowStruct)
+		{
+			return false;
+		}
+
+		const UScriptStruct* TableStruct = Table->GetRowStruct();
+		if (!TableStruct)
+		{
+			return false;
+		}
+
+		if (TableStruct == RowStruct)
+		{
+			return true;
+		}
+
+		// Also accept a child struct with an identical memory layout — the same rule
+		// Get Data Table Row applies internally. No-op for Blueprint structs, which
+		// don't support inheritance.
+		return RowStruct->IsChildOf(TableStruct) && FStructUtils::TheSameLayout(RowStruct, TableStruct);
+	}
+
 };
