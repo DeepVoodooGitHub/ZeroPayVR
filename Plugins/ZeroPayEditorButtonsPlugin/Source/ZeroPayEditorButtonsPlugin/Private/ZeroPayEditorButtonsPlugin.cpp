@@ -26,6 +26,10 @@
 #include <windows.h>
 #include "Windows/HideWindowsPlatformTypes.h"
 #include "Subsystems/AssetEditorSubsystem.h"
+#include "Engine/World.h"
+#include "Engine/Level.h"
+#include "GameFramework/Actor.h"
+#include "FileHelpers.h" 
 #include "IBlutilityModule.h"
 
 static const FName ZeroPayEditorButtonsPluginTabName("ZeroPayEditorButtonsPlugin");
@@ -497,6 +501,88 @@ FReducerResults UZeroPayEditorButtonsFunctionLibrary::ReduceLevel(UZeroPayMod_De
 
 	return FReducerResults() ;
 }
+
+
+AActor* UZeroPayEditorButtonsFunctionLibrary::LoadLevelAndFindActorOfClass(TSoftObjectPtr<UWorld> Level,TSubclassOf<AActor> ActorClass,bool& bLevelWasAlreadyLoaded)
+{
+	bLevelWasAlreadyLoaded = false;
+
+	if (Level.IsNull() || !ActorClass)
+	{
+		return nullptr;
+	}
+
+	bLevelWasAlreadyLoaded = Level.IsValid();
+
+	UWorld* World = Level.LoadSynchronous();
+
+	if (!World || !World->PersistentLevel)
+	{
+		return nullptr;
+	}
+
+	for (AActor* Actor : World->PersistentLevel->Actors)
+	{
+		if (Actor && Actor->IsA(ActorClass))
+		{
+			return Actor;
+		}
+	}
+
+	return nullptr;
+}
+
+bool UZeroPayEditorButtonsFunctionLibrary::UnloadInspectedLevel(TSoftObjectPtr<UWorld> Level)
+{
+	if (Level.IsNull())
+	{
+		return false;
+	}
+
+	UWorld* World = Level.Get();
+
+	if (!World)
+	{
+		// Already unloaded.
+		return true;
+	}
+
+	UPackage* Package = World->GetOutermost();
+
+	if (!Package)
+	{
+		return false;
+	}
+
+	TArray<UPackage*> PackagesToUnload;
+	PackagesToUnload.Add(Package);
+
+	bool bAnyPackagesUnloaded = false;
+	FText ErrorMessage;
+
+	UEditorLoadingAndSavingUtils::UnloadPackages(
+		PackagesToUnload,
+		bAnyPackagesUnloaded,
+		ErrorMessage
+	);
+
+	if (!bAnyPackagesUnloaded)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("Failed to unload '%s': %s"),
+			*Package->GetName(),
+			*ErrorMessage.ToString()
+		);
+
+		return false;
+	}
+
+	return true;
+}
+
+
 
 #undef LOCTEXT_NAMESPACE
 	

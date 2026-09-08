@@ -388,4 +388,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
 	static FReducerResults ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
 
+	UFUNCTION(BlueprintCallable, Category = "ZeroPayMod Editor")
+	static AActor* LoadLevelAndFindActorOfClass(TSoftObjectPtr<UWorld> Level, TSubclassOf<AActor> ActorClass, bool& bLevelWasAlreadyLoaded);
+
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Editor")
+	static bool UnloadInspectedLevel(TSoftObjectPtr<UWorld> Level);
 };

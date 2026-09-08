@@ -52,6 +52,8 @@
 #include "VR/ZeroPay_VRCharacterBase_r1.h"
 #include "VR/GameMode/ZeroPay_GameMode_r1.h"
 
+#include "GameMapsSettings.h"
+	
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
 class UGripMotionControllerComponent;
@@ -860,6 +862,13 @@ public:
 		// Get Data Table Row applies internally. No-op for Blueprint structs, which
 		// don't support inheritance.
 		return RowStruct->IsChildOf(TableStruct) && FStructUtils::TheSameLayout(RowStruct, TableStruct);
+	}
+
+	// Return the default map, usually for "returning to main menu"
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Misc Support")
+	static FString GetProjectGameDefaultMap()
+	{
+		return UGameMapsSettings::GetGameDefaultMap(EDefaultMapRequestType::Client);
 	}
 
 };
