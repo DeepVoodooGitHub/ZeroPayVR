@@ -871,4 +871,40 @@ public:
 		return UGameMapsSettings::GetGameDefaultMap(EDefaultMapRequestType::Client);
 	}
 
+	// Editor only - Used to return the UGC of the active world
+	UFUNCTION(BlueprintPure,Category = "ZeroPay|Misc Support", meta = (WorldContext = "WorldContextObject"))
+	static int64 GetCurrentLevelUGCId(const UObject* WorldContextObject)
+	{
+#if WITH_EDITOR
+		if (!WorldContextObject || !GEngine)
+		{
+			return 0;
+		}
+
+		UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull
+		);
+
+		if (!World)
+		{
+			return 0;
+		}
+
+		// Example:
+		// /Game/ZeroPayMods/UGC6106253/Levels/LVL_Weapons_WaW_TestHarness
+		const FString WorldPackagePath = World->GetOutermost()->GetName();
+
+		static const FRegexPattern UGCPattern( TEXT("/Game/ZeroPayMods/UGC([0-9]+)/") );
+
+		FRegexMatcher Matcher(UGCPattern, WorldPackagePath);
+
+		if (Matcher.FindNext())
+		{
+			const FString UGCNumberString = Matcher.GetCaptureGroup(1);
+
+			return FCString::Atoi64(*UGCNumberString);
+		}
+#endif
+		return 0;
+	}
+
 };

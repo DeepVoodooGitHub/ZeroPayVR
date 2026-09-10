@@ -38,13 +38,6 @@ void UZeroPay_GameInstance_r1::HandlePostLoadMap(UWorld* LoadedWorld)
         return;
     }
 
-    // Client-side only. NM_Client for a real client, NM_ListenServer for a host,
-    // NM_Standalone for single player — all have a local viewport.
-    if (LoadedWorld->GetNetMode() == NM_DedicatedServer)
-    {
-        return;
-    }
-
     // Ignore the brief transition map used by seamless travel.
     const FSoftObjectPath& TransitionMap = UGameMapsSettings::GetGameMapsSettings()->TransitionMap;
     if (!TransitionMap.IsNull() && LoadedWorld->GetMapName().Contains(TransitionMap.GetAssetName()))
@@ -52,8 +45,19 @@ void UZeroPay_GameInstance_r1::HandlePostLoadMap(UWorld* LoadedWorld)
         return;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("ZeroPay: client map loaded - %s"), *LoadedWorld->GetMapName());
+    if (LoadedWorld->GetNetMode() == NM_Client)
+    {
+        UE_LOG(LogTemp, Log, TEXT("ZeroPay: client map loaded - %s"), *LoadedWorld->GetMapName());
 
-    OnClientMapLoaded.Broadcast(LoadedWorld);
-    K2_OnClientMapLoaded(LoadedWorld);
+        OnClientMapLoaded.Broadcast(LoadedWorld);
+        K2_OnClientMapLoaded(LoadedWorld);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Log, TEXT("ZeroPay: server map loaded - %s"), *LoadedWorld->GetMapName());
+
+        OnServerMapLoaded.Broadcast(LoadedWorld);
+        K2_OnServerMapLoaded(LoadedWorld);
+    }
+    
 }

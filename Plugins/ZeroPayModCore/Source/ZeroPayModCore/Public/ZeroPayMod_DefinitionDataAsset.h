@@ -107,7 +107,7 @@ struct FZeroPayMod_Definition
 	// (Optional) Points to an object in the /Game/ZeroPayMods/UGCxxxxxx/ path that may be used to initialise the mod
 	// this is useful for register guns, items, menus, etc. with ZeroPay when the mod loads into the client
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-	TSoftClassPtr<UObject> InitUGCObject;
+	TSoftClassPtr<AActor> InitUGCObject;
 
 	// Always cook the content in these paths, for certain items (such as game-modes) you may not have a level or something that can be
     // used to detect references that are actually used. If no references exist then the asset is never cooked and packed into your
