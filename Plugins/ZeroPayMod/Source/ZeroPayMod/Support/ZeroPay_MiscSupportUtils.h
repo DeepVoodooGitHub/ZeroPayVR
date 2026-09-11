@@ -907,4 +907,60 @@ public:
 		return 0;
 	}
 
+	/* Editor Only - return if Level is in valid folder is valid */
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Mods")
+	static bool IsWorldInUGCLevelsFolder(const TSoftObjectPtr<UWorld>& World)
+	{
+#if WITH_EDITOR
+
+		if (World.IsNull())
+		{
+			return false;
+		}
+
+		const FSoftObjectPath SoftPath = World.ToSoftObjectPath();
+
+		// e.g.
+		// /Game/ZeroPayMods/UGC6055676/Levels/LVL_DerRiese_Persistent
+		const FString PackageName = SoftPath.GetLongPackageName();
+
+		static const FString RootPath = TEXT("/Game/ZeroPayMods/");
+
+		if (!PackageName.StartsWith(RootPath))
+		{
+			return false;
+		}
+
+		// Strip "/Game/ZeroPayMods/"
+		const FString RelativePath = PackageName.Mid(RootPath.Len());
+
+		TArray<FString> Parts;
+		RelativePath.ParseIntoArray(Parts, TEXT("/"), true);
+
+		// Need at least:
+		// UGCxxxx / Levels / MapName
+		if (Parts.Num() < 3)
+		{
+			return false;
+		}
+
+		if (!Parts[0].StartsWith(TEXT("UGC"), ESearchCase::IgnoreCase))
+		{
+			return false;
+		}
+
+		if (!Parts[1].Equals(TEXT("Levels"), ESearchCase::IgnoreCase))
+		{
+			return false;
+		}
+#endif
+		return true;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Mods")
+	static FString GetLongPackageNameFromWorldSoftReference(TSoftObjectPtr<UWorld> World)
+	{
+		return World.ToSoftObjectPath().GetLongPackageName();
+	}
+
 };

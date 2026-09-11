@@ -8,6 +8,8 @@
 #include "AssetRegistry/AssetRegistryState.h"
 #include "Modules/ModuleManager.h"
 #include "Misc/FileHelper.h"
+#include "AssetRegistry/IAssetRegistry.h"
+#include "Misc/PackageName.h"
 #include "Serialization/ArrayReader.h"
 
 UZeroPay_PakEngine* UZeroPay_PakEngine::Instance = nullptr;
@@ -121,6 +123,12 @@ bool UZeroPay_PakEngineLibrary::GetPakFileText(const FString& AssetPath, FString
 {
     return UZeroPay_PakEngine::Get()->ReadStringFromPak(AssetPath, String);
 }
+
+bool UZeroPay_PakEngineLibrary::ValidateHardPackageDependencies(const FSoftObjectPath& RootAsset, TArray<FString>& OutMissingPackages)
+{
+    return UZeroPay_PakEngine::Get()->ValidateHardPackageDependencies(RootAsset, OutMissingPackages);
+}
+
 
 /* */
 
@@ -274,4 +282,153 @@ UClass* UZeroPay_PakEngine::LoadClassFromPak(const FString& AssetPath)
 bool UZeroPay_PakEngine::ReadStringFromPak(const FString& AssetPath, FString& OutStr)
 {
     return FFileHelper::LoadFileToString(OutStr, *AssetPath);
+}
+
+bool UZeroPay_PakEngine::ValidateHardPackageDependencies(
+    const FSoftObjectPath& RootAsset,
+    TArray<FString>& OutMissingPackages)
+{
+    OutMissingPackages.Reset();
+
+    const FString RootPackageName = RootAsset.GetLongPackageName();
+
+    if (RootPackageName.IsEmpty())
+    {
+        UE_LOG(LogTemp, Error,
+            TEXT("ValidateHardPackageDependencies: Invalid root asset '%s'"),
+            *RootAsset.ToString());
+
+        OutMissingPackages.Add(TEXT("Invalid root package"));
+        return false;
+    }
+
+    IAssetRegistry& AssetRegistry =
+        FModuleManager::LoadModuleChecked<FAssetRegistryModule>(
+            TEXT("AssetRegistry")).Get();
+
+    TArray<FName> Pending;
+    TSet<FName> Queued;
+    TSet<FName> Visited;
+
+    const FName RootPackage(*RootPackageName);
+
+    Pending.Add(RootPackage);
+    Queued.Add(RootPackage);
+
+    int32 PackagesInspected = 0;
+    int32 DependenciesChecked = 0;
+
+    while (!Pending.IsEmpty())
+    {
+        const FName CurrentPackage = Pending.Pop();
+        Queued.Remove(CurrentPackage);
+
+        if (Visited.Contains(CurrentPackage))
+        {
+            continue;
+        }
+
+        Visited.Add(CurrentPackage);
+        ++PackagesInspected;
+
+        const FString CurrentPackageString =
+            CurrentPackage.ToString();
+
+        // Resolve the package to its mounted file.
+        FString CurrentFilename;
+
+        if (!FPackageName::DoesPackageExist(
+            CurrentPackageString,
+            &CurrentFilename,
+            false))
+        {
+            OutMissingPackages.Add(CurrentPackageString);
+
+            UE_LOG(LogTemp, Error,
+                TEXT("ValidateHardPackageDependencies: Missing package '%s'"),
+                *CurrentPackageString);
+
+            return false;
+        }
+
+        // Read dependency information directly from the mounted package.
+        IAssetRegistry::FLoadPackageRegistryData PackageData(
+            true // bGetDependencies
+        );
+
+        AssetRegistry.LoadPackageRegistryData(
+            CurrentFilename,
+            PackageData);
+
+        // If UE couldn't read anything from a package that definitely
+        // exists, treat validation as failed rather than claiming success.
+        if (PackageData.Data.IsEmpty() &&
+            PackageData.DataDependencies.IsEmpty())
+        {
+            OutMissingPackages.Add(CurrentPackageString);
+
+            UE_LOG(LogTemp, Error,
+                TEXT("ValidateHardPackageDependencies: Unable to inspect package '%s'"),
+                *CurrentPackageString);
+
+            return false;
+        }
+
+        for (const FName& Dependency :
+            PackageData.DataDependencies)
+        {
+            const FString DependencyString =
+                Dependency.ToString();
+
+            // Ignore engine/module dependencies.
+            if (DependencyString.StartsWith(TEXT("/Script/")))
+            {
+                continue;
+            }
+
+            // Only validate dynamically-mounted ZeroPay mod packages.
+            if (!DependencyString.StartsWith(
+                TEXT("/Game/ZeroPayMods/")))
+            {
+                continue;
+            }
+
+            ++DependenciesChecked;
+
+            FString DependencyFilename;
+
+            if (!FPackageName::DoesPackageExist(
+                DependencyString,
+                &DependencyFilename,
+                false))
+            {
+                OutMissingPackages.Add(DependencyString);
+
+                UE_LOG(LogTemp, Error,
+                    TEXT("ValidateHardPackageDependencies: MISSING dependency '%s' referenced by '%s'"),
+                    *DependencyString,
+                    *CurrentPackageString);
+
+                return false;
+            }
+
+            // Inspect this dependency too, because the missing package
+            // may be indirect:
+            //
+            // Map -> TeleporterLogic -> missing external UGC asset
+            if (!Visited.Contains(Dependency) &&
+                !Queued.Contains(Dependency))
+            {
+                Pending.Add(Dependency);
+                Queued.Add(Dependency);
+            }
+        }
+    }
+
+    UE_LOG(LogTemp, Log,
+        TEXT("ValidateHardPackageDependencies: SUCCESS - %d packages inspected, %d UGC dependencies checked"),
+        PackagesInspected,
+        DependenciesChecked);
+
+    return true;
 }

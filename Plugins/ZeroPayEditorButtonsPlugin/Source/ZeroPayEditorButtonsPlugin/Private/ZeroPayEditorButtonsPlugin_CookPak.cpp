@@ -159,8 +159,15 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackWindows(UZeroPayMod_Definitio
 			/* Ignore any "game" folders, these will be skipped as the main game containts them and the mod
 			   will have a "soft" reference to it which will still load in-game */
 			bool bIgnoreGameAsset = false ;
-			if ((realignedrelativePakFilePath.StartsWith("../../../VRE/")) || (realignedrelativePakFilePath.StartsWith("../../../ZeroPay/")))
+
+			const FString BaseUGCPath = FString::Printf(TEXT("../../../ZeroPayMods/UGC%s/"), *UGCID);
+
+			if (realignedrelativePakFilePath.StartsWith(TEXT("../../../VRE/")) ||
+				realignedrelativePakFilePath.StartsWith(TEXT("../../../ZeroPay/")) ||
+				!realignedrelativePakFilePath.StartsWith(BaseUGCPath))
+			{
 				bIgnoreGameAsset = true;
+			}
 
 			if (!bIgnoreGameAsset)
 				generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
@@ -274,8 +281,14 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackAndroid(UZeroPayMod_Definitio
 			/* Ignore any "game" folders, these will be skipped as the main game containts them and the mod
 			   will have a "soft" reference to it which will still load in-game */
 			bool bIgnoreGameAsset = false;
-			if ((realignedrelativePakFilePath.StartsWith("../../../VRE/")) || (realignedrelativePakFilePath.StartsWith("../../../ZeroPay/")))
+			const FString BaseUGCPath = FString::Printf(TEXT("../../../ZeroPayMods/UGC%s/"), *UGCID);
+
+			if (realignedrelativePakFilePath.StartsWith(TEXT("../../../VRE/")) ||
+				realignedrelativePakFilePath.StartsWith(TEXT("../../../ZeroPay/")) ||
+				!realignedrelativePakFilePath.StartsWith(BaseUGCPath))
+			{
 				bIgnoreGameAsset = true;
+			}
 
 			if (!bIgnoreGameAsset)
 				generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";
@@ -386,8 +399,14 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 			/* Ignore any "game" folders, these will be skipped as the main game containts them and the mod
 			   will have a "soft" reference to it which will still load in-game */
 			bool bIgnoreGameAsset = false;
-			if ((realignedrelativePakFilePath.StartsWith("../../../VRE/")) || (realignedrelativePakFilePath.StartsWith("../../../ZeroPay/")))
+			const FString BaseUGCPath = FString::Printf(TEXT("../../../ZeroPayMods/UGC%s/"), *UGCID);
+
+			if (realignedrelativePakFilePath.StartsWith(TEXT("../../../VRE/")) ||
+				realignedrelativePakFilePath.StartsWith(TEXT("../../../ZeroPay/")) ||
+				!realignedrelativePakFilePath.StartsWith(BaseUGCPath))
+			{
 				bIgnoreGameAsset = true;
+			}
 
 			if (!bIgnoreGameAsset)
 				generatedPakListLine += "\"" + realignedFilePath + "\"   \"" + realignedrelativePakFilePath + "\" \n";

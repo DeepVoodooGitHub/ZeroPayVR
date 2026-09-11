@@ -8,7 +8,6 @@
 /* Linux implementation*/
 void UZeroPay_ModEngine::UnzipFileAsync(const FString& ZipFilePath, int64 ModID, const FOnUnzipSuccess& OnSuccess, const FOnUnzipFailure& OnFailure)
 {
-    OnFailure.ExecuteIfBound(TEXT("Not supported under Windows"));
     if (!FPaths::FileExists(ZipFilePath))
     {
         FString Error = FString::Printf(TEXT("ZIP file does not exist: %s"), *ZipFilePath);

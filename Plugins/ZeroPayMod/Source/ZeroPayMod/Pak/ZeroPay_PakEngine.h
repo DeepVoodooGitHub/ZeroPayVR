@@ -83,6 +83,11 @@ public:
 	/* Reads content as string */
 	UFUNCTION(BlueprintPure, Category = "ZeroPay Pak Management")
 	static bool GetPakFileText(const FString& AssetPath, FString& String);
+
+	/* Reads content as string */
+	UFUNCTION(BlueprintPure, Category = "ZeroPay Pak Management")
+	static bool ValidateHardPackageDependencies(const FSoftObjectPath& RootAsset, TArray<FString>& OutMissingPackages);
+
 };
 
 class ZEROPAYMOD_API FPakLoaderDirectoryVisitor : public IPlatformFile::FDirectoryVisitor
@@ -151,6 +156,7 @@ public:
 		return Cast<T>(StaticLoadObject(T::StaticClass(), nullptr, *Name));
 	}
 
-
 	bool ReadStringFromPak(const FString& AssetPath, FString& OutStr);
+
+	bool ValidateHardPackageDependencies(const FSoftObjectPath& RootAsset, TArray<FString>& OutMissingPackages);
 };
