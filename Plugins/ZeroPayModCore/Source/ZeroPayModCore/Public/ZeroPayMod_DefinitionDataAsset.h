@@ -99,6 +99,11 @@ struct FZeroPayMod_Definition
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	TSoftObjectPtr<UWorld> psvrlevel;
 
+	// A list of UGC's that this mod "depends" on; this mod will not load (if there are any hard references) to this UGC, and will 
+	// prevent the whole server from moving to any game that uses your UGC (so make sure you know it's OK to depend on it)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPayMod Definition")
+	TArray<FString> UGCDependancies;
+
 	// Points to a BP Structure that will be used for settings presented to the user when selecting this "mod" 
 	// Assuming the mod is "full-mod", "game-mode", or similar. 
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition", meta = (AllowAbstract = false))
@@ -128,10 +133,6 @@ public:
 	// Mod information
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	FZeroPayMod_Definition Definition;
-
-	// Dependant UGC's
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPayMod Definition")
-	TArray<FString> UGCDependancies;
 
 	// Normally true, unless you downloaded a "Source" Mod which contains usable assets but not the permissions to upload changes to it
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ZeroPayMod Definition")

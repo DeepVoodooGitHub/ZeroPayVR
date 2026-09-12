@@ -141,4 +141,43 @@ public:
 	{
 		return (ModCategoryFlags & (1 << static_cast<uint8>(InCategory))) != 0;
 	}
+
+	// .cpp
+
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|UGC|Conversion")
+	static int64 GetUGCIdFromString(const FString& UGCString)
+	{
+		// Must start with "UGC"
+		if (!UGCString.StartsWith(TEXT("UGC"), ESearchCase::CaseSensitive))
+		{
+			return -1;
+		}
+
+		// Everything after "UGC"
+		const FString NumberString = UGCString.Mid(3);
+
+		if (NumberString.IsEmpty())
+		{
+			return -1;
+		}
+
+		// Ensure every remaining character is a digit.
+		for (const TCHAR Character : NumberString)
+		{
+			if (!FChar::IsDigit(Character))
+			{
+				return -1;
+			}
+		}
+
+		// Parse safely, including checking for int64 overflow.
+		int64 UGCId = 0;
+
+		if (!LexTryParseString(UGCId, *NumberString))
+		{
+			return -1;
+		}
+
+		return UGCId;
+	}
 };

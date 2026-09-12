@@ -85,7 +85,7 @@ public:
 	static bool GetPakFileText(const FString& AssetPath, FString& String);
 
 	/* Reads content as string */
-	UFUNCTION(BlueprintPure, Category = "ZeroPay Pak Management")
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay Pak Management")
 	static bool ValidateHardPackageDependencies(const FSoftObjectPath& RootAsset, TArray<FString>& OutMissingPackages);
 
 };
