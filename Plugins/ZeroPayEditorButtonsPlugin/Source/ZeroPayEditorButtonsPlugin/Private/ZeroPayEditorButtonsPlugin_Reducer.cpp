@@ -60,15 +60,29 @@ FReducerResults FZeroPayEditorButtonsPluginModule::ReducePCVRLevelForQuest3(UZer
 	FString ReducedAssetMeshPath = FString::Printf(TEXT("/Game/ZeroPayMods/UGC%s/Levels/ReducedAssets/Meshes"), *dataAsset->Definition.UGCID);
 
 	/* Handle bad dataAsset */
-	if (dataAsset->Definition.pcvrlevel == nullptr)
+	if (dataAsset->Definition.pcvrlevel.IsNull())
 	{
 		LastMessage = "Error S1 - PCVR Level is not defined (in data asset in UGC folder)";
 		UpdateQuest3ReducerUIProgressField();
 		return returnValue ;
 	}
 
+	if (dataAsset->Definition.quest3level.IsNull())
+	{
+		LastMessage = "Error S1 - Quest3 Level is not defined (in data asset in UGC folder)";
+		UpdateQuest3ReducerUIProgressField();
+		return returnValue;
+	}
+
+	if (dataAsset->Definition.quest3level.Get()->PersistentLevel == nullptr)
+	{
+		LastMessage = "Error S2 - Quest3 Level not added to the persistent level!";
+		UpdateQuest3ReducerUIProgressField();
+		return returnValue;
+	}
+
 	/* Validate existing installation */
-	FFoundAssetInformation Result = ScanLevelActorsAndDirectory(dataAsset->Definition.quest3level->PersistentLevel, *ReducedAssetMeshPath);
+	FFoundAssetInformation Result = ScanLevelActorsAndDirectory(dataAsset->Definition.quest3level.Get()->PersistentLevel, *ReducedAssetMeshPath);
 	if ( (Result.FoundAssets > 0) || (Result.FoundInstances > 0) )
 	{
 		const FString DialogMessage = FString::Printf(TEXT("Warning!\n\nThere are %d found assets in the Context Browser (merged meshes, materials, etc.) that will be destroyed and recreated.\nThere are %d instanced actors in the Quest 3 level that will be destroyed and recreated.\n\nAre you sure? You cannot undo these changes later."), Result.FoundAssets, Result.FoundInstances );
@@ -94,7 +108,7 @@ FReducerResults FZeroPayEditorButtonsPluginModule::ReducePCVRLevelForQuest3(UZer
 	/* >>> Delete old things */
 	if (!reducerSettings->MeshReductionSettings.bDryRun)
 	{
-		bool bDeletionSuccess = DeleteActorsAndAssets(dataAsset->Definition.quest3level->PersistentLevel, *ReducedAssetMeshPath);
+		bool bDeletionSuccess = DeleteActorsAndAssets(dataAsset->Definition.quest3level.Get()->PersistentLevel, *ReducedAssetMeshPath);
 		if (!bDeletionSuccess)
 		{
 			EAppReturnType::Type DialogResult = FMessageDialog::Open(EAppMsgType::Ok, FText::FromString("Error, failed to delete existing Quest 3 level 'ReducedAssets' folder and/or the merged assets located under the 'UGC/Levels/ReducedAssets' folder"));
@@ -159,10 +173,10 @@ FReducerResults FZeroPayEditorButtonsPluginModule::ReducePCVRLevelForQuest3(UZer
 	FlushPersistentDebugLines(PCVRWorld);
 
 	/* >>> Merge actors within each cluster */
-	bool bSuccess = MergeMeshIslands(Chunks, 0.5f, *ReducedAssetMeshPath, dataAsset->Definition.quest3level, returnValue, reducerSettings, runtimeSettings);
+	bool bSuccess = MergeMeshIslands(Chunks, 0.5f, *ReducedAssetMeshPath, dataAsset->Definition.quest3level.Get(), returnValue, reducerSettings, runtimeSettings);
 
 	/* >>> Save the changes */
-	UPackage* LevelPackage = dataAsset->Definition.quest3level->PersistentLevel->GetOutermost();
+	UPackage* LevelPackage = dataAsset->Definition.quest3level.Get()->PersistentLevel->GetOutermost();
 	bool bSaved = FEditorFileUtils::PromptForCheckoutAndSave({ LevelPackage }, /*bCheckDirty=*/true, /*bPromptToSave=*/false) == FEditorFileUtils::EPromptReturnCode::PR_Success;
 	if (!bSaved)
 	{
