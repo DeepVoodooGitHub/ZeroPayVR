@@ -24,9 +24,28 @@ void AZeroPay_MiscSupportUtils::BeginPlay()
 
 }
 
+
+void AZeroPay_MiscSupportUtils::IsLocallyControlled(ACharacter* target, EZeroPay_NetControllerStatus& Result)
+{
+
+	if (IsValid(target))
+	{
+		if (target->IsLocallyControlled())
+			Result = EZeroPay_NetControllerStatus::Local;
+	}
+
+	Result = EZeroPay_NetControllerStatus::Remote;
+}
+
 void AZeroPay_MiscSupportUtils::UnderLocalControl(AActor* target, EZeroPay_NetControllerStatus& Result)
 {
+	if (!IsValid(target))
+		return ;
+
 	AActor* Owner = target->GetOwner();
+
+	if (!IsValid(Owner))
+		return;
 
 	if (APlayerController* OwnerPC = Cast<APlayerController>(Owner))
 	{
@@ -42,18 +61,21 @@ void AZeroPay_MiscSupportUtils::UnderLocalControl(AActor* target, EZeroPay_NetCo
 
 void AZeroPay_MiscSupportUtils::IsLocallyControlledByPawn(AActor* target, EZeroPay_NetControllerStatus& Result)
 {
+	if (!IsValid(target))
+		return;
+
 	Result = EZeroPay_NetControllerStatus::Remote;
 
 	AActor* Owner = target->GetOwner();
-	if (Owner)
-	{
-		ACharacter* Character = Cast<ACharacter>(Owner);
-		if (Character)
-		{
-			if (Character->IsLocallyControlled())
-				Result = EZeroPay_NetControllerStatus::Local;
-		}
+
+	if (!IsValid(Owner))
 		return;
+
+	ACharacter* Character = Cast<ACharacter>(Owner);
+	if (IsValid(Character))
+	{
+		if (Character->IsLocallyControlled())
+			Result = EZeroPay_NetControllerStatus::Local;
 	}
 
 

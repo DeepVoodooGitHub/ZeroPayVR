@@ -37,9 +37,12 @@ UZeroPayEditorCookPakOperationHandle* FZeroPayEditorButtonsPluginModule::CookAnd
 
 	Async(EAsyncExecution::Thread, [this, dataAsset]()
 		{
+			EUGCCookMode CookDepth = dataAsset->Definition.CookDepth;
+
 			/* >>> Pack PCVR <<< */
-			if (!CookAndPackWindows(dataAsset))
-				bAbortOperation = true;
+			if ((CookDepth == EUGCCookMode::Normal) || (CookDepth == EUGCCookMode::PCVR_Only_WARNING))
+				if (!CookAndPackWindows(dataAsset))
+					bAbortOperation = true;
 
 			/* Aborted? */
 			if (bAbortOperation)
@@ -52,8 +55,9 @@ UZeroPayEditorCookPakOperationHandle* FZeroPayEditorButtonsPluginModule::CookAnd
 				return;
 			}
 			/* >>> Pack Quest 3 <<< */
-			if (!CookAndPackAndroid(dataAsset))
-				bAbortOperation = true;
+			if ((CookDepth == EUGCCookMode::Normal) || (CookDepth == EUGCCookMode::Q3_Only_WARNING))
+				if (!CookAndPackAndroid(dataAsset))
+					bAbortOperation = true;
 
 			/* Aborted? */
 			if (bAbortOperation)
@@ -66,8 +70,9 @@ UZeroPayEditorCookPakOperationHandle* FZeroPayEditorButtonsPluginModule::CookAnd
 				return;
 			}
 			/* >>> Pack Linux Server <<< */
-			if (!CookAndPackLinuxServer(dataAsset))
-				bAbortOperation = true;
+			if ((CookDepth == EUGCCookMode::Normal) || (CookDepth == EUGCCookMode::PCVR_Only_WARNING))
+				if (!CookAndPackLinuxServer(dataAsset))
+					bAbortOperation = true;
 
 			/* All Good! */
 			if (!bAbortOperation)
@@ -331,6 +336,27 @@ bool FZeroPayEditorButtonsPluginModule::CookAndPackLinuxServer(UZeroPayMod_Defin
 	FString mapName = dataAsset->Definition.persistentlevel.GetAssetName();
 	// Cook everything (all map 'data' anyway for server)
 	FString neverCookMapName = "" ;
+	switch (dataAsset->Definition.MapForServer)
+	{
+		case EUGCServerMap::PCVR:
+		{
+			// Use PCVR map for server-side data.
+			neverCookMapName = dataAsset->Definition.quest3level.GetAssetName();
+			break;
+		}
+		case EUGCServerMap::Quest3:
+		{
+			neverCookMapName = dataAsset->Definition.pcvrlevel.GetAssetName();
+			// Use Quest 3 map for server-side data.
+			break;
+		}
+		case EUGCServerMap::CookAll:
+		{
+			// Include both PCVR and Quest 3 maps.
+			break;
+		}
+	}
+	
 	TArray<FString> alwaysCookPaths = dataAsset->Definition.AlwaysCookPaths;
 
 	// All build paths, names, etc

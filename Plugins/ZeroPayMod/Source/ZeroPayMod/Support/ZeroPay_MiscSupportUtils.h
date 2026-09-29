@@ -105,6 +105,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "target"))
 	static void InitialiseZeroPayVR(AActor* target);
 
+
+	// Returns Local or Remote path if the target character is locally controlled
+	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
+	static void IsLocallyControlled(ACharacter* target, EZeroPay_NetControllerStatus& Result);
+
 	// WIDGETS ONLY - Returns the correct path based on whether the "target" actor is controlled by a Player Controller (on the network) locally or remotely
 	// Recommended to use "IsLocallyControlledByPawn" for most grabbable in-world actors
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support", meta = (DefaultToSelf = "target", ExpandEnumAsExecs = "Result"))
@@ -754,7 +759,7 @@ public:
 #endif
 	}
 
-	// Return the platform we are running on
+	// Set's the player state to indicate if we are a spectator or not
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|Misc Support")
 	static void SetSpectatorPlayerState(APlayerState* playerState, bool isSpectator)
 	{
@@ -961,6 +966,19 @@ public:
 	static FString GetLongPackageNameFromWorldSoftReference(TSoftObjectPtr<UWorld> World)
 	{
 		return World.ToSoftObjectPath().GetLongPackageName();
+	}
+
+	// Returns direction ignoring Z
+	UFUNCTION(BlueprintPure, Category = "ZeroPay|Mods")
+	static FVector GetDirection2D(const FVector& From, const FVector& To)
+	{
+		FVector From2D = From;
+		FVector To2D = To;
+
+		From2D.Z = 0.0f;
+		To2D.Z = 0.0f;
+
+		return (To2D - From2D).GetSafeNormal();
 	}
 
 };

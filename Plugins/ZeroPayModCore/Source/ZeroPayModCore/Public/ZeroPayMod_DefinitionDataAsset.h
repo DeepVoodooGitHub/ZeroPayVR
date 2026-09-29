@@ -52,6 +52,32 @@ enum class EUGCSupportedGamemodes : uint8
 	Hide                UMETA(DisplayName = "Hide"),
 };
 
+
+UENUM(BlueprintType)
+enum class EUGCServerMap : uint8
+{
+	/* (DEFAULT) Use only the PCVR map for server side stuff (collision, navmesh, etc.) */
+	PCVR,
+	/* Use only the Quest3 map for server side stuff (collision, navmesh, etc.) */
+	Quest3,
+	/* Include both PCVR and Quest3 when baking (will bloat) */
+	CookAll
+} ;
+
+
+UENUM(BlueprintType)
+enum class EUGCCookMode : uint8
+{
+	/* (DEFAULT) Cooks everything, meaning things stay in sync  */
+	Normal,
+	/* WARNING DO NOT USE (Unless you really know what your doing) */
+	PCVR_Only_WARNING,
+	/* WARNING DO NOT USE (Unless you really know what your doing) */
+	Q3_Only_WARNING,
+	/* WARNING DO NOT USE (Unless you really know what your doing) */
+	Persistent_Only_WARNING
+};
+
 USTRUCT(BlueprintType)
 struct FZeroPayMod_Definition
 {
@@ -80,14 +106,19 @@ struct FZeroPayMod_Definition
 	int32 SupportedGamemodeFlags = (1 << static_cast<int32>(EUGCSupportedGamemodes::AllGameModes));
 
 	// The parent persistent level (REQUIRED) - MUST reference (as sub levels) the other levels
+	// IMPORTANT: This should contain level wide blueprints, lights, navigation meshes, etc.
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	TSoftObjectPtr<UWorld> persistentlevel;
 
-	// the PCVR sub-level (REQUIRED)
+	// the PCVR sub-level (REQUIRED) - Normally meshes only
+	// IMPORTANT: No blueprint logic outside that which MUST be for PCVR should be included in map
+	//            All blueprint logic should be in persistent level
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	TSoftObjectPtr<UWorld> pcvrlevel;
 
-	// the quest 3 level ((REQUIRED)
+	// The quest 3 level (REQUIRED) - Normally meshes only
+	// IMPORTANT: No blueprint logic outside that which MUST be for Q3 should be included in map
+	//            All blueprint logic should be in persistent level
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	TSoftObjectPtr<UWorld> quest3level;
 
@@ -122,6 +153,20 @@ struct FZeroPayMod_Definition
 	// *** DO NOT USE THIS WITHOUT UNDERSTANDING IT CAN BLOAT YOUR UGC - Come talk to us on Discord ***
 	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
 	TArray<FString> AlwaysCookPaths ;
+
+	// What level should be used as the reference for the server; this is normally the PCVR level (and others are "reduced) from it
+	//
+	// *** DO NOT CHANGE THIS UNLESS YOU KNOW WHAT YOUR DOING - Come talk to us on Discord ***
+	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
+	EUGCServerMap MapForServer = EUGCServerMap::PCVR ;
+
+	// What should be cooked; this should almost always be left on "Normal" - unless you clearly understand what you are
+	// doing and want to risk a de-sync between your mod on Q3, PCVR and Server (i.e. it will break)
+	//
+	// *** DO NOT CHANGE THIS UNLESS YOU KNOW WHAT YOUR DOING - Come talk to us on Discord ***
+	UPROPERTY(EditAnywhere, NotReplicated, BlueprintReadWrite, Category = "ZeroPayMod Definition")
+	EUGCCookMode CookDepth = EUGCCookMode::Normal ;
+	
 
 };
 

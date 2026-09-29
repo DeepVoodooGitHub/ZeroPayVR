@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 
@@ -10,18 +10,26 @@
 #include "Windows/HideWindowsPlatformTypes.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/MeshMerging.h"          /* FMaterialProxySettings */
+#include "Misc/ScopedSlowTask.h"         /* FScopedSlowTask& parameters */
 #include "Framework/Notifications/NotificationManager.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "GPULightmassModule.h"
 #include "GPUlightMassSettings.h"
+
+#include "ZeroPayEditor_ReducerTypes.h"          /* FReducerResults, FReducerRuntimeSettings, FFoundAssetInformation */
+#include "ZeroPayEditor_ReducerSettingsAsset.h"  /* UZeroPayEditor_ReducerSettingsAsset and all settings structs */
+
 #include "ZeroPayEditorButtonsPlugin.generated.h"
 
 class FToolBarBuilder;
 class FMenuBuilder;
+class AStaticMeshActor;
+
 
 /**********************************************************************************************************************
 *
-* Class: UZeroPayEditorOperationHandle
+* Class: UZeroPayEditorCookPakOperationHandle
 * Description: Used for cook and pak event generation
 *
 */
@@ -42,192 +50,6 @@ public:
 	FOnUploadProgress OnUploadProgress;
 };
 
-/**********************************************************************************************************************
-*
-* Class: UZeroPayEditorOperationHandle
-* Description: Used for cook and pak event generation
-*
-*/
-
-USTRUCT(BlueprintType)
-struct FZeroPayEditor_MeshReductionZone
-{
-	GENERATED_BODY()
-
-	/* Distance from previous zone to this zone */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	float ZoneDistance = 2500.0f;
-
-	/* Closer to zero avoids expansion / contraction */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	float MergeDistance = 0.0f;
-
-	/* Screen size, large is more reduction */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	float ScreenSize = 1.0f;
-
-	FZeroPayEditor_MeshReductionZone(float InZoneDistance, float InMergeDistance, float InScreenSize)
-		: ZoneDistance(InZoneDistance)
-		, MergeDistance(InMergeDistance)
-		, ScreenSize(InScreenSize)
-	{
-	}
-
-	FZeroPayEditor_MeshReductionZone() = default;
-};
-
-USTRUCT(BlueprintType)
-struct FZeroPayEditor_MeshReductionSettings
-{
-	GENERATED_BODY()
-
-	/* Does not perform the merge, but validates the level, chunk size, meshes per chunk, etc. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	bool bDryRun = false ;
-
-	/* The size of each bounding box chunk in units  */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	float BoundingChunkSize = 200.0f ;
-
-	/* Max meshes that can be per chunk, making this too large will kill the merging due to out of memory issues */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	int32 MaxMeshesPerChunk = 1000;
-
-	/* Show (in red debug cube for 1 minute) any chunks that have too many meshes */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	bool bShowBadMaxMeshChunks = true ;
-
-	/* If true, we will use any 'ZeroPayEditor_Reducer_PlayerZone' actors to use higher detail around where players are */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	bool bEnablePlayerZoning = true;
-
-	/* Settings for first zone (from any Player Zones) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	FZeroPayEditor_MeshReductionZone PlayerZone1_Settings ;
-
-	/* Settings for second zone (from any Player Zones) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	FZeroPayEditor_MeshReductionZone PlayerZone2_Settings;
-
-	/* Settings for third zone to affinitiy (from any Player Zones) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	FZeroPayEditor_MeshReductionZone PlayerZone3_Settings;
-
-	FZeroPayEditor_MeshReductionSettings()
-		: PlayerZone1_Settings(2500.0f, 10.0f, 1.0f)
-		, PlayerZone2_Settings(2500.0f, 10.0f, 1.0f)
-		, PlayerZone3_Settings(2500.0f, 10.0f, 1.0f)
-	{
-	}
-};
-
-USTRUCT(BlueprintType)
-struct FZeroPayEditor_ReductionStatistics
-{
-	GENERATED_BODY()
-
-	/* The total triangles found in the original PCVR level */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
-	int32 Stats_OriginalTriangleCount = 0;
-
-	/* The total triangles found in the reduced Quest3 level */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
-	int32 Stats_ReducedTriangleCount = 0;
-
-	/* The total materials found in the original PCVR level */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
-	int32 Stats_OriginalMaterialCount = 0;
-
-	/* The total triangles found in the reduced Quest3 level */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
-	int32 Stats_ReducedMaterialCount = 0;
-};
-
-UCLASS(BlueprintType)
-class UZeroPayEditor_ReducerSettingsAsset : public UDataAsset
-{
-	GENERATED_BODY()
-public:
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	FZeroPayEditor_MeshReductionSettings MeshReductionSettings ;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ZeroPay Level Reducer")
-	FZeroPayEditor_ReductionStatistics Statistics ;
-
-};
-
-USTRUCT(BlueprintType)
-struct FReducerRuntimeSettings
-{
-	GENERATED_BODY()
-
-	/* Show stage 1 visual debugging */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	bool bStage1_ShowVisualDebug = true;
-
-	/* How long to show any debug boxes, labels, etc. for stage 1 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	float fStage1_VisualDebugDuration = 15.0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ZeroPay Level Reducer")
-	bool bStage1_ShowOutputLogDebug = true;
-
-};
-
-struct FFoundAssetInformation
-{
-	int32 FoundAssets = 0 ; 
-	int32 FoundInstances = 0 ;
-};
-
-
-USTRUCT(BlueprintType)
-struct FReducerResults
-{
-	GENERATED_BODY()
-
-	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
-	bool bFailed ;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
-	int32 OriginalTriangleCount;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
-	int32 OriginalVertexCount;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
-	int32 OriginalMaterialCount;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
-	int32 OriginalActorCount;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
-	int32 ReducedTriangleCount;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
-	int32 ReducedVertexCount;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
-	int32 ReducedMaterialCount;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Mesh Stats")
-	int32 ReducedActorCount;
-
-	FReducerResults()
-	{
-		bFailed = true;
-		OriginalTriangleCount = 0;
-		OriginalVertexCount = 0;
-		OriginalMaterialCount = 0;
-		OriginalActorCount = 0;
-		ReducedTriangleCount = 0;
-		ReducedVertexCount = 0;
-		ReducedMaterialCount = 0;
-		ReducedActorCount = 0;
-
-	};
-};
 
 /**********************************************************************************************************************
 *
@@ -256,10 +78,11 @@ struct FMeshMaterialKey
 	}
 };
 
+
 /**********************************************************************************************************************
 *
-* Class: UZeroPayEditorOperationHandle
-* Description: Provide the UE editor plugin module that provides cooking, reducer, etc. functionality
+* Class: FZeroPayEditorButtonsPluginModule
+* Description: Provides the UE editor plugin module - cooking, reducer, light baking, etc.
 *
 */
 
@@ -269,8 +92,8 @@ public:
 	/* >>> IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
-	
-	/* >>> OnClick routins triggered by UE buttons on the toolbar */
+
+	/* >>> OnClick routines triggered by UE buttons on the toolbar */
 	void ShowQuest3View_Clicked();
 	void ShowPCVRView_Clicked();
 	void BakeLightsOnLevels_Clicked();
@@ -279,42 +102,67 @@ public:
 
 	/* >>> Cooking logic - Called from Function Library */
 	UZeroPayEditorCookPakOperationHandle* CookAndUploadPackages(UZeroPayMod_DefinitionDataAsset* dataAsset);
-	UZeroPayEditorCookPakOperationHandle* PollUploadStatus() ;
+	UZeroPayEditorCookPakOperationHandle* PollUploadStatus();
 	void CancelUploadStatus();
 
 	/* >>> Reducer Logic - Called from Function Library */
-	FReducerResults ReduceLevel(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
+	FReducerResults ReduceLevel(
+		UZeroPayMod_DefinitionDataAsset* DataAsset,
+		UZeroPayEditor_ReducerSettingsAsset* ReducerSettings,
+		FReducerRuntimeSettings RuntimeSettings);
+
+	FReducerResults Old_ReducePCVRLevelForQuest3(UZeroPayMod_DefinitionDataAsset* DataAsset,
+		UZeroPayEditor_ReducerSettingsAsset* ReducerSettings,
+		FReducerRuntimeSettings RuntimeSettings);
+
 private:
-	/* >>> Vars */
+
+	/* ================================================================== */
+	/* Vars                                                                */
+	/* ================================================================== */
+
 	bool bIsOperationRunning;
 	FString ClosurePreventationMessage;
 	TSharedPtr<class FUICommandList> PluginCommands;
+
 	/* Window widget instances */
 	UEditorUtilityWidget* WidgetModManagementInstance;
 	UEditorUtilityWidget* WidgetQuest3ReducerInstance;
+
 	/* >>> Cooking vars */
 	UZeroPayEditorCookPakOperationHandle* CookPakHandle;
 	FString GlobalUGCValue;
-	FString LastMessage ;
-	bool bAbortOperation ;
-	bool bPollCompleted ;
-	/* >>> Reducer Vars */
+	FString LastMessage;
+	bool bAbortOperation;
+	bool bPollCompleted;
+
+	/* >>> Reducer vars
+	 * Cached for the duration of a run and read by the UI for debug drawing.
+	 * NOTE: the old StaticMeshComponentsToMerge member has been removed - it was
+	 * shared mutable state that made the merge path non-reentrant. The merge
+	 * backends build their component arrays locally. */
 	TArray<FBox> PlayerZoneBounds;
-	TArray<UStaticMeshComponent*> StaticMeshComponentsToMerge;
-	/* >>> Baking Vars */
+
+	/* >>> Baking vars */
 	UGPULightmassSubsystem* GPULightmassSubsystem;
 	FTimerDelegate TimerCallback;
 	FTimerHandle TimerHandle;
 
-	/* >>> Windows, Menus, Dialogs, etc. */
+	/* ================================================================== */
+	/* Windows, Menus, Dialogs, etc.                                       */
+	/* ================================================================== */
+
 	TSharedRef<SDockTab> SpawnModManagementDockableTab(const FSpawnTabArgs& Args);
 	TSharedRef<SDockTab> SpawnQuest3ReducerDockableTab(const FSpawnTabArgs& Args);
 	void RegisterMenus();
 	void ShowTemporaryNotification(const FString& Message, float Duration = 2.0f);
-	TSharedPtr<SWidget> FindWidgetRecursive(TSharedPtr<SWidget> Root, TSharedRef<SWidget> Target) ;
-	FString FormatDataRateResponse(int64 BytesPerSecond) ;
+	TSharedPtr<SWidget> FindWidgetRecursive(TSharedPtr<SWidget> Root, TSharedRef<SWidget> Target);
+	FString FormatDataRateResponse(int64 BytesPerSecond);
+	void ShowNotification(FString notification, SNotificationItem::ECompletionState State);
 
-	/* --->>> Cooking logic <<<--- */
+	/* ================================================================== */
+	/* --->>> Cooking logic <<<---                                         */
+	/* ================================================================== */
 
 	bool CookAndPackWindows(UZeroPayMod_DefinitionDataAsset* dataAsset);
 	bool CookAndPackAndroid(UZeroPayMod_DefinitionDataAsset* dataAsset);
@@ -324,53 +172,177 @@ private:
 	bool ReadNextLineFromPipe(HANDLE PipeHandle, FString& OutLine, FString& Remainder);
 	bool ExecutePakShellCmd(FString Platform, FString CookedPakLocation_Windows, FString CookedPakListFilePath);
 
-	/* Cooking support */
-	void UpdateModManagementUIProgressField(); 
+	void UpdateModManagementUIProgressField();
 
-	/* --->>> Reducer Logic <<<--- */
+	/* ================================================================== */
+	/* --->>> Reducer logic <<<---                                         */
+	/* ================================================================== */
 
-	FReducerResults ReducePCVRLevelForQuest3(UZeroPayMod_DefinitionDataAsset* dataAsset, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings) ;
+	/* ---- Reducer-only types ---- */
 
-	/* Reducer mesh, world, etc. support */
-	FBox GetMaximumVisibleBoundingBox(ULevel* Level) ;
-	TArray<TPair<FBox, TArray<UStaticMeshComponent*>>> PartitionActorsIntoBoundingBoxes(const FBox& GlobalBounds, const FVector& ChunkSize, ULevel* Level, FReducerResults& returnValue, UZeroPayEditor_ReducerSettingsAsset* reducerSettings);
+	/* A spatial bucket of candidate components. */
+	struct FReducerChunk
+	{
+		FIntVector Key = FIntVector::ZeroValue;
+		FBox Bounds = FBox(ForceInit);
+		TArray<UStaticMeshComponent*> Components;
+	};
 
-	/* Merge system */
-	bool MergeMeshIslands(const TArray<TPair<FBox, TArray<UStaticMeshComponent*>>>& ClusteredIslands, float ReductionPercent, const FString& TargetFolderPath, TSoftObjectPtr<UWorld> Quest3World, FReducerResults& returnValue, UZeroPayEditor_ReducerSettingsAsset* reducerSettings, FReducerRuntimeSettings runtimeSettings);
-	bool MergeMesh(const TArray<UStaticMeshComponent*> SelectedComponents, const FString& PackageName, UWorld* targetQuest3World, FZeroPayEditor_MeshReductionZone* reductionZoneSettings, FReducerResults& returnValue);
-	void PlaceMeshProxyInQuest3Level(TArray<UObject*>& NewAssetsToSync, ULevel* Level, FReducerResults& returnValue) ;
+	/* One merge operation: a chunk, optionally split by material set and by
+	 * MaxMeshesPerChunk, resolved to a single player zone. */
+	struct FReducerMergeJob
+	{
+		FBox Bounds = FBox(ForceInit);
+		TArray<UStaticMeshComponent*> Components;
+		int32 ZoneIndex = 0;                                   /* 0 = no zoning, otherwise 1..3 */
+		const FZeroPayEditor_MeshReductionZone* Zone = nullptr;
+		FString MaterialGroupTag;
+	};
 
-	/* Reducer support */
-	FFoundAssetInformation ScanLevelActorsAndDirectory(ULevel* LevelToScan, const FString& TargetAssetPath) ;
-	bool DeleteActorsAndAssets(ULevel* TargetLevel, const FString& AssetFolderPathToDelete) ;
-	float BoxSurfaceDistance(const FBox& A, const FBox& B) ;
+	/* ---- Entry point ---- */
+
+	FReducerResults ReducePCVRLevelForQuest3(
+		UZeroPayMod_DefinitionDataAsset* DataAsset,
+		UZeroPayEditor_ReducerSettingsAsset* ReducerSettings,
+		FReducerRuntimeSettings RuntimeSettings);
+
+	/* ---- Pipeline ---- */
+
+	/* Single predicate shared by the bounds pass and the partition pass, so the
+	 * two cannot disagree about what is in the level. */
+	bool ShouldConsiderComponent(
+		UStaticMeshComponent* Component,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings) const;
+
+	FBox GetMaximumVisibleBoundingBox(
+		ULevel* Level,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		bool& bOutUsedReducerZone) const;
+
+	TArray<FReducerChunk> PartitionComponentsIntoChunks(
+		const FBox& GlobalBounds,
+		const FVector& ChunkSize,
+		ULevel* Level,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		FReducerResults& Results) const;
+
+	TArray<FReducerMergeJob> BuildMergeJobs(
+		const TArray<FReducerChunk>& Chunks,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		const TArray<FBox>& InPlayerZoneBounds,
+		FReducerResults& Results) const;
+
+	bool RunMergeJobs(
+		const TArray<FReducerMergeJob>& Jobs,
+		const FString& TargetFolderPath,
+		UWorld* Quest3World,
+		ULevel* Quest3Level,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		const FReducerRuntimeSettings& RuntimeSettings,
+		FScopedSlowTask& ParentTask,
+		FReducerResults& Results);
+
+	bool ExecuteMergeJob(
+		const FReducerMergeJob& Job,
+		const FString& PackageName,
+		UWorld* Quest3World,
+		ULevel* Quest3Level,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		FReducerResults& Results);
+
+	/* ---- Merge backends ---- */
+
+	/* Straight merge. Preserves source UVs, vertex colours, lightmap UVs and
+	 * collision. The default for everything except distant zones. */
+	bool MergeComponents_Standard(
+		const FReducerMergeJob& Job,
+		const FString& PackageName,
+		UWorld* Quest3World,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		TArray<UObject*>& OutAssets,
+		FVector& OutMergedLocation,
+		FReducerResults& Results);
+
+	/* Proxy (ProxyLOD) generation. Rebuilds geometry and always bakes an atlas.
+	 * Gated behind the per-zone bUseProxyMerge. */
+	bool MergeComponents_Proxy(
+		const FReducerMergeJob& Job,
+		const FString& PackageName,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		TArray<UObject*>& OutAssets,
+		FReducerResults& Results);
+
+	/* MATERIAL REDUCTION HOOK. Every material/atlas decision in the reducer
+	 * flows through this one function - the material reduction stage should
+	 * extend this and nothing else. */
+	void ConfigureMaterialProxySettings(
+		FMaterialProxySettings& OutSettings,
+		const FReducerMergeJob& Job,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings) const;
+
+	/* ---- Post-merge ---- */
+
+	void ApplyTriangleReduction(
+		UStaticMesh* Mesh,
+		const FReducerMergeJob& Job,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		FReducerResults& Results) const;
+
+	void MergeCollisionFromComponents(
+		const TArray<UStaticMeshComponent*>& Components,
+		UStaticMesh* OutMergedMesh,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		FReducerResults& Results) const;
+
+	AStaticMeshActor* PlaceMergedMeshInQuest3Level(
+		UStaticMesh* MergedMesh,
+		const FVector& SpawnLocation,
+		const FReducerMergeJob& Job,
+		ULevel* Level,
+		const UZeroPayEditor_ReducerSettingsAsset* Settings,
+		FReducerResults& Results) const;
+
+	/* ---- Reducer housekeeping ---- */
+
+	FFoundAssetInformation ScanLevelActorsAndDirectory(
+		ULevel* LevelToScan,
+		const FString& TargetAssetPath) const;
+
+	bool DeleteActorsAndAssets(
+		ULevel* TargetLevel,
+		const FString& AssetFolderPathToDelete);
+
+	static float BoxSurfaceDistance(const FBox& A, const FBox& B);
+
 	void UpdateQuest3ReducerUIProgressField();
 
-	/* --->>> Light baking logic <<<--- */
-	bool bPCVRLevel_OriginalVisibility ;
-	bool bQuest3Level_OriginalVisibility ;
-	UWorld* persistentLeveLightBake ;
-	UWorld* pcvrLevelLightBake ;
+	/* ================================================================== */
+	/* --->>> Light baking logic <<<---                                    */
+	/* ================================================================== */
+
+	bool bPCVRLevel_OriginalVisibility;
+	bool bQuest3Level_OriginalVisibility;
+	UWorld* persistentLeveLightBake;
+	UWorld* pcvrLevelLightBake;
 	UWorld* quest3LevelLightBake;
 
-	void PerformLightBake() ;
+	void PerformLightBake();
 
 	/* Events */
 	void HandlePCVRLightBuildComplete();
 	void HandleQuest3LightBuildComplete();
 
 	/* Lightbake support */
-	void ShowNotification(FString notification, SNotificationItem::ECompletionState State) ;
-	bool IsSubLevelVisibleByPath(UWorld* World, UWorld* SubWorld) ;
-	void MergeCollisionFromComponents(const TArray<UStaticMeshComponent*>& Components, UStaticMesh* OutMergedMesh);
-	void SetSpecificSublevelVisible(UWorld* SubWorld, bool bVisbility) ;
+	bool IsSubLevelVisibleByPath(UWorld* World, UWorld* SubWorld);
+	void SetSpecificSublevelVisible(UWorld* SubWorld, bool bVisbility);
 };
+
 
 /**********************************************************************************************************************
 *
 * Class: UZeroPayEditorButtonsFunctionLibrary
-* Description: Provide an BP callable interface to the plugin's core "cooking and packing" operations
-* 
+* Description: Provides a BP callable interface to the plugin's core operations
+*
 */
 
 UCLASS()

@@ -30,7 +30,7 @@ public:
 
 	/* Used to handle Windows / Quest 3 fades using different underlying mechanisms */
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "ZeroPayVR|Player Controller")
-	void TriggerVRHeadsetFade(bool fadeDown, float duration);
+	void TriggerVRHeadsetFade(bool fadeDown, float duration, bool fadeAudio = true);
 
 	/* Used to handle Windows / Quest 3 fades using different underlying mechanisms */
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "ZeroPayVR|Player Controller")

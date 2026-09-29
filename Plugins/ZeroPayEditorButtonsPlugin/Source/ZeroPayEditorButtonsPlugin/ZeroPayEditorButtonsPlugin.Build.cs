@@ -32,7 +32,13 @@ public class ZeroPayEditorButtonsPlugin : ModuleRules
 				"SlateCore", 
 				"UMG",
                 "EditorWidgets",
-                "GPULightmass"
+                "GPULightmass",
+                "UnrealEd", 
+				"AssetRegistry", 
+				"MaterialEditor", 
+				"ImageCore",
+				"MeshDescription", 
+				"StaticMeshDescription"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
