@@ -3,9 +3,50 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "LatentActions.h"
+#include "GameFramework/GameModeBase.h"
 #include "GripMotionControllerComponent.h"
 #include "VR/GameMode/ZeroPay_GameMode_r1.h"
 
+// ---------------------------------------------------------------------------
+// Latent action: completes on its first update and reports Failure.
+// Used for every early-out so the Blueprint's Failure exec pin still fires.
+// ---------------------------------------------------------------------------
+class FZeroPay_SpawnItemFailed_LatentAction : public FPendingLatentAction
+{
+public:
+
+	EZeroPaySpawnItemLatentStartResult& ResultOutput;
+
+	FName ExecutionFunction;
+	int32 OutputLink;
+	FWeakObjectPtr CallbackTarget;
+
+	FZeroPay_SpawnItemFailed_LatentAction(EZeroPaySpawnItemLatentStartResult& InResultOutput, const FLatentActionInfo& InLatentInfo)
+		: ResultOutput(InResultOutput)
+		, ExecutionFunction(InLatentInfo.ExecutionFunction)
+		, OutputLink(InLatentInfo.Linkage)
+		, CallbackTarget(InLatentInfo.CallbackTarget)
+	{
+	}
+
+	virtual void UpdateOperation(FLatentResponse& Response) override
+	{
+		ResultOutput = EZeroPaySpawnItemLatentStartResult::Failure;
+		Response.FinishAndTriggerIf(true, ExecutionFunction, OutputLink, CallbackTarget);
+	}
+
+#if WITH_EDITOR
+	virtual FString GetDescription() const override
+	{
+		return TEXT("ZeroPay latent action: SpawnItem (failed)");
+	}
+#endif
+};
+
+// ---------------------------------------------------------------------------
+// Latent action: waits one tick after the spawn, then grabs/attaches the item.
+// Reports Success if the spawned actor still exists, otherwise Failure.
+// ---------------------------------------------------------------------------
 class FZeroPay_SpawnItem_LatentAction : public FPendingLatentAction
 {
 public:
@@ -22,6 +63,7 @@ public:
 
 	AActor*& SpawnedActorOutput;
 	bool& AttachedCorrectlyOutput;
+	EZeroPaySpawnItemLatentStartResult& ResultOutput;
 
 	FName ExecutionFunction;
 	int32 OutputLink;
@@ -29,7 +71,19 @@ public:
 
 	bool bHasWaitedOneTick = false;
 
-	FZeroPay_SpawnItem_LatentAction(AZeroPay_GameMode_r1* InTargetGameMode, const FString& InItemID, AZeroPay_VRCharacterBase_r1* InOwningCharacter, UGripMotionControllerComponent* InGripMotionController, EZeroPayVRItemDefaultSpawnLocation InSpawnLocation, int InSpawnLocationIndex, EZeroPayVRItemSpawnCollision InSpawnCollision, AActor* InSpawnedActor, AActor*& InSpawnedActorOutput, bool& InAttachedCorrectlyOutput, const FLatentActionInfo& InLatentInfo)
+	FZeroPay_SpawnItem_LatentAction(
+		AZeroPay_GameMode_r1* InTargetGameMode,
+		const FString& InItemID,
+		AZeroPay_VRCharacterBase_r1* InOwningCharacter,
+		UGripMotionControllerComponent* InGripMotionController,
+		EZeroPayVRItemDefaultSpawnLocation InSpawnLocation,
+		int InSpawnLocationIndex,
+		EZeroPayVRItemSpawnCollision InSpawnCollision,
+		AActor* InSpawnedActor,
+		AActor*& InSpawnedActorOutput,
+		bool& InAttachedCorrectlyOutput,
+		EZeroPaySpawnItemLatentStartResult& InResultOutput,
+		const FLatentActionInfo& InLatentInfo)
 		: TargetGameModePtr(InTargetGameMode)
 		, ItemID(InItemID)
 		, OwningCharacterPtr(InOwningCharacter)
@@ -40,6 +94,7 @@ public:
 		, SpawnedActorPtr(InSpawnedActor)
 		, SpawnedActorOutput(InSpawnedActorOutput)
 		, AttachedCorrectlyOutput(InAttachedCorrectlyOutput)
+		, ResultOutput(InResultOutput)
 		, ExecutionFunction(InLatentInfo.ExecutionFunction)
 		, OutputLink(InLatentInfo.Linkage)
 		, CallbackTarget(InLatentInfo.CallbackTarget)
@@ -70,6 +125,11 @@ public:
 		SpawnedActorOutput = SpawnedActor;
 		AttachedCorrectlyOutput = bAttachedCorrectly;
 
+		// The actor may have been destroyed during the one-tick wait.
+		ResultOutput = SpawnedActor
+			? EZeroPaySpawnItemLatentStartResult::Success
+			: EZeroPaySpawnItemLatentStartResult::Failure;
+
 		Response.FinishAndTriggerIf(true, ExecutionFunction, OutputLink, CallbackTarget);
 	}
 
@@ -81,27 +141,50 @@ public:
 #endif
 };
 
+// ---------------------------------------------------------------------------
+// Blueprint entry point.
+// Latent nodes only continue execution when a latent action completes, so
+// every path after a valid World + CallbackTarget must queue an action -
+// otherwise neither the Success nor the Failure exec pin will ever fire.
+// ---------------------------------------------------------------------------
 void UZeroPay_LatentFunctionLibrary::SpawnItem(UObject* WorldContextObject, AZeroPay_GameMode_r1* TargetGameMode, const FString& ItemID, AZeroPay_VRCharacterBase_r1* OwningCharacter, UGripMotionControllerComponent* GripMotionController, EZeroPayVRItemDefaultSpawnLocation SpawnLocation, int SpawnLocationIndex, EZeroPayVRItemSpawnCollision SpawnCollision, AActor*& SpawnedActor, bool& AttachedCorrectly, EZeroPaySpawnItemLatentStartResult& StartResult, FLatentActionInfo LatentInfo)
 {
 	SpawnedActor = nullptr;
 	AttachedCorrectly = false;
 	StartResult = EZeroPaySpawnItemLatentStartResult::Failure;
 
-	if (!WorldContextObject)
+	// Without a world or a callback target there is no way to resume the Blueprint.
+	UWorld* World = WorldContextObject
+		? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull)
+		: nullptr;
+
+	if (!World || !LatentInfo.CallbackTarget)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SpawnItem: No valid World or CallbackTarget - Blueprint execution cannot be resumed."));
+		return;
+	}
+
+	FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
+
+	// An action for this node is already pending; its completion will fire the correct pin.
+	if (LatentActionManager.FindExistingAction<FZeroPay_SpawnItem_LatentAction>(LatentInfo.CallbackTarget, LatentInfo.UUID) ||
+		LatentActionManager.FindExistingAction<FZeroPay_SpawnItemFailed_LatentAction>(LatentInfo.CallbackTarget, LatentInfo.UUID))
 	{
 		return;
 	}
 
-	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
-
-	if (!World)
-	{
-		return;
-	}
+	auto QueueFailure = [&]()
+		{
+			LatentActionManager.AddNewAction(
+				LatentInfo.CallbackTarget,
+				LatentInfo.UUID,
+				new FZeroPay_SpawnItemFailed_LatentAction(StartResult, LatentInfo));
+		};
 
 	// GameMode only exists on the server, but this makes the authority check explicit.
 	if (World->GetNetMode() == NM_Client)
 	{
+		QueueFailure();
 		return;
 	}
 
@@ -110,6 +193,8 @@ void UZeroPay_LatentFunctionLibrary::SpawnItem(UObject* WorldContextObject, AZer
 		AGameModeBase* AuthGameMode = World->GetAuthGameMode();
 		if (!AuthGameMode)
 		{
+			UE_LOG(LogTemp, Warning, TEXT("SpawnItem: No authoritative GameMode found."));
+			QueueFailure();
 			return;
 		}
 
@@ -117,32 +202,22 @@ void UZeroPay_LatentFunctionLibrary::SpawnItem(UObject* WorldContextObject, AZer
 		TargetGameMode = Cast<AZeroPay_GameMode_r1>(AuthGameMode);
 		if (!TargetGameMode)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Current GameMode is not based on AZeroPay_GameMode_r1. Found: %s"), *GetNameSafe(AuthGameMode));
+			UE_LOG(LogTemp, Warning, TEXT("SpawnItem: Current GameMode is not based on AZeroPay_GameMode_r1. Found: %s"), *GetNameSafe(AuthGameMode));
+			QueueFailure();
 			return;
 		}
 	}
 
-	if (!LatentInfo.CallbackTarget)
+	AActor* NewActor = TargetGameMode->Internal_SpawnItem(ItemID, OwningCharacter, GripMotionController, SpawnLocation, SpawnLocationIndex, SpawnCollision);
+
+	if (!NewActor)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("SpawnItem: Internal_SpawnItem failed for ItemID '%s'."), *ItemID);
+		QueueFailure();
 		return;
 	}
 
-	FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
-
-	if (LatentActionManager.FindExistingAction<FZeroPay_SpawnItem_LatentAction>(LatentInfo.CallbackTarget, LatentInfo.UUID))
-	{
-		// A latent action for this node is already pending.
-		// Treat this as success because the latent Completed pin should still fire later.
-		StartResult = EZeroPaySpawnItemLatentStartResult::Success;
-		return;
-	}
-
-	SpawnedActor = TargetGameMode->Internal_SpawnItem(ItemID, OwningCharacter, GripMotionController, SpawnLocation, SpawnLocationIndex, SpawnCollision);
-
-	if (!SpawnedActor)
-	{
-		return;
-	}
+	SpawnedActor = NewActor;
 
 	LatentActionManager.AddNewAction(
 		LatentInfo.CallbackTarget,
@@ -155,12 +230,11 @@ void UZeroPay_LatentFunctionLibrary::SpawnItem(UObject* WorldContextObject, AZer
 			SpawnLocation,
 			SpawnLocationIndex,
 			SpawnCollision,
-			SpawnedActor,
+			NewActor,
 			SpawnedActor,
 			AttachedCorrectly,
+			StartResult,
 			LatentInfo
 		)
 	);
-
-	StartResult = EZeroPaySpawnItemLatentStartResult::Success;
 }
