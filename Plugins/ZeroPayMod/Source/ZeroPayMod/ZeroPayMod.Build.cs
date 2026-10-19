@@ -77,7 +77,9 @@ public class ZeroPayMod : ModuleRules
 				"UMG",
                 "AssetRegistry",
 				"PakFile",
-                "PhysicsCore"
+                "PhysicsCore",
+                "HTTP",
+                "XmlParser"
             }
             );
 

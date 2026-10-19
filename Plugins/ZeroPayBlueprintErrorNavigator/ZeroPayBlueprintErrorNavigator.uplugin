@@ -1,0 +1,17 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "ZeroPay Blueprint Error Navigator",
+  "Description": "Paste a Blueprint LogScript bytecode location and navigate to its source node in the Unreal Editor.",
+  "Category": "Editor",
+  "CanContainContent": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "ZeroPayBlueprintErrorNavigator",
+      "Type": "Editor",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

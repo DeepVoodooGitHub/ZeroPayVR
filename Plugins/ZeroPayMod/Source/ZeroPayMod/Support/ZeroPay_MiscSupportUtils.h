@@ -53,6 +53,9 @@
 #include "VR/GameMode/ZeroPay_GameMode_r1.h"
 
 #include "GameMapsSettings.h"
+
+#include "XmlFile.h"
+#include "XmlNode.h"
 	
 #include "ZeroPay_MiscSupportUtils.generated.h"
 
@@ -88,6 +91,7 @@ enum class EZeroPay_PlatformType : uint8
 };
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FOnIPResolved, const FString&, PublicIP);
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FSteamAvatarURLCallback,	bool, bSuccess,	FString, AvatarURL);
 
 UCLASS()
 class ZEROPAYMOD_API AZeroPay_MiscSupportUtils : public AActor
@@ -981,4 +985,65 @@ public:
 		return (To2D - From2D).GetSafeNormal();
 	}
 
+	UFUNCTION(BlueprintCallable, Category = "Steam|Avatar")
+	static void GetSteamAvatarURL(const FString& SteamID, const FSteamAvatarURLCallback& OnCompleted)
+	{
+		const FString ID = SteamID.TrimStartAndEnd();
+
+		if (!ID.IsNumeric())
+		{
+			OnCompleted.ExecuteIfBound(false, FString());
+			return;
+		}
+
+		const FString URL = FString::Printf(TEXT("https://steamcommunity.com/profiles/%s/?xml=1"), *ID);
+
+		TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
+
+		Request->SetURL(URL);
+		Request->SetVerb(TEXT("GET"));
+		Request->SetTimeout(15.0f);
+		Request->SetDelegateThreadPolicy(EHttpRequestDelegateThreadPolicy::CompleteOnGameThread);
+
+		Request->OnProcessRequestComplete().BindLambda(
+			[OnCompleted](FHttpRequestPtr HttpRequest, FHttpResponsePtr Response, bool bSucceeded)
+			{
+				FString AvatarURL;
+
+				if (bSucceeded && Response.IsValid() && Response->GetResponseCode() == 200)
+				{
+					const FString Body = Response->GetContentAsString();
+					FString AfterOpen;
+					FString RawValue;
+
+					if (Body.Split(TEXT("<avatarFull>"), nullptr, &AfterOpen, ESearchCase::CaseSensitive) &&
+						AfterOpen.Split(TEXT("</avatarFull>"), &RawValue, nullptr, ESearchCase::CaseSensitive))
+					{
+						RawValue.TrimStartAndEndInline();
+
+						if (RawValue.Len() >= 12 && RawValue.StartsWith(TEXT("<![CDATA[")) && RawValue.EndsWith(TEXT("]]>")))
+						{
+							RawValue = RawValue.Mid(9, RawValue.Len() - 12);
+						}
+
+						AvatarURL = RawValue.TrimStartAndEnd();
+					}
+				}
+
+				const bool bSuccess = AvatarURL.StartsWith(TEXT("https://"));
+
+				if (!bSuccess)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("Steam avatar URL lookup failed"));
+				}
+
+				OnCompleted.ExecuteIfBound(bSuccess, bSuccess ? AvatarURL : FString());
+			}
+		);
+
+		if (!Request->ProcessRequest())
+		{
+			OnCompleted.ExecuteIfBound(false, FString());
+		}
+	}
 };
