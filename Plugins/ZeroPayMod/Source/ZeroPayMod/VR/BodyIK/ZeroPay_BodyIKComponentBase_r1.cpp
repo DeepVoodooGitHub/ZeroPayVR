@@ -137,12 +137,16 @@ void UZeroPay_BodyIKComponentBase_r1::Initialize(USceneComponent* InHead, UScene
 //   3. Distance from the viewer camera -> Near / Mid / Far tier selection.
 // Each non-Hero tier also throttles how often it actually solves.
 // =============================================================================
-void UZeroPay_BodyIKComponentBase_r1::UpdateBody()
+void UZeroPay_BodyIKComponentBase_r1::UpdateBody(bool forceRender)
 {
 	if (!Initialized)
 		return;
 
-	CurrentDetailTier = ComputeDetailTier();
+	// Force can be used for first renders, etc.. 
+	if (forceRender)
+		CurrentDetailTier = EBodyIKDetailTier::Full ;
+	else
+        CurrentDetailTier = ComputeDetailTier();
 
 //	const UEnum* DetailTierEnum = StaticEnum<EBodyIKDetailTier>();
 //	const FString DetailTierString = DetailTierEnum

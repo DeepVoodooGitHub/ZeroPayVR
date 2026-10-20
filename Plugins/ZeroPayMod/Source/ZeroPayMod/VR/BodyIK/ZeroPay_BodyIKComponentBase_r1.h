@@ -419,7 +419,7 @@ public:
 	void Initialize(USceneComponent* InHead, USceneComponent* InLeftWrist, USceneComponent* InRightWrist, USceneComponent* InCapsuleBase, USkeletalMeshComponent* InCharacterMesh, UCharacterMovementComponent* InCharacterMovementComponent);
 
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|BodyIK")
-	void UpdateBody();
+	void UpdateBody(bool forceRender = false);
 
 	UFUNCTION(BlueprintCallable, Category = "ZeroPay|BodyIK")
 	void Calibrate(float OptionalHMDHeightOverride = 0.0f, float OldHeightAlpha = 0.0f);
