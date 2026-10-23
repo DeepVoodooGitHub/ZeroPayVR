@@ -26,6 +26,15 @@ namespace
 	// querying it in the same frame only pay for one PlayerCameraManager lookup.
 	FVector GetCachedViewLocation(const UWorld* World)
 	{
+#if WITH_EDITOR
+		/* Editor may have multiple clients, never cache */
+		if (APlayerCameraManager* PCM = UGameplayStatics::GetPlayerCameraManager(World, 0))
+		{
+			return  PCM->GetCameraLocation();
+		}
+
+		return FVector::ZeroVector ;
+#else
 		static uint64 CachedFrame = TNumericLimits<uint64>::Max();
 		static FVector CachedLocation = FVector::ZeroVector;
 
@@ -43,6 +52,7 @@ namespace
 			}
 		}
 		return CachedLocation;
+#endif
 	}
 
 	float GetOwnerVirtualHeightOffset(AActor* Owner)
@@ -169,10 +179,8 @@ void UZeroPay_BodyIKComponentBase_r1::UpdateBody(bool forceRender)
 EBodyIKDetailTier UZeroPay_BodyIKComponentBase_r1::ComputeDetailTier() 
 {
 	// Off-screen / occluded avatars are the cheapest, highest-value cull.
-	if (IsValid(CharacterMesh) && !CharacterMesh->WasRecentlyRendered(0.1f))
-	{
+	if (!IsValid(CharacterMesh))
 		return EBodyIKDetailTier::Culled;
-	}
 
 	// Too Far?
 	const AActor* Owner = GetOwner();
