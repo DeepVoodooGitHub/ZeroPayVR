@@ -23,14 +23,15 @@ public:
 	virtual void PostInitializeComponents() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+	virtual void InitGameState() override;
 	
 	virtual void StartPlay() override;
 
-	// SERVER ONLY - Called at the very start of the game-modes existance, nothing may exist in the world
-	// Used to generally process configuration and such things; shouldn't do any game-logic
+	// SERVER ONLY - Called during early mode game-mode initialise; game-state, game instance is valid and world should
+	// be valid but objects within it (and all player actors) may not exist or be initialised
+	// Used to generally process configuration and such things; shouldn't do any game-logic here just register things
 	UFUNCTION(BlueprintImplementableEvent, Category = "ZeroPay|GameMode")
-	void ZeroPayInitGameMode(const FString& MapName, const FString& Options);
+	void ZeroPayInitGameMode();
 
 	// SERVER ONLY - Called before BeginPlay() occurs on any in world actors, used to initialise the game-mode
 	// or other related logic operations. 

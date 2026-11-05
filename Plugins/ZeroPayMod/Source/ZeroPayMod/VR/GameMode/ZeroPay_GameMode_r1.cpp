@@ -30,13 +30,13 @@ void AZeroPay_GameMode_r1::HandlePostLoadMap(UWorld* LoadedWorld)
     OnPostLoadMap();
 }
 
-void AZeroPay_GameMode_r1::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+void AZeroPay_GameMode_r1::InitGameState()
 {
     // Default C++ behaviour: Super + config + (optional) logging
-    Super::InitGame(MapName, Options, ErrorMessage);
+    Super::InitGameState();
 
     // Drive everything through the BP-native version, don't care about error (mod's can't error)
-    ZeroPayInitGameMode(MapName, Options);
+    ZeroPayInitGameMode();
 }
 
 void AZeroPay_GameMode_r1::StartPlay()
